@@ -1,0 +1,94 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ShoppingCart, Eye, Star, Plus, Minus } from 'lucide-react';
+import { Card, CardContent, CardFooter } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { formatCurrency } from '../../utils';
+import { useCart } from '../../hooks/useCart';
+
+export function ProductCard({ product, companySlug }) {
+    const { addToCart } = useCart();
+    const [quantity, setQuantity] = useState(1);
+    const mainImage = product.images[0];
+
+    const handleAddToCart = () => {
+        addToCart(product, quantity);
+        setQuantity(1); // Reset after adding
+    };
+
+    return (
+        <Card className="group flex flex-col h-full overflow-hidden">
+            <div className="relative aspect-square overflow-hidden bg-slate-100">
+                <img
+                    src={mainImage}
+                    alt={product.name}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                    <Badge variant="success">Stock: {product.stock}</Badge>
+                    {product.rating && (
+                        <div className="flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg ring-1 ring-white/10">
+                            <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                            <span>{product.rating}</span>
+                            <span className="text-[8px] text-slate-300 border-l border-white/20 pl-1 ml-0.5 font-medium">{product.reviews?.length || 0}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <CardContent className="flex-1 p-4">
+                <h4 className="line-clamp-2 text-sm font-semibold text-slate-800 h-10 mb-1">
+                    {product.name}
+                </h4>
+                <div className="flex items-center justify-between mt-2">
+                    <span className="text-lg font-bold text-primary-600">
+                        {formatCurrency(product.price)}
+                    </span>
+                    {product.weight && (
+                        <span className="text-xs text-slate-400 font-medium">{product.weight}</span>
+                    )}
+                </div>
+            </CardContent>
+
+            <CardFooter className="p-4 pt-0 flex-col gap-3">
+                {/* Quantity Selector */}
+                <div className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-1">
+                    <button
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    >
+                        <Minus size={14} />
+                    </button>
+                    <span className="text-xs font-bold text-slate-700">{quantity}</span>
+                    <button
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
+                        onClick={() => setQuantity(quantity + 1)}
+                    >
+                        <Plus size={14} />
+                    </button>
+                </div>
+
+                <div className="flex w-full gap-2">
+                    <Link
+                        to={`/catalogo/${companySlug}/producto/${product.slug}`}
+                        className="flex-1"
+                    >
+                        <Button variant="secondary" size="sm" className="w-full">
+                            <Eye className="mr-2 h-4 w-4" />
+                            Detalles
+                        </Button>
+                    </Link>
+                    <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={handleAddToCart}
+                        className="px-3"
+                    >
+                        <ShoppingCart className="h-4 w-4" />
+                    </Button>
+                </div>
+            </CardFooter>
+        </Card>
+    );
+}
