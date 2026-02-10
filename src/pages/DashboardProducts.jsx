@@ -6,20 +6,26 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { formatCurrency, cn } from '../utils';
+import { useToast } from '../components/ui/Toast';
 
 export default function DashboardProducts() {
     const [search, setSearch] = useState('');
+    const { showToast } = useToast();
+
+    const handleDemoAction = () => {
+        showToast("La gestión de productos está deshabilitada en el demo.", "demo");
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Mis Productos</h1>
                     <p className="text-slate-500">Gestiona el inventario de tu catálogo digital.</p>
                 </div>
-                <Button>
-                    <Plus className="mr-2 h-5 w-5" />
-                    Añadir Producto
+                <Button onClick={handleDemoAction} className="h-10 w-10 p-0 md:h-10 md:w-auto md:px-4 shrink-0">
+                    <Plus className="h-5 w-5 md:mr-2" />
+                    <span className="hidden md:inline">Añadir Producto</span>
                 </Button>
             </div>
 
@@ -78,10 +84,10 @@ export default function DashboardProducts() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end space-x-1">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleDemoAction}>
                                                 <Edit size={16} />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-500">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-500" onClick={handleDemoAction}>
                                                 <Trash2 size={16} />
                                             </Button>
                                         </div>

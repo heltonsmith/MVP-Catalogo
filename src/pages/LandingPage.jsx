@@ -26,8 +26,8 @@ export default function LandingPage() {
     return (
         <div className="flex flex-col overflow-hidden">
             {/* Hero Section */}
-            <section className="relative bg-slate-50 py-20 lg:py-32">
-                <div className="container mx-auto px-4">
+            <section className="relative bg-slate-50 py-20 lg:py-32 overflow-x-hidden">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col items-center text-center">
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -66,8 +66,8 @@ export default function LandingPage() {
             </section>
 
             {/* Benefits */}
-            <section className="py-24 bg-white">
-                <div className="container mx-auto px-4">
+            <section className="py-24 bg-white overflow-x-hidden">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="text-center">
                         <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">Todo lo que necesitas para vender online</h2>
                         <p className="mt-4 text-slate-600">Simplifica tu proceso de venta y profesionaliza tu negocio.</p>
@@ -98,8 +98,8 @@ export default function LandingPage() {
             </section>
 
             {/* CTA section */}
-            <section className="bg-primary-600 py-16">
-                <div className="container mx-auto px-4 text-center">
+            <section className="bg-primary-600 py-16 overflow-x-hidden">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
                     <h2 className="text-3xl font-bold text-white sm:text-4xl">¿Listo para subir tus productos?</h2>
                     <p className="mt-4 text-primary-100 italic">Únete a cientos de emprendedores que ya están vendiendo más.</p>
                     <div className="mt-8">

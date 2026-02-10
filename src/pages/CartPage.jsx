@@ -55,7 +55,7 @@ export default function CartPage() {
 
     return (
         <div className="bg-slate-50 min-h-screen pb-20">
-            <div className="container mx-auto px-4 py-8">
+            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-8">
                     <h1 className="text-2xl font-bold text-slate-900">Carrito de Cotización</h1>
                     <Button variant="ghost" size="sm" onClick={() => clearCart()} className="text-red-500 hover:text-red-600 hover:bg-red-50">

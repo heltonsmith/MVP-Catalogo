@@ -20,9 +20,9 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-2 sm:px-4 py-8 sm:py-12 overflow-x-hidden">
             <Card className="w-full max-w-2xl border-none shadow-xl">
-                <CardContent className="p-8">
+                <CardContent className="p-4 sm:p-8">
                     <div className="flex flex-col items-center text-center">
                         <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-200">
                             <Rocket size={24} />

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ShoppingCart, Share2, ShieldCheck, Truck, Package, User } from 'lucide-react';
 import { PRODUCTS, COMPANIES } from '../data/mock';
 import { Button } from '../components/ui/Button';
@@ -8,9 +8,14 @@ import { StarRating } from '../components/ui/StarRating';
 import { Modal } from '../components/ui/Modal';
 import { formatCurrency } from '../utils';
 import { useCart } from '../hooks/useCart';
+import { useToast } from '../components/ui/Toast';
 import { motion } from 'framer-motion';
 
 export default function ProductDetailsPage() {
+    const { showToast } = useToast();
+    const [searchParams] = useSearchParams();
+    const isDemo = searchParams.get('mode') === 'demo';
+
     const { productSlug, companySlug } = useParams();
     const navigate = useNavigate();
     const { addToCart } = useCart();
@@ -30,7 +35,39 @@ export default function ProductDetailsPage() {
     }
 
     const handleAddToCart = () => {
+        if (isDemo) {
+            showToast('Esta es una función de demostración. En la versión real, añadiría el producto al carrito.', 'demo');
+            return;
+        }
         addToCart(product, quantity);
+    };
+
+    const handleShare = async () => {
+        if (isDemo) {
+            showToast('Esta es una función de demostración. En la versión real, permitiría compartir el producto.', 'demo');
+            return;
+        }
+        const shareData = {
+            title: product.name,
+            text: `Mira este producto en ${company.name}: ${product.name}`,
+            url: window.location.href,
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.error('Error sharing:', err);
+            }
+        } else {
+            // Fallback: Copy to clipboard
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                showToast('¡Enlace copiado al portapapeles!', 'success');
+            } catch (err) {
+                console.error('Error copying:', err);
+            }
+        }
     };
 
     return (
@@ -41,12 +78,12 @@ export default function ProductDetailsPage() {
                     <ChevronLeft className="mr-1 h-5 w-5" />
                     Volver
                 </Button>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" onClick={handleShare}>
                     <Share2 className="h-5 w-5 text-slate-600" />
                 </Button>
             </div>
 
-            <div className="container mx-auto px-4 py-6 md:py-12">
+            <div className="mx-auto max-w-7xl px-4 py-6 md:py-12">
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                     {/* Image Gallery */}
                     <div className="space-y-4">
@@ -151,33 +188,6 @@ export default function ProductDetailsPage() {
                     </div>
                 </div>
 
-                {/* Product Reviews Section */}
-                <div className="mt-20 border-t border-slate-100 pt-12">
-                    <h3 className="text-2xl font-bold text-slate-900 mb-8 text-center">Valoraciones del producto</h3>
-                    <div className="max-w-3xl mx-auto space-y-6">
-                        {product.reviews?.map(review => (
-                            <div key={review.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex gap-4">
-                                <div className="h-12 w-12 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
-                                    <User size={24} className="text-slate-300" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="font-bold text-slate-900">{review.user}</h4>
-                                        <StarRating rating={review.rating} size={12} />
-                                    </div>
-                                    <p className="text-slate-500 text-xs mb-3">{review.date}</p>
-                                    <p className="text-slate-600 italic">"{review.comment}"</p>
-
-                                    <div className="mt-4 flex gap-4 border-t border-slate-200 pt-3">
-                                        <div className="text-[10px] uppercase font-bold text-slate-400">Calidad: ⭐⭐⭐⭐⭐</div>
-                                        <div className="text-[10px] uppercase font-bold text-slate-400">Envío: ⭐⭐⭐⭐⭐</div>
-                                        <div className="text-[10px] uppercase font-bold text-slate-400">Responsabilidad: ⭐⭐⭐⭐⭐</div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
             </div>
 
             {/* Reviews Modal */}
@@ -186,7 +196,7 @@ export default function ProductDetailsPage() {
                 onClose={() => setIsReviewsOpen(false)}
                 title={`Opiniones de ${product.name}`}
             >
-                <div className="space-y-6">
+                <div className="space-y-6 p-4 sm:p-6">
                     <div className="flex items-center justify-between bg-slate-50 p-6 rounded-2xl border border-slate-100">
                         <div>
                             <p className="text-3xl font-bold text-slate-900">{product.rating}</p>
@@ -197,31 +207,35 @@ export default function ProductDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                         {product.reviews?.map(review => (
-                            <div key={review.id} className="border-b border-slate-100 pb-4 last:border-0 hover:bg-slate-50/50 p-2 rounded-xl transition-colors">
+                            <div key={review.id} className="border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                            <User size={16} className="text-slate-400" />
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                            <User size={18} className="text-slate-400" />
                                         </div>
-                                        <span className="font-bold text-slate-800 text-sm">{review.user}</span>
+                                        <div>
+                                            <span className="font-bold text-slate-800 text-sm block">{review.user}</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">{review.date}</span>
+                                        </div>
                                     </div>
-                                    <StarRating rating={review.rating} size={10} />
+                                    <StarRating rating={review.rating} size={12} />
                                 </div>
-                                <p className="text-xs text-slate-400 mb-1">{review.date}</p>
-                                <p className="text-slate-600 text-sm italic">"{review.comment}"</p>
+                                <p className="text-slate-600 text-sm italic leading-relaxed pl-12">"{review.comment}"</p>
                             </div>
                         ))}
                     </div>
 
-                    <Button
-                        variant="primary"
-                        className="w-full"
-                        onClick={() => setIsReviewsOpen(false)}
-                    >
-                        Cerrar
-                    </Button>
+                    <div className="pt-2">
+                        <Button
+                            variant="primary"
+                            className="w-full h-12 rounded-xl font-bold shadow-lg shadow-primary-200/50"
+                            onClick={() => setIsReviewsOpen(false)}
+                        >
+                            Cerrar
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </div>

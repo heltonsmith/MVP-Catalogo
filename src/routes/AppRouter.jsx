@@ -9,6 +9,11 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import DashboardOverview from '../pages/DashboardOverview';
 import DashboardProducts from '../pages/DashboardProducts';
+import DashboardMessages from '../pages/DashboardMessages';
+import DashboardQuotes from '../pages/DashboardQuotes';
+import DashboardCategories from '../pages/DashboardCategories';
+import DashboardProfile from '../pages/DashboardProfile';
+import UserMessages from '../pages/UserMessages';
 
 export function AppRouter() {
     return (
@@ -19,6 +24,7 @@ export function AppRouter() {
                 <Route path="/catalogo/:companySlug" element={<CatalogPage />} />
                 <Route path="/catalogo/:companySlug/producto/:productSlug" element={<ProductDetailsPage />} />
                 <Route path="/carrito" element={<CartPage />} />
+                <Route path="/mensajes" element={<UserMessages />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/registro" element={<RegisterPage />} />
             </Route>
@@ -26,8 +32,10 @@ export function AppRouter() {
             <Route path="/dashboard" element={<DashboardLayout />}>
                 <Route index element={<DashboardOverview />} />
                 <Route path="productos" element={<DashboardProducts />} />
-                <Route path="categorias" element={<div className="p-8">Gestión de Categorías (Próximamente)</div>} />
-                <Route path="perfil" element={<div className="p-8">Ajustes del Perfil (Próximamente)</div>} />
+                <Route path="mensajes" element={<DashboardMessages />} />
+                <Route path="cotizaciones" element={<DashboardQuotes />} />
+                <Route path="categorias" element={<DashboardCategories />} />
+                <Route path="perfil" element={<DashboardProfile />} />
             </Route>
         </Routes>
     );

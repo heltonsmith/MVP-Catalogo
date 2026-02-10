@@ -12,7 +12,7 @@ export function Footer() {
                             <img
                                 src="/logo-transparente.png"
                                 alt="ktaloog"
-                                className="h-8 w-auto invert brightness-0" // High contrast for footer
+                                className="h-8 w-auto"
                             />
                         </Link>
                         <p className="mt-4 max-w-xs text-slate-500">

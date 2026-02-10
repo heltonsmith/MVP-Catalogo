@@ -19,28 +19,32 @@ export function ProductCard({ product, companySlug }) {
 
     return (
         <Card className="group flex flex-col h-full overflow-hidden">
-            <div className="relative aspect-square overflow-hidden bg-slate-100">
-                <img
-                    src={mainImage}
-                    alt={product.name}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-                    <Badge variant="success">Stock: {product.stock}</Badge>
-                    {product.rating && (
-                        <div className="flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg ring-1 ring-white/10">
-                            <Star size={10} className="fill-yellow-400 text-yellow-400" />
-                            <span>{product.rating}</span>
-                            <span className="text-[8px] text-slate-300 border-l border-white/20 pl-1 ml-0.5 font-medium">{product.reviews?.length || 0}</span>
-                        </div>
-                    )}
+            <Link to={`/catalogo/${companySlug}/producto/${product.slug}`} className="block">
+                <div className="relative aspect-square overflow-hidden bg-slate-100">
+                    <img
+                        src={mainImage}
+                        alt={product.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                        <Badge variant="success">Stock: {product.stock}</Badge>
+                        {product.rating && (
+                            <div className="flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg ring-1 ring-white/10">
+                                <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                                <span>{product.rating}</span>
+                                <span className="text-[8px] text-slate-300 border-l border-white/20 pl-1 ml-0.5 font-medium">{product.reviews?.length || 0}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            </Link>
 
             <CardContent className="flex-1 p-4">
-                <h4 className="line-clamp-2 text-sm font-semibold text-slate-800 h-10 mb-1">
-                    {product.name}
-                </h4>
+                <Link to={`/catalogo/${companySlug}/producto/${product.slug}`}>
+                    <h4 className="line-clamp-2 text-sm font-semibold text-slate-800 h-10 mb-1 hover:text-primary-600 transition-colors">
+                        {product.name}
+                    </h4>
+                </Link>
                 <div className="flex items-center justify-between mt-2">
                     <span className="text-lg font-bold text-primary-600">
                         {formatCurrency(product.price)}

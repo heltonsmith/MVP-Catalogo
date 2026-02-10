@@ -11,19 +11,18 @@ export function Navbar() {
 
     const navLinks = [
         { name: 'Inicio', path: '/' },
-        { name: 'Catálogo', path: '/catalogo/ecoverde-spa' },
-        { name: 'Explorar', path: '/explorar' },
+        { name: 'Demo de tienda', path: '/catalogo/ecoverde-spa?mode=demo' },
     ];
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
-            <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
                     <Link to="/" className="flex items-center">
                         <img
                             src="/logo-transparente.png"
                             alt="ktaloog"
-                            className="h-10 w-auto" // Increased size slightly for better visibility
+                            className="h-10 w-auto"
                         />
                     </Link>
 
