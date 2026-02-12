@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter } from 'lucide-react';
 import { PRODUCTS } from '../data/mock';
 import { Card, CardContent } from '../components/ui/Card';
@@ -11,19 +12,53 @@ import { useToast } from '../components/ui/Toast';
 export default function DashboardProducts() {
     const [search, setSearch] = useState('');
     const { showToast } = useToast();
+    const company = COMPANIES[0]; // In real app, get current authenticated company
+    const isFree = company.plan === 'free';
+    const productCount = PRODUCTS.filter(p => p.companyId === company.id).length;
+    const limitReached = isFree && productCount >= 5;
 
     const handleDemoAction = () => {
+        if (limitReached) {
+            showToast("Has alcanzado el límite de 5 productos del plan Gratis. Sube a Pro para productos ilimitados.", "error");
+            return;
+        }
         showToast("La gestión de productos está deshabilitada en el demo.", "demo");
     };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Upgrade Banner for Free Users */}
+            {isFree && (
+                <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-2 rounded-xl">
+                            <Package className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                            <p className="font-bold">Límite de Plan Gratis ({productCount}/5 productos)</p>
+                            <p className="text-amber-50 text-xs">Sube a Pro para agregar productos ilimitados y fotos infinitas.</p>
+                        </div>
+                    </div>
+                    <Link to="/precios">
+                        <Button variant="secondary" size="sm" className="bg-white text-amber-600 hover:bg-amber-50 border-none font-bold">
+                            Actualizar ahora
+                        </Button>
+                    </Link>
+                </div>
+            )}
+
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Mis Productos</h1>
                     <p className="text-slate-500">Gestiona el inventario de tu catálogo digital.</p>
                 </div>
-                <Button onClick={handleDemoAction} className="h-10 w-10 p-0 md:h-10 md:w-auto md:px-4 shrink-0">
+                <Button
+                    onClick={handleDemoAction}
+                    className={cn(
+                        "h-10 w-10 p-0 md:h-10 md:w-auto md:px-4 shrink-0 shadow-lg",
+                        limitReached ? "bg-slate-400 hover:bg-slate-400 cursor-not-allowed" : "shadow-primary-100"
+                    )}
+                >
                     <Plus className="h-5 w-5 md:mr-2" />
                     <span className="hidden md:inline">Añadir Producto</span>
                 </Button>

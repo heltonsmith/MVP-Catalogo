@@ -23,16 +23,15 @@ export function Footer() {
                         <h4 className="font-semibold text-slate-900">Explorar</h4>
                         <ul className="mt-4 space-y-2 text-sm text-slate-500">
                             <li><Link to="/" className="hover:text-primary-600">Inicio</Link></li>
-                            <li><Link to="/explorar" className="hover:text-primary-600">Catálogos</Link></li>
-                            <li><Link to="/beneficios" className="hover:text-primary-600">Beneficios</Link></li>
+                            <li><Link to="/precios" className="hover:text-primary-600">Precios</Link></li>
+                            <li><Link to="/nosotros" className="hover:text-primary-600">Nosotros</Link></li>
                         </ul>
                     </div>
                     <div>
                         <h4 className="font-semibold text-slate-900">Soporte</h4>
                         <ul className="mt-4 space-y-2 text-sm text-slate-500">
-                            <li><Link to="#" className="hover:text-primary-600">Ayuda</Link></li>
-                            <li><Link to="#" className="hover:text-primary-600">Contacto</Link></li>
-                            <li><Link to="#" className="hover:text-primary-600">Términos</Link></li>
+                            <li><Link to="/ayuda" className="hover:text-primary-600">Centro de Ayuda</Link></li>
+                            <li><Link to="/terminos" className="hover:text-primary-600">Aspectos Legales</Link></li>
                         </ul>
                     </div>
                 </div>

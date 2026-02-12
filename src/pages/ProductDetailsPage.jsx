@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ShoppingCart, Share2, ShieldCheck, Truck, Package, User } from 'lucide-react';
-import { PRODUCTS, COMPANIES } from '../data/mock';
+import { ChevronLeft, ShoppingCart, Share2, ShieldCheck, Package, Truck, Utensils, User } from 'lucide-react';
+import { PRODUCTS, COMPANIES, CATEGORIES } from '../data/mock';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { StarRating } from '../components/ui/StarRating';
@@ -10,6 +10,7 @@ import { formatCurrency } from '../utils';
 import { useCart } from '../hooks/useCart';
 import { useToast } from '../components/ui/Toast';
 import { motion } from 'framer-motion';
+import NotFoundPage from './NotFoundPage';
 
 export default function ProductDetailsPage() {
     const { showToast } = useToast();
@@ -31,7 +32,7 @@ export default function ProductDetailsPage() {
         [companySlug]);
 
     if (!product || !company) {
-        return <div className="p-20 text-center">Producto o empresa no encontrados</div>;
+        return <NotFoundPage />;
     }
 
     const handleAddToCart = () => {
@@ -49,7 +50,7 @@ export default function ProductDetailsPage() {
         }
         const shareData = {
             title: product.name,
-            text: `Mira este producto en ${company.name}: ${product.name}`,
+            text: `Mira este producto en ${company.name}: ${product.name} `,
             url: window.location.href,
         };
 
@@ -102,9 +103,15 @@ export default function ProductDetailsPage() {
 
                     {/* Product Info */}
                     <div className="flex flex-col">
-                        <div className="flex items-center space-x-2 mb-4">
-                            <Badge variant="primary">{product.categoryId}</Badge>
-                            <Badge variant="success">En stock</Badge>
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                            <Badge variant="primary">{CATEGORIES.find(c => c.id === product.categoryId)?.name || product.categoryId}</Badge>
+                            {company.features?.cartEnabled !== false ? (
+                                <Badge variant="success">En stock</Badge>
+                            ) : (
+                                <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
+                                    {product.stock > 0 ? 'Disponible' : 'No disponible'}
+                                </Badge>
+                            )}
                             {product.rating && (
                                 <StarRating
                                     rating={product.rating}
@@ -134,56 +141,76 @@ export default function ProductDetailsPage() {
                             {/* Specs */}
                             <div className="grid grid-cols-2 gap-4 py-6 border-y border-slate-100">
                                 <div className="flex items-center space-x-3 text-slate-600">
-                                    <Package className="h-5 w-5 text-slate-400" />
+                                    {company.features?.cartEnabled !== false ? (
+                                        <Package className="h-5 w-5 text-slate-400" />
+                                    ) : (
+                                        <Utensils className="h-5 w-5 text-slate-400" />
+                                    )}
                                     <div>
-                                        <p className="text-xs font-medium uppercase text-slate-400">Tamaño</p>
+                                        <p className="text-xs font-medium uppercase text-slate-400">
+                                            {company.features?.cartEnabled !== false ? 'Tamaño' : 'Tipo'}
+                                        </p>
                                         <p className="text-sm font-semibold">{product.size}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-3 text-slate-600">
-                                    <Truck className="h-5 w-5 text-slate-400" />
+                                    {company.features?.cartEnabled !== false ? (
+                                        <Truck className="h-5 w-5 text-slate-400" />
+                                    ) : (
+                                        <Package className="h-5 w-5 text-slate-400" />
+                                    )}
                                     <div>
-                                        <p className="text-xs font-medium uppercase text-slate-400">Peso</p>
+                                        <p className="text-xs font-medium uppercase text-slate-400">
+                                            {company.features?.cartEnabled !== false ? 'Peso' : 'Porción'}
+                                        </p>
                                         <p className="text-sm font-semibold">{product.weight}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Quantity and CTA */}
-                            <div className="space-y-4">
-                                <div className="flex items-center space-x-4">
-                                    <div className="flex h-12 items-center rounded-xl border border-slate-200 px-2">
-                                        <button
-                                            className="px-3 text-xl font-medium text-slate-500 hover:text-primary-600"
-                                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                        >
-                                            -
-                                        </button>
-                                        <span className="w-8 text-center font-bold text-slate-800">{quantity}</span>
-                                        <button
-                                            className="px-3 text-xl font-medium text-slate-500 hover:text-primary-600"
-                                            onClick={() => setQuantity(quantity + 1)}
-                                        >
-                                            +
-                                        </button>
+                            {company.features?.cartEnabled !== false ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center space-x-4">
+                                        <div className="flex h-12 items-center rounded-xl border border-slate-200 px-2">
+                                            <button
+                                                className="px-3 text-xl font-medium text-slate-500 hover:text-primary-600"
+                                                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                            >
+                                                -
+                                            </button>
+                                            <span className="w-8 text-center font-bold text-slate-800">{quantity}</span>
+                                            <button
+                                                className="px-3 text-xl font-medium text-slate-500 hover:text-primary-600"
+                                                onClick={() => setQuantity(quantity + 1)}
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                        <Button size="lg" className="flex-1 h-12 shadow-md shadow-primary-200" onClick={handleAddToCart}>
+                                            <ShoppingCart className="mr-2 h-5 w-5" />
+                                            Añadir al carrito
+                                        </Button>
                                     </div>
-                                    <Button size="lg" className="flex-1 h-12 shadow-md shadow-primary-200" onClick={handleAddToCart}>
-                                        <ShoppingCart className="mr-2 h-5 w-5" />
-                                        Añadir al carrito
-                                    </Button>
-                                </div>
 
-                                <div className="flex items-center justify-center space-x-4 pt-4 text-xs text-slate-400 font-medium uppercase">
-                                    <div className="flex items-center">
-                                        <ShieldCheck className="mr-1 h-4 w-4 text-emerald-500" />
-                                        Compra Segura
-                                    </div>
-                                    <div className="flex items-center">
-                                        <ShieldCheck className="mr-1 h-4 w-4 text-emerald-500" />
-                                        Garantía Original
+                                    <div className="flex items-center justify-center space-x-4 pt-4 text-xs text-slate-400 font-medium uppercase">
+                                        <div className="flex items-center">
+                                            <ShieldCheck className="mr-1 h-4 w-4 text-emerald-500" />
+                                            Compra Segura
+                                        </div>
+                                        <div className="flex items-center">
+                                            <ShieldCheck className="mr-1 h-4 w-4 text-emerald-500" />
+                                            Garantía Original
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="pt-4 border-t border-slate-100">
+                                    <p className="text-sm text-slate-500 italic">
+                                        Modo catálogo: Consulta disponibilidad directamente en el local.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -194,7 +221,7 @@ export default function ProductDetailsPage() {
             <Modal
                 isOpen={isReviewsOpen}
                 onClose={() => setIsReviewsOpen(false)}
-                title={`Opiniones de ${product.name}`}
+                title={`Opiniones de ${product.name} `}
             >
                 <div className="space-y-6 p-4 sm:p-6">
                     <div className="flex items-center justify-between bg-slate-50 p-6 rounded-2xl border border-slate-100">

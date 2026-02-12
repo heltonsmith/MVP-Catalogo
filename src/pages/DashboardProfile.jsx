@@ -1,4 +1,5 @@
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download } from 'lucide-react';
+import QRCode from "react-qr-code";
 import { COMPANIES } from '../data/mock';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -13,6 +14,25 @@ export default function DashboardProfile() {
     const handleDemoAction = (e) => {
         if (e) e.preventDefault();
         showToast("Los ajustes del perfil están bloqueados en la versión de demostración.", "demo");
+    };
+
+    const downloadQR = () => {
+        const svg = document.getElementById("QRCode");
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const img = new Image();
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            const pngFile = canvas.toDataURL("image/png");
+            const downloadLink = document.createElement("a");
+            downloadLink.download = "qr-tienda.png";
+            downloadLink.href = pngFile;
+            downloadLink.click();
+        };
+        img.src = "data:image/svg+xml;base64," + btoa(svgData);
     };
 
     return (
@@ -48,7 +68,7 @@ export default function DashboardProfile() {
                                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                 )}
                             >
-                                {item.icon}
+                                <item.icon />
                                 {item.name}
                             </button>
                         ))}
@@ -144,6 +164,38 @@ export default function DashboardProfile() {
                                     </Button>
                                 </div>
                             </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center gap-2">
+                            <QrCode size={18} className="text-slate-500" />
+                            Código QR de tu Tienda
+                        </div>
+                        <CardContent className="p-6">
+                            <div className="flex flex-col sm:flex-row items-center gap-8">
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                                    <div style={{ height: "auto", margin: "0 auto", maxWidth: 150, width: "100%" }}>
+                                        <QRCode
+                                            size={256}
+                                            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                            value={`${window.location.origin}/catalogo/${company.slug}`}
+                                            viewBox={`0 0 256 256`}
+                                            id="QRCode"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex-1 text-center sm:text-left">
+                                    <h4 className="font-bold text-slate-900 mb-2">Comparte tu tienda</h4>
+                                    <p className="text-sm text-slate-500 mb-4">
+                                        Descarga este código QR y colócalo en tu local, mesas o tarjetas de presentación para que tus clientes accedan rápido a tu catálogo.
+                                    </p>
+                                    <Button onClick={downloadQR} className="w-full sm:w-auto">
+                                        <Download size={16} className="mr-2" />
+                                        Descargar QR
+                                    </Button>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 

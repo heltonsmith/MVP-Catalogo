@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { Search, Filter, MessageCircle, User, Globe, Instagram, Music2, Share2, Bell } from 'lucide-react';
+import { Search, Filter, MessageCircle, User, Globe, Instagram, Music2, Share2, Bell, QrCode, BadgeCheck } from 'lucide-react';
+import QRCode from "react-qr-code";
 import { COMPANIES, PRODUCTS, CATEGORIES } from '../data/mock';
 import { ProductCard } from '../components/product/ProductCard';
 import { Button } from '../components/ui/Button';
@@ -12,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChatWidget } from '../components/chat/ChatWidget';
 import { MailboxPreview } from '../components/chat/MailboxPreview';
 import { useToast } from '../components/ui/Toast';
+import NotFoundPage from './NotFoundPage';
 
 export default function CatalogPage() {
     const { showToast } = useToast();
@@ -23,6 +25,7 @@ export default function CatalogPage() {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [isReviewsOpen, setIsReviewsOpen] = useState(false);
     const [isMailboxOpen, setIsMailboxOpen] = useState(false);
+    const [isQROpen, setIsQROpen] = useState(false);
 
     const company = useMemo(() =>
         COMPANIES.find(c => c.slug === companySlug),
@@ -31,6 +34,11 @@ export default function CatalogPage() {
     const companyProducts = useMemo(() =>
         PRODUCTS.filter(p => p.companyId === company?.id),
         [company]);
+
+    const companyCategories = useMemo(() => {
+        const categoryIds = new Set(companyProducts.map(p => p.categoryId));
+        return CATEGORIES.filter(c => categoryIds.has(c.id));
+    }, [companyProducts]);
 
     const filteredProducts = useMemo(() => {
         return companyProducts.filter(p => {
@@ -42,7 +50,7 @@ export default function CatalogPage() {
 
 
     if (!company) {
-        return <div className="p-20 text-center">Empresa no encontrada</div>;
+        return <NotFoundPage />;
     }
 
     return (
@@ -64,8 +72,13 @@ export default function CatalogPage() {
                                 className="h-14 w-14 sm:h-20 sm:w-20 lg:h-28 lg:w-28 rounded-[16px] sm:rounded-2xl bg-white p-1 ring-2 sm:ring-4 ring-white shadow-lg flex-shrink-0"
                             />
                             <div className="mb-0 sm:mb-2 min-w-0 flex-1">
-                                <h1 className="text-lg sm:text-2xl font-bold text-white lg:text-3xl truncate leading-tight">{company.name}</h1>
-                                <p className="text-slate-300 text-[10px] sm:text-sm line-clamp-1 sm:line-clamp-none opacity-90 mb-1">{company.description}</p>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h1 className="text-xl sm:text-2xl font-bold text-white lg:text-3xl truncate leading-tight">{company.name}</h1>
+                                    {company.plan === 'pro' && (
+                                        <BadgeCheck className="h-6 w-6 sm:h-7 sm:w-7 text-blue-400 fill-blue-400/20 flex-shrink-0" title="Cuenta Verificada (Pro)" />
+                                    )}
+                                </div>
+                                <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 sm:line-clamp-none opacity-90 mb-1">{company.description}</p>
                                 <StarRating
                                     rating={company.rating}
                                     count={company.reviews.length}
@@ -77,7 +90,7 @@ export default function CatalogPage() {
                         {/* Actions Group */}
                         <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end border-t border-white/10 pt-3 md:border-0 md:pt-0">
                             <div className="flex items-center gap-1 sm:gap-2">
-                                {company.socials?.website && (
+                                {(company.socials?.website && company.plan === 'pro') && (
                                     <button
                                         onClick={() => {
                                             if (isDemo) {
@@ -150,33 +163,45 @@ export default function CatalogPage() {
                                     <Share2 size={16} className="sm:size-18" />
                                 </button>
 
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 text-[10px] sm:text-xs font-bold gap-2 px-3 sm:px-4"
-                                    onClick={() => {
-                                        if (isDemo) {
-                                            showToast('Esta es una función de demostración. En la versión real, abriría el chat.', 'demo');
-                                            return;
-                                        }
-                                        const chatBtn = document.querySelector('.fixed.bottom-6.right-6 button');
-                                        if (chatBtn) chatBtn.click();
-                                    }}
-                                >
-                                    <MessageCircle size={14} />
-                                    <span className="hidden sm:inline">Chatea con nosotros</span>
-                                    <span className="sm:hidden">Chat</span>
-                                </Button>
+                                {company.plan === 'pro' && (
+                                    <>
+                                        <button
+                                            onClick={() => setIsQROpen(true)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                            title="Ver código QR"
+                                        >
+                                            <QrCode size={16} className="sm:size-18" />
+                                        </button>
 
-                                <button
-                                    className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                    onClick={() => setIsMailboxOpen(true)}
-                                >
-                                    <Bell size={16} className="sm:size-18" />
-                                    <span className="absolute -top-1 -right-1 flex h-[14px] w-[14px] items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white ring-2 ring-primary-600">
-                                        3
-                                    </span>
-                                </button>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 text-[10px] sm:text-xs font-bold gap-2 px-3 sm:px-4"
+                                            onClick={() => {
+                                                if (isDemo) {
+                                                    showToast('Esta es una función de demostración. En la versión real, abriría el chat.', 'demo');
+                                                    return;
+                                                }
+                                                const chatBtn = document.querySelector('.fixed.bottom-6.right-6 button');
+                                                if (chatBtn) chatBtn.click();
+                                            }}
+                                        >
+                                            <MessageCircle size={14} />
+                                            <span className="hidden sm:inline">Chatea con nosotros</span>
+                                            <span className="sm:hidden">Chat</span>
+                                        </Button>
+
+                                        <button
+                                            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                            onClick={() => setIsMailboxOpen(true)}
+                                        >
+                                            <Bell size={16} className="sm:size-18" />
+                                            <span className="absolute -top-1 -right-1 flex h-[14px] w-[14px] items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white ring-2 ring-primary-600">
+                                                3
+                                            </span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -184,8 +209,8 @@ export default function CatalogPage() {
             </div>
 
             <div className="mx-auto max-w-7xl px-4 py-8">
-                {/* ... existing search and filters ... */}
-                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 sticky top-16 z-10 bg-slate-50 py-4 border-b border-slate-200 w-full overflow-x-hidden">
+                {/* Search and Filters */}
+                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 sticky top-16 z-10 bg-slate-50 py-4 border-b border-slate-200 w-full">
                     <div className="relative w-full md:w-96 max-w-full">
                         <Input
                             placeholder="Buscar productos..."
@@ -196,7 +221,7 @@ export default function CatalogPage() {
                         <Search className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                     </div>
 
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide no-scrollbar">
+                    <div className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide no-scrollbar">
                         <Button
                             variant={selectedCategory === 'all' ? 'primary' : 'secondary'}
                             size="sm"
@@ -205,7 +230,7 @@ export default function CatalogPage() {
                         >
                             Todos
                         </Button>
-                        {CATEGORIES.map(cat => (
+                        {companyCategories.map(cat => (
                             <Button
                                 key={cat.id}
                                 variant={selectedCategory === cat.id ? 'primary' : 'secondary'}
@@ -220,7 +245,7 @@ export default function CatalogPage() {
                 </div>
 
                 {/* Product Grid */}
-                <div className="mt-8">
+                <div className="mt-8 space-y-12">
                     <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-slate-500 font-medium text-sm">
                             Mostrando {filteredProducts.length} productos
@@ -228,15 +253,44 @@ export default function CatalogPage() {
                     </div>
 
                     {filteredProducts.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {filteredProducts.map(product => (
-                                <ProductCard
-                                    key={product.id}
-                                    product={product}
-                                    companySlug={companySlug}
-                                />
-                            ))}
-                        </div>
+                        <>
+                            {selectedCategory === 'all' ? (
+                                companyCategories.map(category => {
+                                    const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
+                                    if (categoryProducts.length === 0) return null;
+                                    return (
+                                        <div key={category.id} className="scroll-mt-24" id={`category-${category.id}`}>
+                                            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-4 sm:mb-6 flex items-center gap-2">
+                                                <div className="h-6 w-1 bg-primary-500 rounded-full" />
+                                                {category.name}
+                                                <span className="text-sm font-normal text-slate-400 ml-2">({categoryProducts.length})</span>
+                                            </h2>
+                                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                                {categoryProducts.map(product => (
+                                                    <ProductCard
+                                                        key={product.id}
+                                                        product={product}
+                                                        companySlug={companySlug}
+                                                        cartEnabled={company.features?.cartEnabled !== false}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {filteredProducts.map(product => (
+                                        <ProductCard
+                                            key={product.id}
+                                            product={product}
+                                            companySlug={companySlug}
+                                            cartEnabled={company.features?.cartEnabled !== false}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     ) : (
                         <div className="py-20 text-center">
                             <p className="text-slate-400">No se encontraron productos en esta categoría.</p>
@@ -297,6 +351,33 @@ export default function CatalogPage() {
                                 Cerrar
                             </Button>
                         </div>
+                    </div>
+                </Modal>
+
+                {/* QR Code Modal */}
+                <Modal
+                    isOpen={isQROpen}
+                    onClose={() => setIsQROpen(false)}
+                    title="Escanea para visitar"
+                    maxWidth="sm"
+                >
+                    <div className="flex flex-col items-center justify-center p-8 space-y-6">
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                            <div style={{ height: "auto", margin: "0 auto", maxWidth: 200, width: "100%" }}>
+                                <QRCode
+                                    size={256}
+                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                    value={window.location.href}
+                                    viewBox={`0 0 256 256`}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-center text-slate-500 text-sm">
+                            Escanea este código con tu cámara para abrir esta tienda en tu celular.
+                        </p>
+                        <Button onClick={() => setIsQROpen(false)} className="w-full">
+                            Cerrar
+                        </Button>
                     </div>
                 </Modal>
             </div>

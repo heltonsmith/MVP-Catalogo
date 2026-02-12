@@ -1,17 +1,35 @@
-import { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ShoppingCart, Menu, X, Rocket } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useCart } from '../../hooks/useCart';
 import { cn } from '../../utils';
+import { COMPANIES } from '../../data/mock';
 
 export function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
-    const { totalItems } = useCart();
+    const { carts } = useCart();
+    const location = useLocation();
+
+    // Detect current company from URL and check if cart is enabled
+    const cartVisible = useMemo(() => {
+        const match = location.pathname.match(/^\/catalogo\/([^/]+)/);
+        if (!match) return true; // Not on a catalog page, show cart by default
+        const slug = match[1];
+        const company = COMPANIES.find(c => c.slug === slug);
+        return company ? company.features?.cartEnabled !== false : true;
+    }, [location.pathname]);
+
+    // Calculate total items across all carts
+    const totalItems = Object.values(carts).reduce((total, cartItems) => {
+        return total + cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    }, 0);
 
     const navLinks = [
         { name: 'Inicio', path: '/' },
-        { name: 'Demo de tienda', path: '/catalogo/ecoverde-spa?mode=demo' },
+        { name: 'Precios', path: '/precios' },
+        { name: 'Demo Tienda', path: '/catalogo/ecoverde-spa?mode=demo' },
+        { name: 'Demo Restaurante', path: '/catalogo/restaurante-delicias?mode=demo' },
     ];
 
     return (
@@ -45,16 +63,18 @@ export function Navbar() {
                     </div>
 
                     <div className="flex items-center space-x-2">
-                        <Link to="/carrito">
-                            <Button variant="ghost" size="icon" className="relative">
-                                <ShoppingCart size={20} />
-                                {totalItems > 0 && (
-                                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white ring-2 ring-white">
-                                        {totalItems}
-                                    </span>
-                                )}
-                            </Button>
-                        </Link>
+                        {cartVisible && (
+                            <Link to="/carrito">
+                                <Button variant="ghost" size="icon" className="relative">
+                                    <ShoppingCart size={20} />
+                                    {totalItems > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white ring-2 ring-white">
+                                            {totalItems}
+                                        </span>
+                                    )}
+                                </Button>
+                            </Link>
+                        )}
 
                         <Link to="/login" className="hidden md:block">
                             <Button variant="secondary" size="sm">Ingresar</Button>

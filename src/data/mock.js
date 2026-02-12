@@ -8,10 +8,16 @@ export const COMPANIES = [
         banner: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?q=80&w=1200&auto=format&fit=crop',
         whatsapp: '56986920235',
         rating: 4.8,
+        plan: 'pro',
+        subscriptionDate: '2024-01-01',
+        renewalDate: '2025-01-01',
         socials: {
             instagram: 'https://instagram.com/ecoverde',
             tiktok: 'https://tiktok.com/@ecoverde',
             website: 'https://ecoverde.cl'
+        },
+        features: {
+            cartEnabled: true
         },
         reviews: [
             { id: 1, user: 'Maria L.', rating: 5, comment: 'Excelente atención y productos muy comprometidos con el medio ambiente.', date: '2024-01-15' },
@@ -27,9 +33,15 @@ export const COMPANIES = [
         banner: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1200&auto=format&fit=crop',
         whatsapp: '56986920235',
         rating: 4.5,
+        plan: 'free',
+        subscriptionDate: '2024-02-10',
+        renewalDate: '2024-03-10',
         socials: {
             instagram: 'https://instagram.com/technova',
             website: 'https://technova.store'
+        },
+        features: {
+            cartEnabled: true
         },
         reviews: [
             { id: 1, user: 'Carlos M.', rating: 5, comment: 'La mejor tecnología a precios justos.', date: '2024-02-01' }
@@ -37,19 +49,26 @@ export const COMPANIES = [
     },
     {
         id: '3',
-        name: 'Artesanía Sur',
-        slug: 'artesania-sur',
-        description: 'Artesanía tradicional hecha a mano con amor.',
-        logo: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=200&auto=format&fit=crop',
-        banner: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=1200&auto=format&fit=crop',
+        name: 'Restaurante Delicias',
+        slug: 'restaurante-delicias',
+        description: 'La mejor comida casera y gourmet de la ciudad.',
+        logo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=200&auto=format&fit=crop',
+        banner: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200&auto=format&fit=crop',
         whatsapp: '56986920235',
         rating: 4.9,
+        plan: 'pro',
+        subscriptionDate: '2024-01-15',
+        renewalDate: '2024-02-15',
         socials: {
-            instagram: 'https://instagram.com/artesaniasur',
-            tiktok: 'https://tiktok.com/@artesaniasur'
+            instagram: 'https://instagram.com/restaurantedelicias',
+            tiktok: 'https://tiktok.com/@restaurantedelicias',
+            website: 'https://delicias.cl'
+        },
+        features: {
+            cartEnabled: false // Digital Menu mode (no cart)
         },
         reviews: [
-            { id: 1, user: 'Ana P.', rating: 5, comment: 'Los detalles son impresionantes, muy feliz con mi compra.', date: '2024-02-05' }
+            { id: 1, user: 'Ana P.', rating: 5, comment: 'La comida estaba deliciosa y la atención fue excelente.', date: '2024-02-05' }
         ]
     }
 ];
@@ -59,6 +78,10 @@ export const CATEGORIES = [
     { id: 'cat2', name: 'Tecnología', slug: 'tecnologia' },
     { id: 'cat3', name: 'Alimentos', slug: 'alimentos' },
     { id: 'cat4', name: 'Accesorios', slug: 'accesorios' },
+    { id: 'cat5', name: 'Entradas', slug: 'entradas' },
+    { id: 'cat6', name: 'Platos de Fondo', slug: 'platos-fondo' },
+    { id: 'cat7', name: 'Bebidas', slug: 'bebidas' },
+    { id: 'cat8', name: 'Postres', slug: 'postres' },
 ];
 
 export const PRODUCTS = [
@@ -162,6 +185,96 @@ export const PRODUCTS = [
         reviews: [
             { id: 1, user: 'Rosa D.', rating: 5, comment: 'El sabor es exquisito, se nota que es pura.', date: '2024-02-14' }
         ]
+    },
+    {
+        id: 'p6',
+        name: 'Empanadas de Pino',
+        slug: 'empanadas-pino',
+        sku: 'RES-EMP-001',
+        price: 2500,
+        stock: 50,
+        rating: 4.8,
+        description: 'Empanadas de horno tradicionales con carne picada, aceituna, huevo y pasas.',
+        weight: '2 unidades',
+        size: 'Entrada',
+        categoryId: 'cat5',
+        companyId: '3',
+        views: 300,
+        quotesCount: 20,
+        images: ['https://images.pexels.com/photos/6941010/pexels-photo-6941010.jpeg?auto=compress&cs=tinysrgb&w=800'],
+        reviews: []
+    },
+    {
+        id: 'p7',
+        name: 'Lomo a lo Pobre',
+        slug: 'lomo-pobre',
+        sku: 'RES-LOM-002',
+        price: 12990,
+        stock: 20,
+        rating: 4.9,
+        description: 'Jugoso lomo vetado acompañado de papas fritas, cebolla caramelizada y huevos fritos.',
+        weight: '1 persona',
+        size: 'Plato principal',
+        categoryId: 'cat6',
+        companyId: '3',
+        views: 500,
+        quotesCount: 45,
+        images: ['https://images.pexels.com/photos/3535383/pexels-photo-3535383.jpeg?auto=compress&cs=tinysrgb&w=800'],
+        reviews: []
+    },
+    {
+        id: 'p8',
+        name: 'Reineta a la Plancha',
+        slug: 'reineta-plancha',
+        sku: 'RES-REI-003',
+        price: 9990,
+        stock: 0,
+        rating: 4.7,
+        description: 'Filete de reineta fresca a la plancha con agregado de arroz o ensalada surtida.',
+        weight: '1 persona',
+        size: 'Plato principal',
+        categoryId: 'cat6',
+        companyId: '3',
+        views: 280,
+        quotesCount: 15,
+        images: ['https://images.pexels.com/photos/3763847/pexels-photo-3763847.jpeg?auto=compress&cs=tinysrgb&w=800'],
+        reviews: []
+    },
+    {
+        id: 'p9',
+        name: 'Jugo Natural de Frambuesa',
+        slug: 'jugo-frambuesa',
+        sku: 'RES-BEB-004',
+        price: 3500,
+        stock: 100,
+        rating: 5.0,
+        description: 'Jugo 100% natural de frambuesas recién cosechadas.',
+        weight: '500 ml',
+        size: 'Bebida fría',
+        categoryId: 'cat7',
+        companyId: '3',
+        views: 150,
+        quotesCount: 30,
+        images: ['https://images.pexels.com/photos/1132558/pexels-photo-1132558.jpeg?auto=compress&cs=tinysrgb&w=800'],
+        reviews: []
+    },
+    {
+        id: 'p10',
+        name: 'Tiramisú Casero',
+        slug: 'tiramisu-casero',
+        sku: 'RES-POS-005',
+        price: 4500,
+        stock: 25,
+        rating: 4.9,
+        description: 'Clásico postre italiano preparado con mascarpone fresco y café de grano.',
+        weight: '1 porción',
+        size: 'Postre',
+        categoryId: 'cat8',
+        companyId: '3',
+        views: 400,
+        quotesCount: 50,
+        images: ['https://images.pexels.com/photos/6880219/pexels-photo-6880219.jpeg?auto=compress&cs=tinysrgb&w=800'],
+        reviews: []
     }
 ];
 
