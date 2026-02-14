@@ -136,7 +136,7 @@ export default function LandingPage() {
                                 <span className="text-primary-400 bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-emerald-400">siguiente nivel</span>
                             </h2>
                             <p className="text-xl text-slate-300 mb-8 leading-relaxed max-w-xl">
-                                Nuestro plan Pro incluye productos ilimitados, fotos infinitas, chat integrado y mucho más. Además, podrás <span className="text-white font-semibold underline decoration-primary-500/30">ocultar el branding de ktaloog en móviles</span> para una experiencia 100% propia.
+                                Nuestro plan Pro incluye productos ilimitados, hasta 6 fotos por producto, chat integrado y mucho más. Además, podrás <span className="text-white font-semibold underline decoration-primary-500/30">ocultar el branding de ktaloog en móviles</span> para una experiencia 100% propia.
                             </p>
                             <div className="flex flex-col gap-4">
                                 <Link to="/precios">

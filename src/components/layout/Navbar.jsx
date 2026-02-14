@@ -4,6 +4,7 @@ import { ShoppingCart, Menu, X, Rocket, LogOut, User, Store, ChevronDown } from 
 import { Button } from '../ui/Button';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../context/AuthContext';
+import { NotificationCenter } from '../notifications/NotificationCenter';
 import { cn } from '../../utils';
 import { COMPANIES } from '../../data/mock';
 
@@ -112,6 +113,11 @@ export function Navbar() {
                                 </Button>
                             </Link>
                         )}
+                        {user && (
+                            <div className="hidden md:flex items-center gap-3 mr-2">
+                                <NotificationCenter />
+                            </div>
+                        )}
 
                         {user ? (
                             <div className="hidden md:flex items-center gap-4">
@@ -119,10 +125,14 @@ export function Navbar() {
                                     <span className="text-sm font-bold text-slate-700">
                                         {profile?.role === 'admin' || profile?.role === 'super_admin'
                                             ? 'Admin Ktaloog'
-                                            : (company?.name || 'Mi Tienda')
+                                            : profile?.role === 'client'
+                                                ? profile?.full_name || 'Mi Perfil'
+                                                : (company?.name || 'Mi Tienda')
                                         }
                                     </span>
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Sesión Activa</span>
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+                                        {profile?.role === 'client' ? 'Cliente Ktaloog' : 'Sesión Activa'}
+                                    </span>
                                 </div>
                                 <div className="h-8 w-px bg-slate-200 mx-2" />
                                 <Button
@@ -134,7 +144,7 @@ export function Navbar() {
                                     <LogOut size={16} className="mr-2" />
                                     Salir
                                 </Button>
-                                <Link to="/dashboard">
+                                <Link to={profile?.role === 'client' ? '/dashboard/cliente' : '/dashboard'}>
                                     <Button size="sm" className="shadow-lg shadow-primary-200">
                                         Ir al Panel
                                     </Button>
@@ -223,7 +233,7 @@ export function Navbar() {
                                             <p className="text-xs text-slate-500">{user.email}</p>
                                         </div>
                                     </div>
-                                    <Link to="/dashboard" onClick={() => setIsOpen(false)}>
+                                    <Link to={profile?.role === 'client' ? '/dashboard/cliente' : '/dashboard'} onClick={() => setIsOpen(false)}>
                                         <Button className="w-full">Ir al Panel</Button>
                                     </Link>
                                     <Button

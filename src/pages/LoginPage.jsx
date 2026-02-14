@@ -21,8 +21,16 @@ export default function LoginPage() {
     // Handle redirection once we have the user and their profile
     useEffect(() => {
         if (!authLoading && user && profile) {
-            console.log('LoginPage: Auth ready, redirecting to Home');
-            navigate('/');
+            console.log('LoginPage: Auth ready, redirecting based on role:', profile.role);
+            if (profile.role === 'admin') {
+                navigate('/admin');
+            } else if (profile.role === 'owner') {
+                navigate('/dashboard');
+            } else if (profile.role === 'client') {
+                navigate('/dashboard/cliente');
+            } else {
+                navigate('/');
+            }
         }
     }, [user, profile, authLoading, navigate]);
 

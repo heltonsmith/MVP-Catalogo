@@ -83,12 +83,26 @@ export default function DashboardProducts() {
         try {
             const { data, error } = await supabase
                 .from('products')
-                .select('*, categories(name)')
+                .select(`
+                    *,
+                    product_images(image_url, display_order),
+                    product_categories(
+                        categories(id, name)
+                    )
+                `)
                 .eq('company_id', company.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setProducts(data || []);
+
+            // Transform the data to include categories array
+            const transformedProducts = (data || []).map(product => ({
+                ...product,
+                categories: product.product_categories?.map(pc => pc.categories) || [],
+                images: product.product_images?.sort((a, b) => a.display_order - b.display_order) || []
+            }));
+
+            setProducts(transformedProducts);
         } catch (error) {
             console.error('Error fetching products:', error);
             showToast("Error al cargar los productos", "error");
@@ -165,8 +179,11 @@ export default function DashboardProducts() {
             return names.length > 0 ? names.join(', ') : 'Sin categoría';
         }
 
-        // Real data case: product.categories is the object from the join
-        return product.categories?.name || 'Sin categoría';
+        // Real data case: product.categories is now an array of category objects
+        if (!product.categories || product.categories.length === 0) {
+            return 'Sin categoría';
+        }
+        return product.categories.map(cat => cat.name).join(', ');
     };
 
     const handleSuccess = () => {
@@ -252,8 +269,8 @@ export default function DashboardProducts() {
                                 <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">
-                                            {product.images && product.images[0] ? (
-                                                <img src={product.images[0]} className="h-10 w-10 rounded-lg object-cover mr-3 bg-slate-100 shadow-sm border border-slate-100" />
+                                            {product.images && product.images.length > 0 ? (
+                                                <img src={product.images[0].image_url || product.image} className="h-10 w-10 rounded-lg object-cover mr-3 bg-slate-100 shadow-sm border border-slate-100" />
                                             ) : (
                                                 <div className="h-10 w-10 rounded-lg bg-slate-100 mr-3 flex items-center justify-center border border-slate-100">
                                                     <Package size={20} className="text-slate-300" />

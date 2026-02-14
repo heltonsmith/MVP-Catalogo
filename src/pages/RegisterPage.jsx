@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Rocket, Instagram, Twitter, Linkedin, Github, Globe, Phone, Loader2 } from 'lucide-react';
+import { Rocket, Instagram, Twitter, Linkedin, Globe, Phone, Loader2, BadgeCheck, TrendingUp, User, Search, Heart, Star, ShoppingBag } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
@@ -28,8 +28,16 @@ export default function RegisterPage() {
     // Handle redirection once we have the user and their profile
     useEffect(() => {
         if (!authLoading && user && profile) {
-            console.log('RegisterPage: Auth ready, redirecting to Home');
-            navigate('/');
+            console.log('RegisterPage: Auth ready, redirecting based on role:', profile.role);
+            if (profile.role === 'admin') {
+                navigate('/admin');
+            } else if (profile.role === 'owner') {
+                navigate('/dashboard');
+            } else if (profile.role === 'client') {
+                navigate('/dashboard/cliente');
+            } else {
+                navigate('/');
+            }
         }
     }, [user, profile, authLoading, navigate]);
 
@@ -68,7 +76,7 @@ export default function RegisterPage() {
         password: '',
         location: '',
         isOnline: false,
-        role: 'owner' // 'owner' or 'client'
+        role: 'client' // Default to client as requested
     });
 
     const validateRut = (rut) => {
@@ -184,19 +192,15 @@ export default function RegisterPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!validateRut(formData.rut)) {
-            showToast("RUT inválido. Por favor verifica los datos.", "error");
-            return;
-        }
-
-        if (parseInt(userCaptcha) !== captcha.a) {
-            showToast("Por favor resuelve el captcha correctamente.", "error");
-            return;
-        }
-
-        if (formData.role === 'owner' && !formData.location) {
-            showToast("La ubicación (Región y Comuna) es obligatoria.", "error");
-            return;
+        if (formData.role === 'owner') {
+            if (!validateRut(formData.rut)) {
+                showToast("RUT inválido. Por favor verifica los datos.", "error");
+                return;
+            }
+            if (!formData.location) {
+                showToast("La ubicación (Región y Comuna) es obligatoria.", "error");
+                return;
+            }
         }
 
         setLoading(true);
@@ -215,6 +219,12 @@ export default function RegisterPage() {
             });
 
             if (authError) throw authError;
+
+            if (parseInt(userCaptcha) !== captcha.a) {
+                showToast("Por favor resuelve el captcha correctamente.", "error");
+                setLoading(false);
+                return;
+            }
 
             if (authData?.user) {
                 // Check if this is the designated admin account
@@ -288,48 +298,32 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-2 sm:px-4 py-8 sm:py-12 overflow-x-hidden">
-            <Card className="w-full max-w-2xl border-none shadow-xl">
-                <CardContent className="p-4 sm:p-8">
-                    <div className="flex flex-col items-center text-center">
-                        <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-200">
+        <div className="flex min-h-screen bg-white overflow-hidden">
+            {/* Left Side: Form Section */}
+            <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 overflow-y-auto bg-slate-50/50">
+                <div className="mx-auto w-full max-w-xl lg:w-[500px]">
+                    <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+                        <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-xl shadow-primary-200 ring-4 ring-white transition-transform hover:scale-110">
                             <Rocket size={24} />
                         </Link>
-                        <h2 className="text-2xl font-bold text-slate-900">
-                            {formData.role === 'owner' ? 'Crea tu cuenta de Emprendedor' : 'Crea tu cuenta de Cliente'}
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                            {formData.role === 'owner' ? 'Emprende con Ktaloog' : 'Únete a la Comunidad'}
                         </h2>
-                        <p className="mt-2 text-slate-500 text-sm">
+                        <p className="mt-3 text-slate-500 font-medium text-sm leading-relaxed max-w-sm">
                             {formData.role === 'owner'
-                                ? 'Regístrate para empezar a gestionar tu catálogo digital'
-                                : 'Regístrate para guardar favoritos, valorar tiendas y chatear'}
+                                ? 'Crea tu catálogo profesional en minutos y llega a miles de clientes.'
+                                : 'Guarda tus tiendas favoritas, gestiona pedidos y obtén atención personalizada.'}
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="mt-8 space-y-8">
+                    <form onSubmit={handleSubmit} className="mt-10 space-y-8 pb-12">
                         {/* Role Selector with Radio Buttons */}
-                        <div className="flex gap-6 justify-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="grid grid-cols-2 gap-3 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm">
                             <label className={cn(
-                                "flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 transition-all",
-                                formData.role === 'owner'
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-transparent hover:bg-slate-100"
-                            )}>
-                                <input
-                                    type="radio"
-                                    name="role"
-                                    value="owner"
-                                    checked={formData.role === 'owner'}
-                                    onChange={() => setFormData(prev => ({ ...prev, role: 'owner' }))}
-                                    className="w-5 h-5 text-primary-600 focus:ring-primary-500 border-gray-300"
-                                />
-                                <span className="font-bold text-slate-700">Soy Emprendedor</span>
-                            </label>
-
-                            <label className={cn(
-                                "flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 transition-all",
+                                "flex flex-col items-center justify-center gap-2 cursor-pointer p-4 rounded-xl border-2 transition-all",
                                 formData.role === 'client'
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-transparent hover:bg-slate-100"
+                                    ? "border-primary-500 bg-primary-50/50"
+                                    : "border-transparent hover:bg-slate-50"
                             )}>
                                 <input
                                     type="radio"
@@ -337,15 +331,42 @@ export default function RegisterPage() {
                                     value="client"
                                     checked={formData.role === 'client'}
                                     onChange={() => setFormData(prev => ({ ...prev, role: 'client' }))}
-                                    className="w-5 h-5 text-primary-600 focus:ring-primary-500 border-gray-300"
+                                    className="sr-only"
                                 />
-                                <span className="font-bold text-slate-700">Soy Cliente</span>
+                                <div className={cn("p-2 rounded-lg", formData.role === 'client' ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400")}>
+                                    <User size={20} />
+                                </div>
+                                <span className={cn("text-xs font-black uppercase tracking-widest", formData.role === 'client' ? "text-primary-700" : "text-slate-400")}>Cliente</span>
+                            </label>
+
+                            <label className={cn(
+                                "flex flex-col items-center justify-center gap-2 cursor-pointer p-4 rounded-xl border-2 transition-all",
+                                formData.role === 'owner'
+                                    ? "border-primary-500 bg-primary-50/50"
+                                    : "border-transparent hover:bg-slate-50"
+                            )}>
+                                <input
+                                    type="radio"
+                                    name="role"
+                                    value="owner"
+                                    checked={formData.role === 'owner'}
+                                    onChange={() => setFormData(prev => ({ ...prev, role: 'owner' }))}
+                                    className="sr-only"
+                                />
+                                <div className={cn("p-2 rounded-lg", formData.role === 'owner' ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400")}>
+                                    <Rocket size={20} />
+                                </div>
+                                <span className={cn("text-xs font-black uppercase tracking-widest", formData.role === 'owner' ? "text-primary-700" : "text-slate-400")}>Emprendedor</span>
                             </label>
                         </div>
-                        {/* Identidad */}
-                        <div>
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">1. Identidad</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* Datos Personales */}
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">1</span>
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Identidad</h3>
+                            </div>
+                            <div className={cn("grid gap-4", formData.role === 'owner' ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
                                 <Input
                                     label="Nombre completo"
                                     name="fullName"
@@ -354,183 +375,162 @@ export default function RegisterPage() {
                                     value={formData.fullName}
                                     onChange={handleChange}
                                     autoComplete="name"
+                                    className="bg-white"
                                 />
-                                <Input
-                                    label="RUT"
-                                    name="rut"
-                                    placeholder="12.345.678-9"
-                                    required
-                                    value={formData.rut}
-                                    onChange={handleChange}
-                                />
+                                {formData.role === 'owner' && (
+                                    <Input
+                                        label="RUT"
+                                        name="rut"
+                                        placeholder="12.345.678-9"
+                                        required
+                                        value={formData.rut}
+                                        onChange={handleChange}
+                                        className="bg-white"
+                                    />
+                                )}
                             </div>
                         </div>
 
                         {/* Emprendimiento - Block hidden for clients */}
                         {formData.role === 'owner' && (
-                            <>
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">2. Tu Emprendimiento</h3>
-                                    <div className="space-y-4">
-                                        <Input
-                                            label="Nombre de emprendimiento"
-                                            name="businessName"
-                                            placeholder="Mi Tienda Online"
-                                            required={formData.role === 'owner'}
-                                            value={formData.businessName}
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">2</span>
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Tu Emprendimiento</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    <Input
+                                        label="Nombre de emprendimiento"
+                                        name="businessName"
+                                        placeholder="Mi Tienda Online"
+                                        required={formData.role === 'owner'}
+                                        value={formData.businessName}
+                                        onChange={handleChange}
+                                        className="bg-white"
+                                    />
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-bold text-slate-700">Descripción de la tienda</label>
+                                        <textarea
+                                            name="description"
+                                            placeholder="Cuéntanos brevemente sobre tu negocio..."
+                                            className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-4 text-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-50 outline-none transition-all resize-none shadow-sm bg-white"
+                                            value={formData.description}
                                             onChange={handleChange}
+                                        ></textarea>
+                                    </div>
+                                    <Input
+                                        label="Dirección (Real u Online)"
+                                        name="address"
+                                        placeholder="Calle Falsa 123 o mitienda.cl"
+                                        required={formData.role === 'owner'}
+                                        value={formData.address}
+                                        onChange={handleChange}
+                                        className="bg-white"
+                                    />
+
+                                    <div className="space-y-3">
+                                        <LocationSelector
+                                            value={formData.location}
+                                            onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
+                                            className="gap-4"
                                         />
-                                        <div className="space-y-1.5">
-                                            <label className="text-sm font-medium text-slate-700">Descripción de la tienda</label>
-                                            <textarea
-                                                name="description"
-                                                placeholder="Cuéntanos brevemente sobre tu negocio..."
-                                                className="w-full min-h-[100px] rounded-lg border border-slate-200 p-3 text-sm focus:border-primary-600 focus:ring-1 focus:ring-primary-600 outline-none transition-all resize-none"
-                                                value={formData.description}
+                                        <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                            <input
+                                                type="checkbox"
+                                                id="isOnline"
+                                                name="isOnline"
+                                                checked={formData.isOnline}
                                                 onChange={handleChange}
-                                            ></textarea>
-                                        </div>
-                                        <Input
-                                            label="Dirección (Real u Online)"
-                                            name="address"
-                                            placeholder="Calle Falsa 123 o mitienda.cl"
-                                            required={formData.role === 'owner'}
-                                            value={formData.address}
-                                            onChange={handleChange}
-                                        />
-
-                                        <div className="space-y-3">
-                                            <LocationSelector
-                                                value={formData.location}
-                                                onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
-                                                className="gap-4"
+                                                className="h-5 w-5 rounded-lg border-slate-300 text-primary-600 focus:ring-primary-500"
                                             />
-                                            <div className="flex items-center gap-2 bg-primary-50 p-3 rounded-xl border border-primary-100">
-                                                <input
-                                                    type="checkbox"
-                                                    id="isOnline"
-                                                    name="isOnline"
-                                                    checked={formData.isOnline}
-                                                    onChange={handleChange}
-                                                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                                                />
-                                                <label htmlFor="isOnline" className="text-xs font-black text-primary-700 cursor-pointer">
-                                                    Mi tienda es 100% Online (No publicar ubicación)
-                                                </label>
-                                            </div>
-                                            <p className="text-[10px] text-slate-400 italic">Es obligatorio elegir ubicación para fines administrativos, pero si marcas Online, no será pública.</p>
+                                            <label htmlFor="isOnline" className="text-xs font-bold text-slate-600 cursor-pointer">
+                                                Mi tienda es 100% Online (No publicar ubicación)
+                                            </label>
                                         </div>
+                                    </div>
 
-                                        <div className="space-y-1.5">
-                                            <label className="text-sm font-medium text-slate-700">Tipo de emprendimiento</label>
-                                            <div className="flex gap-4">
-                                                <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50">
-                                                    <input
-                                                        type="radio"
-                                                        name="businessType"
-                                                        value="retail"
-                                                        className="sr-only"
-                                                        checked={formData.businessType === 'retail'}
-                                                        onChange={handleChange}
-                                                    />
-                                                    <span className="text-sm font-semibold">Minorista</span>
-                                                </label>
-                                                <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50">
-                                                    <input
-                                                        type="radio"
-                                                        name="businessType"
-                                                        value="wholesale"
-                                                        className="sr-only"
-                                                        checked={formData.businessType === 'wholesale'}
-                                                        onChange={handleChange}
-                                                    />
-                                                    <span className="text-sm font-semibold">Mayorista</span>
-                                                </label>
-                                                <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50">
-                                                    <input
-                                                        type="radio"
-                                                        name="businessType"
-                                                        value="restaurant"
-                                                        className="sr-only"
-                                                        checked={formData.businessType === 'restaurant'}
-                                                        onChange={handleChange}
-                                                    />
-                                                    <span className="text-sm font-semibold">Restaurante</span>
-                                                </label>
+                                    <div className="space-y-6">
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-sm font-bold text-slate-700">Tienda de Ventas</label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    {[
+                                                        { id: 'retail', label: 'Detalle' },
+                                                        { id: 'wholesale', label: 'Mayorista' },
+                                                        { id: 'mixed', label: 'Detalle y Mayorista' }
+                                                    ].map((type) => (
+                                                        <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                            <input
+                                                                type="radio"
+                                                                name="businessType"
+                                                                value={type.id}
+                                                                className="sr-only"
+                                                                checked={formData.businessType === type.id}
+                                                                onChange={handleChange}
+                                                            />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                                {type.label}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-sm font-bold text-slate-700">Negocios</label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    {[
+                                                        { id: 'restaurant', label: 'Restaurante' }
+                                                    ].map((type) => (
+                                                        <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                            <input
+                                                                type="radio"
+                                                                name="businessType"
+                                                                value={type.id}
+                                                                className="sr-only"
+                                                                checked={formData.businessType === type.id}
+                                                                onChange={handleChange}
+                                                            />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                                {type.label}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        )}
 
-                                {/* Presencia Digital */}
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">3. Presencia Digital</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-4">
-                                            <Input
-                                                label="Sitio Web"
-                                                name="website"
-                                                placeholder="https://..."
-                                                icon={<Globe className="h-4 w-4" />}
-                                                value={formData.website}
-                                                onChange={handleChange}
-                                            />
-                                            <Input
-                                                label="Instagram"
-                                                name="instagram"
-                                                placeholder="@tu_cuenta"
-                                                icon={<Instagram className="h-4 w-4" />}
-                                                value={formData.instagram}
-                                                onChange={handleChange}
-                                            />
-                                            <Input
-                                                label="TikTok"
-                                                name="tiktok"
-                                                placeholder="@tu_cuenta"
-                                                icon={<TikTokIcon />}
-                                                value={formData.tiktok}
-                                                onChange={handleChange}
-                                            />
-                                        </div>
-                                        <div className="space-y-4">
-                                            <Input
-                                                label="X (Twitter)"
-                                                name="twitter"
-                                                placeholder="@tu_cuenta"
-                                                icon={<Twitter className="h-4 w-4" />}
-                                                value={formData.twitter}
-                                                onChange={handleChange}
-                                            />
-                                            <Input
-                                                label="LinkedIn"
-                                                name="linkedin"
-                                                placeholder="linkedin.com/in/..."
-                                                icon={<Linkedin className="h-4 w-4" />}
-                                                value={formData.linkedin}
-                                                onChange={handleChange}
-                                            />
-                                            <Input
-                                                label="WhatsApp"
-                                                name="whatsapp"
-                                                placeholder="+569..."
-                                                icon={<Phone className="h-4 w-4" />}
-                                                value={formData.whatsapp}
-                                                onChange={handleChange}
-                                            />
-                                        </div>
-                                    </div>
+                        {/* Presencia Digital */}
+                        {formData.role === 'owner' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">3</span>
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Presencia Digital</h3>
                                 </div>
-                            </>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <Input label="Web" name="website" placeholder="https://..." icon={<Globe size={16} />} value={formData.website} onChange={handleChange} className="bg-white" />
+                                    <Input label="Instagram" name="instagram" placeholder="@tu_cuenta" icon={<Instagram size={16} />} value={formData.instagram} onChange={handleChange} className="bg-white" />
+                                    <Input label="TikTok" name="tiktok" placeholder="@tu_cuenta" icon={<TikTokIcon />} value={formData.tiktok} onChange={handleChange} className="bg-white" />
+                                    <Input label="WhatsApp" name="whatsapp" placeholder="+569..." icon={<Phone size={16} />} value={formData.whatsapp} onChange={handleChange} className="bg-white" />
+                                </div>
+                            </div>
                         )}
 
                         {/* Credenciales */}
-                        <div>
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
-                                {formData.role === 'owner' ? '4. Acceso' : '2. Acceso'}
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">
+                                    {formData.role === 'owner' ? '4' : '2'}
+                                </span>
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Credenciales</h3>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <Input
-                                    label="Correo electrónico"
+                                    label="Email"
                                     name="email"
                                     placeholder="tu@email.com"
                                     type="email"
@@ -538,6 +538,7 @@ export default function RegisterPage() {
                                     value={formData.email}
                                     onChange={handleChange}
                                     autoComplete="email"
+                                    className="bg-white"
                                 />
                                 <Input
                                     label="Contraseña"
@@ -548,62 +549,153 @@ export default function RegisterPage() {
                                     value={formData.password}
                                     onChange={handleChange}
                                     autoComplete="new-password"
+                                    className="bg-white"
                                 />
                             </div>
                         </div>
 
                         {/* Bot Protection */}
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                            <h3 className="text-sm font-bold text-slate-700 mb-3">Protección contra Bots</h3>
+                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Protección</h3>
+                                <button type="button" onClick={generateCaptcha} className="text-[10px] font-black text-primary-600 hover:underline">REGENERAR</button>
+                            </div>
                             <div className="flex items-center gap-4">
-                                <div className="flex h-10 w-24 items-center justify-center rounded-lg bg-white border-2 border-slate-200 text-lg font-mono font-bold text-primary-600 select-none">
+                                <div className="flex h-12 w-32 items-center justify-center rounded-xl bg-slate-50 border-2 border-slate-100 text-xl font-mono font-black text-primary-600 select-none shadow-inner">
                                     {captcha.q} =
                                 </div>
-                                <div className="flex-1">
-                                    <Input
-                                        placeholder="?"
-                                        type="number"
-                                        required
-                                        value={userCaptcha}
-                                        onChange={(e) => setUserCaptcha(e.target.value)}
-                                        className="text-center font-bold"
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={generateCaptcha}
-                                    className="text-xs font-semibold text-primary-600 hover:text-primary-700"
-                                >
-                                    Cambiar
-                                </button>
+                                <Input
+                                    placeholder="?"
+                                    type="number"
+                                    required
+                                    value={userCaptcha}
+                                    onChange={(e) => setUserCaptcha(e.target.value)}
+                                    className="text-center font-black text-lg h-12"
+                                />
                             </div>
                         </div>
 
-                        <div className="pt-4">
-                            <Button type="submit" className="w-full h-14 text-lg font-bold shadow-lg shadow-primary-200" disabled={loading || (user && !profile && authLoading)}>
+                        <div className="space-y-4 pt-4">
+                            <Button type="submit" className="w-full h-14 text-lg font-black shadow-xl shadow-primary-200 rounded-2xl transition-all hover:-translate-y-1 active:scale-95" disabled={loading || (user && !profile && authLoading)}>
                                 {loading || (user && !profile && authLoading) ? (
                                     <>
                                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        {loading ? 'Creando cuenta...' : 'Iniciando sesión...'}
+                                        Iniciando...
                                     </>
                                 ) : (
-                                    formData.role === 'owner' ? 'Crear Catálogo Ahora' : 'Crear Cuenta Cliente'
+                                    formData.role === 'owner' ? 'CREAR MI CATÁLOGO' : 'UNIRME AHORA'
                                 )}
                             </Button>
-                            <p className="mt-4 text-[11px] text-slate-400 text-center">
-                                Al registrarte, aceptas nuestros términos y condiciones y políticas de privacidad.
-                            </p>
+
+                            <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                <Link to="/login" className="hover:text-primary-600 transition-colors">¿Ya tienes cuenta? Inicia Sesión</Link>
+                                <span>•</span>
+                                <Link to="/" className="hover:text-primary-600 transition-colors">Volver al Inicio</Link>
+                            </div>
                         </div>
                     </form>
+                </div>
+            </div>
 
-                    <div className="mt-10 text-center text-sm text-slate-500">
-                        ¿Ya tienes cuenta?{' '}
-                        <Link to="/login" className="font-bold text-primary-600 hover:text-primary-700">
-                            Inicia sesión
-                        </Link>
+            {/* Right Side: Info Panel (Desktop Only) */}
+            <div className="hidden lg:flex relative flex-1 bg-slate-900 overflow-hidden items-center justify-center lg:justify-start lg:items-start p-20 lg:pt-32 xl:pt-40">
+                {/* Background Decoration */}
+                <div className="absolute top-0 left-0 w-full h-full">
+                    <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-primary-600/20 blur-[120px] rounded-full" />
+                    <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/20 blur-[120px] rounded-full" />
+                </div>
+
+                <div className="relative z-10 max-w-lg w-full">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-[10px] font-black uppercase tracking-widest mb-8">
+                        <BadgeCheck size={12} /> Ecosistema de confianza
                     </div>
-                </CardContent>
-            </Card>
+
+                    {formData.role === 'client' ? (
+                        <>
+                            <h2 className="text-5xl font-black text-white leading-tight mb-8">
+                                Encuentra y conecta con tus <span className="text-primary-500">tiendas favoritas</span>.
+                            </h2>
+
+                            <div className="space-y-8">
+                                <FeatureItem
+                                    icon={<Search className="text-primary-400" />}
+                                    title="Busca tiendas locales"
+                                    desc="Descubre los mejores negocios cerca de ti y sus catálogos actualizados."
+                                />
+                                <FeatureItem
+                                    icon={<Heart className="text-rose-400" />}
+                                    title="Guarda en favoritos"
+                                    desc="Ten tus tiendas preferidas siempre a mano y no te pierdas sus ofertas."
+                                />
+                                <FeatureItem
+                                    icon={<Star className="text-amber-400" />}
+                                    title="Opinión de la comunidad"
+                                    desc="Conoce lo que otros dicen y comparte tu experiencia con valoraciones reales."
+                                />
+                                <FeatureItem
+                                    icon={<ShoppingBag className="text-blue-400" />}
+                                    title="Cotizaciones rápidas"
+                                    desc="Pregunta por productos y precios en segundos directamente por WhatsApp."
+                                />
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-5xl font-black text-white leading-tight mb-8">
+                                Lleva tu negocio al <span className="text-primary-500">siguiente nivel</span> digital.
+                            </h2>
+
+                            <div className="space-y-8">
+                                <FeatureItem
+                                    icon={<Rocket className="text-primary-400" />}
+                                    title="Despliegue Instantáneo"
+                                    desc="Sube tus productos y comparte tu catálogo por WhatsApp en segundos."
+                                />
+                                <FeatureItem
+                                    icon={<Globe className="text-blue-400" />}
+                                    title="Sin Comisiones"
+                                    desc="Tus ventas son tuyas. No cobramos comisiones por transacción."
+                                />
+                                <FeatureItem
+                                    icon={<TrendingUp size={24} className="text-emerald-400" />}
+                                    title="Analíticas Reales"
+                                    desc="Conoce cuántas personas visitan tu catálogo y qué productos prefieren."
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    <div className="mt-16 p-8 rounded-[2rem] bg-white/5 backdrop-blur-xl border border-white/10">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="flex -space-x-3">
+                                {[1, 2, 3, 4].map(i => (
+                                    <div key={i} className="h-8 w-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center overflow-hidden">
+                                        <img src={`https://i.pravatar.cc/100?u=${i}`} alt="" />
+                                    </div>
+                                ))}
+                            </div>
+                            <span className="text-xs font-bold text-slate-300">+500 emprendedores ya confían</span>
+                        </div>
+                        <p className="text-slate-400 text-sm italic">
+                            "Ktaloog cambió la forma en que atiendo a mis clientes. El catálogo es rápido, elegante y muy fácil de usar."
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FeatureItem({ icon, title, desc }) {
+    return (
+        <div className="flex gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                {icon}
+            </div>
+            <div>
+                <h4 className="font-bold text-white mb-1">{title}</h4>
+                <p className="text-slate-400 text-sm leading-relaxed">{desc}</p>
+            </div>
         </div>
     );
 }

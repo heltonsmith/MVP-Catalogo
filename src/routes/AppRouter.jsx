@@ -7,16 +7,23 @@ import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
+import { CustomerDashboardLayout } from '../components/layout/CustomerDashboardLayout';
 import { DemoDashboardLayout } from '../components/layout/DemoDashboardLayout';
 import { DemoStoreDashboardLayout } from '../components/layout/DemoStoreDashboardLayout';
 import { DemoRestaurantDashboardLayout } from '../components/layout/DemoRestaurantDashboardLayout';
 import DashboardOverview from '../pages/DashboardOverview';
+import CustomerDashboard from '../pages/CustomerDashboard';
 import DashboardProducts from '../pages/DashboardProducts';
 import DashboardMessages from '../pages/DashboardMessages';
 import DashboardQuotes from '../pages/DashboardQuotes';
 import DashboardCategories from '../pages/DashboardCategories';
 import DashboardProfile from '../pages/DashboardProfile';
 import UserMessages from '../pages/UserMessages';
+import CustomerFavorites from '../pages/customer/CustomerFavorites';
+import CustomerOrders from '../pages/customer/CustomerOrders';
+import CustomerReviews from '../pages/customer/CustomerReviews';
+import CustomerMessages from '../pages/customer/CustomerMessages';
+import CustomerProfile from '../pages/customer/CustomerProfile';
 import PricingPage from '../pages/PricingPage';
 import TermsPage from '../pages/TermsPage';
 import AboutUsPage from '../pages/AboutUsPage';
@@ -57,6 +64,17 @@ export function AppRouter() {
                 <Route path="cotizaciones" element={<DashboardQuotes />} />
                 <Route path="categorias" element={<DashboardCategories />} />
                 <Route path="perfil" element={<DashboardProfile />} />
+                <Route path="*" element={<NotFoundPage />} />
+            </Route>
+
+            {/* Customer Dashboard Routes */}
+            <Route path="/dashboard/cliente" element={<CustomerDashboardLayout />}>
+                <Route index element={<CustomerDashboard />} />
+                <Route path="favoritos" element={<CustomerFavorites />} />
+                <Route path="pedidos" element={<CustomerOrders />} />
+                <Route path="resenas" element={<CustomerReviews />} />
+                <Route path="mensajes" element={<CustomerMessages />} />
+                <Route path="perfil" element={<CustomerProfile />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
 

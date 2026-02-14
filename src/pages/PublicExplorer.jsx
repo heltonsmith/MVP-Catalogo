@@ -14,11 +14,14 @@ import {
     Star,
     Clock,
     Calendar,
-    Globe
+    Globe,
+    Heart
 } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/ui/Toast';
 
 import { StoreSearch } from '../components/search/StoreSearch';
 import { supabase } from '../lib/supabase';
@@ -27,8 +30,9 @@ import { Link } from 'react-router-dom';
 
 const BUSINESS_FILTERS = [
     { id: 'all', label: 'Todo', icon: <LayoutGrid size={16} /> },
-    { id: 'retail', label: 'Al Detalle', icon: <ShoppingBag size={16} /> },
-    { id: 'wholesale', label: 'Por Mayor', icon: <Building2 size={16} /> },
+    { id: 'retail', label: 'Detalle', icon: <ShoppingBag size={16} /> },
+    { id: 'wholesale', label: 'Mayorista', icon: <Building2 size={16} /> },
+    { id: 'mixed', label: 'Detalle y Mayorista', icon: <Store size={16} /> },
     { id: 'restaurant', label: 'Restaurantes', icon: <Utensils size={16} /> },
 ];
 
@@ -39,6 +43,9 @@ export default function PublicExplorer() {
     const [activeFilter, setActiveFilter] = useState('all');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
+    const { showToast } = useToast();
+    const [userFavorites, setUserFavorites] = useState(new Set());
 
     const fetchData = async () => {
         setLoading(true);
@@ -85,10 +92,70 @@ export default function PublicExplorer() {
         }
     };
 
+    const fetchFavorites = async () => {
+        if (!user) return;
+        try {
+            const { data } = await supabase
+                .from('favorites')
+                .select('target_id')
+                .eq('user_id', user.id);
+            setUserFavorites(new Set(data?.map(f => f.target_id) || []));
+        } catch (error) {
+            console.error('Error fetching favorites:', error);
+        }
+    };
+
+    const toggleFavorite = async (e, store) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!user) {
+            showToast("Inicia sesión para guardar favoritos", "info");
+            return;
+        }
+
+        const isFav = userFavorites.has(store.id);
+        try {
+            if (isFav) {
+                await supabase
+                    .from('favorites')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('target_id', store.id);
+
+                const newFavs = new Set(userFavorites);
+                newFavs.delete(store.id);
+                setUserFavorites(newFavs);
+                showToast("Eliminado de favoritos", "success");
+            } else {
+                await supabase
+                    .from('favorites')
+                    .insert([{
+                        user_id: user.id,
+                        target_id: store.id,
+                        type: store.business_type || 'retail'
+                    }]);
+
+                const newFavs = new Set(userFavorites);
+                newFavs.add(store.id);
+                setUserFavorites(newFavs);
+                showToast("¡Guardado en favoritos!", "success");
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+            showToast("Error al procesar", "error");
+        }
+    };
+
     useEffect(() => {
         const timer = setTimeout(fetchData, 400);
         return () => clearTimeout(timer);
     }, [search, location, activeFilter]);
+
+    useEffect(() => {
+        if (user) fetchFavorites();
+        else setUserFavorites(new Set());
+    }, [user]);
 
     // Helper to check if store is new (created within last 30 days)
     const isNewStore = (dateString) => {
@@ -219,6 +286,17 @@ export default function PublicExplorer() {
                                             </div>
 
                                             <div className="absolute top-4 right-4 flex gap-2">
+                                                <button
+                                                    onClick={(e) => toggleFavorite(e, store)}
+                                                    className={cn(
+                                                        "h-8 w-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-lg",
+                                                        userFavorites.has(store.id)
+                                                            ? "bg-rose-500 text-white"
+                                                            : "bg-white/80 text-rose-500 hover:bg-white"
+                                                    )}
+                                                >
+                                                    <Heart size={16} className={userFavorites.has(store.id) ? "fill-current" : ""} />
+                                                </button>
                                                 {isNewStore(store.created_at) && (
                                                     <Badge className="bg-emerald-500 text-white border-none font-black shadow-sm flex items-center px-2 py-1 text-[10px] rounded-full">
                                                         NUEVO
@@ -273,11 +351,13 @@ export default function PublicExplorer() {
                                                 </div>
                                                 <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                                     {store.business_type === 'restaurant' ? (
-                                                        <><Utensils size={10} className="text-orange-400" /> Resto</>
+                                                        <><Utensils size={10} className="text-orange-400" /> Restaurante</>
                                                     ) : store.business_type === 'wholesale' ? (
-                                                        <><Building2 size={10} className="text-blue-400" /> Mayor</>
+                                                        <><Building2 size={10} className="text-blue-400" /> Mayorista</>
+                                                    ) : store.business_type === 'mixed' ? (
+                                                        <><Store size={10} className="text-primary-400" /> Detalle y Mayorista</>
                                                     ) : (
-                                                        <><Tag size={10} className="text-primary-400" /> Retail</>
+                                                        <><Tag size={10} className="text-primary-400" /> Detalle</>
                                                     )}
                                                 </div>
                                             </div>

@@ -40,7 +40,8 @@ export default function DashboardProfile() {
         name: '',
         slug: '',
         description: '',
-        whatsapp: ''
+        whatsapp: '',
+        businessType: 'retail'
     });
     const [passwords, setPasswords] = useState({
         current: '',
@@ -54,7 +55,8 @@ export default function DashboardProfile() {
                 name: company.name || '',
                 slug: company.slug || '',
                 description: company.description || '',
-                whatsapp: company.whatsapp || ''
+                whatsapp: company.whatsapp || '',
+                businessType: company.business_type || 'retail'
             });
         }
     }, [company?.id, demoCompany.id]);
@@ -101,7 +103,8 @@ export default function DashboardProfile() {
                     name: formData.name,
                     slug: formData.slug,
                     description: formData.description,
-                    whatsapp: formData.whatsapp
+                    whatsapp: formData.whatsapp,
+                    business_type: formData.businessType
                 })
                 .eq('id', company.id);
 
@@ -463,6 +466,56 @@ export default function DashboardProfile() {
                                                 placeholder="+56 9 1234 5678"
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tienda de Ventas</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                {[
+                                                    { id: 'retail', label: 'Detalle' },
+                                                    { id: 'wholesale', label: 'Mayorista' },
+                                                    { id: 'mixed', label: 'Detalle y Mayorista' }
+                                                ].map((type) => (
+                                                    <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                        <input
+                                                            type="radio"
+                                                            name="businessType"
+                                                            value={type.id}
+                                                            className="sr-only"
+                                                            checked={formData.businessType === type.id}
+                                                            onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
+                                                        />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                            {type.label}
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Negocios</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                {[
+                                                    { id: 'restaurant', label: 'Restaurante' }
+                                                ].map((type) => (
+                                                    <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                        <input
+                                                            type="radio"
+                                                            name="businessType"
+                                                            value={type.id}
+                                                            className="sr-only"
+                                                            checked={formData.businessType === type.id}
+                                                            onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
+                                                        />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                            {type.label}
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 

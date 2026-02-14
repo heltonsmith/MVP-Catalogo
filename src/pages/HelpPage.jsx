@@ -24,7 +24,7 @@ export default function HelpPage() {
         { q: '¿Cómo subo mis productos?', a: 'Desde tu Panel Admin, ve a "Productos" y haz clic en "Nuevo Producto". Solo necesitas nombre, precio y una foto.' },
         { q: '¿Mis clientes necesitan una app?', a: 'No, tus clientes entran a través de un enlace web o escaneando tu código QR. Funciona en cualquier navegador.' },
         { q: '¿Cómo recibo las ventas?', a: 'ktaloog es un catálogo. Los clientes te enviarán sus pedidos o consultas directamente a tu WhatsApp o chat interno.' },
-        { q: '¿Qué incluye el plan Pro?', a: 'Productos ilimitados, todas las fotos, sistema de mensajería, código QR, chat integrado y prioridad en soporte.' },
+        { q: '¿Qué incluye el plan Pro?', a: 'Productos ilimitados, hasta 6 fotos por producto, sistema de mensajería, código QR, chat integrado y prioridad en soporte.' },
     ];
 
     return (

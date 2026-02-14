@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Search, MessageCircle, User, Globe, Instagram, Music2, Share2, Bell, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X } from 'lucide-react';
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { Search, MessageCircle, User, Globe, Instagram, Music2, Share2, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X, Heart, Pencil } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { COMPANIES, PRODUCTS, CATEGORIES } from '../data/mock';
@@ -13,14 +13,17 @@ import { ChatWidget } from '../components/chat/ChatWidget';
 import { MailboxPreview } from '../components/chat/MailboxPreview';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { NotificationCenter } from '../components/notifications/NotificationCenter';
 import { cn, formatCurrency } from '../utils';
 import NotFoundPage from './NotFoundPage';
 
 export default function CatalogPage() {
     const { showToast } = useToast();
+    const { user, profile, refreshCompany } = useAuth();
     const [searchParams] = useSearchParams();
     const isDemo = searchParams.get('mode') === 'demo';
     const { companySlug } = useParams();
+    const navigate = useNavigate();
 
     const [company, setCompany] = useState(null);
     const [products, setProducts] = useState([]);
@@ -32,6 +35,9 @@ export default function CatalogPage() {
     const [isReviewsOpen, setIsReviewsOpen] = useState(false);
     const [isMailboxOpen, setIsMailboxOpen] = useState(false);
     const [isQROpen, setIsQROpen] = useState(false);
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [hasReviewed, setHasReviewed] = useState(false);
+    const [tempReview, setTempReview] = useState({ rating: 0, comment: '' });
 
     useEffect(() => {
         const fetchCatalogData = async () => {
@@ -87,7 +93,22 @@ export default function CatalogPage() {
                 if (companyError || !companyData) {
                     throw new Error('Company not found');
                 }
-                setCompany(companyData);
+
+                // 2. Fetch Reviews for real rating
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select('rating')
+                    .eq('target_id', companyData.id);
+
+                const realRating = reviewsData && reviewsData.length > 0
+                    ? parseFloat((reviewsData.reduce((acc, r) => acc + r.rating, 0) / reviewsData.length).toFixed(1))
+                    : 0;
+
+                setCompany({
+                    ...companyData,
+                    rating: realRating,
+                    reviews: reviewsData || []
+                });
 
                 // 2. Fetch Products and Categories
                 const { data: productsData, error: productsError } = await supabase
@@ -127,6 +148,106 @@ export default function CatalogPage() {
         }
     }, [companySlug]);
 
+    useEffect(() => {
+        if (user && company) {
+            checkIfFavorite();
+            checkIfReviewed();
+        }
+    }, [user, company]);
+
+    const checkIfFavorite = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('favorites')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('target_id', company.id)
+                .maybeSingle();
+
+            setIsFavorite(!!data);
+        } catch (error) {
+            console.error('Error checking favorite:', error);
+        }
+    };
+
+    const checkIfReviewed = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('reviews')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('company_id', company.id)
+                .maybeSingle();
+
+            setHasReviewed(!!data);
+        } catch (error) {
+            console.error('Error checking review:', error);
+        }
+    };
+
+    const toggleFavorite = async () => {
+        if (!user) {
+            showToast("Debes iniciar sesión para guardar favoritos", "info");
+            return;
+        }
+
+        try {
+            if (isFavorite) {
+                await supabase
+                    .from('favorites')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('target_id', company.id);
+                setIsFavorite(false);
+                showToast("Eliminado de favoritos", "success");
+            } else {
+                await supabase
+                    .from('favorites')
+                    .insert([{
+                        user_id: user.id,
+                        target_id: company.id,
+                        type: company.business_type || 'retail'
+                    }]);
+                setIsFavorite(true);
+                showToast("¡Guardado en favoritos!", "success");
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+            showToast("Error al procesar solicitud", "error");
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (!user) return;
+        if (tempReview.rating === 0) {
+            showToast("Por favor selecciona una calificación", "error");
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .insert([{
+                    user_id: user.id,
+                    company_id: company.id,
+                    rating: tempReview.rating,
+                    comment: tempReview.comment,
+                    customer_name: profile?.full_name || 'Anónimo'
+                }]);
+
+            if (error) throw error;
+
+            showToast("¡Gracias por tu opinión!", "success");
+            setHasReviewed(true);
+            setTempReview({ rating: 0, comment: '' });
+
+            // Optionally refresh reviews here if they are fetched live
+        } catch (error) {
+            console.error('Error submitting review:', error);
+            showToast("No se pudo enviar la reseña", "error");
+        }
+    };
+
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name ? p.name.toLowerCase().includes(search.toLowerCase()) : false;
         const matchesCategory = selectedCategory === 'all' ||
@@ -136,7 +257,6 @@ export default function CatalogPage() {
         return matchesSearch && matchesCategory;
     });
 
-    const { user } = useAuth();
     const [editMode, setEditMode] = useState(null); // 'banner' or 'logo'
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -374,12 +494,36 @@ export default function CatalogPage() {
                                         <BadgeCheck className="h-6 w-6 sm:h-7 sm:w-7 text-blue-400 fill-blue-400/20 flex-shrink-0" title="Cuenta Verificada (Pro)" />
                                     )}
                                 </div>
-                                <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 sm:line-clamp-none opacity-90 mb-1">{company.description}</p>
-                                <StarRating
-                                    rating={company.rating || 4.9}
-                                    count={company.reviews?.length || 0}
-                                    onClick={() => setIsReviewsOpen(true)}
-                                />
+                                <div className="group/desc relative">
+                                    <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 sm:line-clamp-none opacity-90 mb-1 pr-6">{company.description || (isOwner ? 'Añade una descripción para tu tienda...' : '')}</p>
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => navigate('/dashboard/profile')}
+                                            className="absolute right-0 top-0 p-1 opacity-0 group-hover/desc:opacity-100 transition-opacity text-white hover:text-primary-400"
+                                            title="Editar descripción"
+                                        >
+                                            <Pencil size={12} />
+                                        </button>
+                                    )}
+                                </div>
+                                {/* Rating Row */}
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    {company.reviews?.length > 0 ? (
+                                        <StarRating
+                                            rating={company.rating}
+                                            count={company.reviews.length}
+                                            size={16}
+                                            onClick={() => setIsReviewsOpen(true)}
+                                        />
+                                    ) : (
+                                        <span
+                                            onClick={() => setIsReviewsOpen(true)}
+                                            className="text-slate-400 text-[10px] font-bold uppercase tracking-widest bg-slate-900/40 px-3 py-1.5 rounded-full ring-1 ring-white/10 backdrop-blur-sm shadow-xl cursor-pointer hover:bg-slate-900/60 transition-colors"
+                                        >
+                                            Aún no hay calificación y comentarios
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -397,26 +541,60 @@ export default function CatalogPage() {
 
                             <div className="flex items-center gap-1 sm:gap-2">
                                 <button
-                                    onClick={() => showToast('Abriendo sitio web...', 'success')}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                    title="Sitio Web"
+                                    onClick={toggleFavorite}
+                                    className={cn(
+                                        "flex h-8 w-8 items-center justify-center rounded-full transition-all active:scale-95 shadow-sm",
+                                        isFavorite
+                                            ? "bg-rose-500 text-white shadow-rose-200"
+                                            : "bg-white/10 text-white hover:bg-white/20"
+                                    )}
+                                    title={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
                                 >
-                                    <Globe size={16} className="sm:size-18" />
+                                    <Heart size={16} className={cn("sm:size-18", isFavorite && "fill-current")} />
                                 </button>
-                                <button
-                                    onClick={() => showToast('Abriendo Instagram...', 'success')}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                    title="Instagram"
-                                >
-                                    <Instagram size={16} className="sm:size-18" />
-                                </button>
-                                <button
-                                    onClick={() => showToast('Abriendo TikTok...', 'success')}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                    title="TikTok"
-                                >
-                                    <Music2 size={16} className="sm:size-18" />
-                                </button>
+
+                                {(company.website || company.socials?.website) && (
+                                    <a
+                                        href={company.website || company.socials?.website}
+                                        target="_blank"
+                                        rel="nofollow noopener noreferrer"
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                        title="Sitio Web"
+                                    >
+                                        <Globe size={16} className="sm:size-18" />
+                                    </a>
+                                )}
+                                {company.socials?.instagram && (
+                                    <a
+                                        href={company.socials.instagram}
+                                        target="_blank"
+                                        rel="nofollow noopener noreferrer"
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                        title="Instagram"
+                                    >
+                                        <Instagram size={16} className="sm:size-18" />
+                                    </a>
+                                )}
+                                {company.socials?.tiktok && (
+                                    <a
+                                        href={company.socials.tiktok}
+                                        target="_blank"
+                                        rel="nofollow noopener noreferrer"
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                        title="TikTok"
+                                    >
+                                        <Music2 size={16} className="sm:size-18" />
+                                    </a>
+                                )}
+                                {isOwner && (!company.website || !company.socials?.instagram || !company.socials?.tiktok) && (
+                                    <button
+                                        onClick={() => navigate('/dashboard/profile')}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-white/30 text-white/50 hover:text-white hover:border-white transition-all"
+                                        title="Agregar redes sociales"
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                )}
                             </div>
 
                             <div className="h-4 w-px bg-white/20 mx-1" />
@@ -454,21 +632,20 @@ export default function CatalogPage() {
                                     variant="secondary"
                                     size="sm"
                                     className="h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 text-[10px] sm:text-xs font-bold gap-2 px-3 sm:px-4"
-                                    onClick={() => showToast('Función de chat activada', 'info')}
+                                    onClick={() => {
+                                        if (!user) {
+                                            showToast('Debes registrarte para chatear con la tienda', 'info');
+                                            return;
+                                        }
+                                        showToast('Función de chat activada', 'info');
+                                    }}
                                 >
                                     <MessageCircle size={14} />
                                     <span className="hidden sm:inline">Chatea con nosotros</span>
                                     <span className="sm:hidden">Chat</span>
                                 </Button>
 
-                                <button
-                                    onClick={() => showToast('No tienes notificaciones nuevas', 'info')}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95 relative"
-                                    title="Notificaciones"
-                                >
-                                    <Bell size={16} className="sm:size-18" />
-                                    <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-slate-900" />
-                                </button>
+                                <NotificationCenter />
                             </div>
                         </div>
                     </div>
@@ -586,11 +763,13 @@ export default function CatalogPage() {
 
             {/* Chat Widget triggers when isMailboxOpen is true or via its own internal floating button if we render it always */}
             {/* We render ChatWidget always, but pass isDemo={false} for these Pro Demos to enable mock chat */}
-            <ChatWidget
-                companyName={company.name}
-                companyLogo={company.logo}
-                isDemo={false} // Force "Pro" behavior (mock chat) for these demos as requested
-            />
+            {user && (
+                <ChatWidget
+                    companyName={company.name}
+                    companyLogo={company.logo}
+                    isDemo={false} // Force "Pro" behavior (mock chat) for these demos as requested
+                />
+            )}
 
             {/* QR Code Modal */}
             <Modal
@@ -639,35 +818,87 @@ export default function CatalogPage() {
                     </div>
 
                     <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                        {/* Use valid reviews or empty array */}
-                        {(company.reviews || []).map(review => (
-                            <div key={review.id} className="border border-slate-100 p-5 rounded-2xl hover:bg-slate-50 transition-colors">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                                            <User size={20} className="text-slate-400" />
+                        {company.reviews?.length > 0 ? (
+                            company.reviews.map(review => (
+                                <div key={review.id} className="border border-slate-100 p-5 rounded-2xl hover:bg-slate-50 transition-colors">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                                <User size={20} className="text-slate-400" />
+                                            </div>
+                                            <div>
+                                                <span className="font-bold text-slate-900 text-sm block">{review.user}</span>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{review.date}</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className="font-bold text-slate-900 text-sm block">{review.user}</span>
-                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{review.date}</span>
+                                        <div className="bg-slate-900 text-white px-2 py-1 rounded-lg text-xs font-black">
+                                            {review.rating}
                                         </div>
                                     </div>
-                                    <div className="bg-slate-900 text-white px-2 py-1 rounded-lg text-xs font-black">
-                                        {review.rating}
+                                    <div className="flex mb-2">
+                                        <StarRating rating={review.rating} size={12} />
                                     </div>
+                                    <p className="text-slate-600 text-sm italic leading-relaxed">"{review.comment}"</p>
                                 </div>
-                                <div className="flex mb-2">
-                                    <StarRating rating={review.rating} size={12} />
-                                </div>
-                                <p className="text-slate-600 text-sm italic leading-relaxed">"{review.comment}"</p>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 opacity-50">
+                                <p className="text-sm font-medium text-slate-500 italic">Aún no hay calificación y comentarios</p>
                             </div>
-                        ))}
+                        )}
                     </div>
+
+                    {user && !hasReviewed && !isOwner && (
+                        <div className="pt-4 border-t border-slate-100">
+                            <h4 className="text-sm font-black text-slate-900 mb-4">Deja tu opinión</h4>
+                            <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <div className="flex justify-center">
+                                    <StarRating
+                                        interactive
+                                        onRate={(val) => setTempReview(prev => ({ ...prev, rating: val }))}
+                                        rating={tempReview.rating}
+                                        size={32}
+                                    />
+                                </div>
+                                <textarea
+                                    className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-primary-600 focus:ring-1 focus:ring-primary-600 outline-none transition-all resize-none min-h-[100px]"
+                                    placeholder="Cuéntanos tu experiencia (opcional)..."
+                                    value={tempReview.comment}
+                                    onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value }))}
+                                />
+                                <Button
+                                    className="w-full"
+                                    onClick={handleSubmitReview}
+                                    disabled={tempReview.rating === 0}
+                                >
+                                    Enviar Calificación
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {hasReviewed && (
+                        <div className="pt-4 text-center">
+                            <p className="text-xs font-bold text-emerald-600 bg-emerald-50 py-3 rounded-xl border border-emerald-100">
+                                Ya has calificado esta tienda. ¡Gracias por tu opinión!
+                            </p>
+                        </div>
+                    )}
+
+                    {!user && (
+                        <div className="pt-4 text-center">
+                            <Link to="/login">
+                                <Button variant="secondary" className="w-full text-xs font-black uppercase tracking-widest h-12">
+                                    Inicia sesión para calificar
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
 
                     <div className="pt-2">
                         <Button
-                            variant="primary"
-                            className="w-full h-12 rounded-xl font-bold shadow-lg shadow-emerald-200"
+                            variant="secondary"
+                            className="w-full h-12 rounded-xl font-bold border-slate-200 text-slate-500"
                             onClick={() => setIsReviewsOpen(false)}
                         >
                             Cerrar
@@ -675,6 +906,6 @@ export default function CatalogPage() {
                     </div>
                 </div>
             </Modal>
-        </div >
+        </div>
     );
 }
