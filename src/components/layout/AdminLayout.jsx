@@ -1,13 +1,36 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, Settings } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { LayoutDashboard, Users, LogOut, Settings, Search, Home } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
 
 export function AdminLayout() {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { user, profile, loading, signOut } = useAuth();
+
+    useEffect(() => {
+        if (!loading) {
+            if (!user) {
+                navigate('/login');
+            } else if (profile?.role !== 'admin') {
+                navigate('/dashboard');
+            }
+        }
+    }, [user, profile, loading, navigate]);
+
+    const handleLogout = async () => {
+        await signOut();
+        navigate('/login');
+    };
+
+    if (loading) return null;
+    if (!profile || profile.role !== 'admin') return null;
 
     const navigation = [
         { name: 'Resumen', href: '/admin', icon: LayoutDashboard },
+        { name: 'Explorador', href: '/admin/explorador', icon: Search },
         { name: 'Usuarios & Tiendas', href: '/admin/usuarios', icon: Users },
         { name: 'Configuración', href: '/admin/configuracion', icon: Settings },
     ];
@@ -43,13 +66,24 @@ export function AdminLayout() {
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-slate-800">
-                    <Link to="/login">
-                        <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3">
-                            <LogOut size={18} />
-                            Cerrar Sesión
+                <div className="p-4 border-t border-slate-800 space-y-2">
+                    <Link to="/">
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
+                        >
+                            <Home size={18} />
+                            Volver al Inicio
                         </Button>
                     </Link>
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 gap-3"
+                        onClick={handleLogout}
+                    >
+                        <LogOut size={18} />
+                        Cerrar Sesión
+                    </Button>
                 </div>
             </aside>
 

@@ -7,32 +7,31 @@ import { Badge } from '../ui/Badge';
 import { formatCurrency } from '../../utils';
 import { useCart } from '../../hooks/useCart';
 
-export function ProductCard({ product, companySlug, cartEnabled = true }) {
+export function ProductCard({ product, companySlug, cartEnabled = true, isDemo = false }) {
     const { addToCart } = useCart();
     const [quantity, setQuantity] = useState(1);
     const mainImage = product.images[0];
 
-    // Check if cart is enabled for this company (passed via props or context, currently props)
-    // companySlug is available, but we need company object to check features. 
-    // Ideally ProductCard should receive 'company' prop or we find it.
-    // For now, let's assume we can fetch it or pass it. 
-    // Optimization: Pass `cartEnabled` prop to ProductCard.
+    const getLink = () => {
+        const baseLink = `/catalogo/${companySlug}/producto/${product.slug}`;
+        return isDemo ? `${baseLink}?mode=demo` : baseLink;
+    };
 
     const handleAddToCart = () => {
-        if (cartEnabled) { // Ensure addToCart is only called if cart is enabled
+        if (cartEnabled) {
             addToCart(product, quantity);
-            setQuantity(1); // Reset after adding
+            setQuantity(1);
         }
     };
 
     return (
-        <Card className="group flex flex-col h-full overflow-hidden">
-            <Link to={`/catalogo/${companySlug}/producto/${product.slug}`} className="block">
+        <Card className="group flex flex-col h-full overflow-hidden hover:shadow-lg transition-shadow duration-300">
+            <Link to={getLink()} className="block">
                 <div className="relative aspect-square overflow-hidden bg-slate-100">
                     <img
                         src={mainImage}
                         alt={product.name}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
                         {cartEnabled ? (
@@ -54,7 +53,7 @@ export function ProductCard({ product, companySlug, cartEnabled = true }) {
             </Link>
 
             <CardContent className="flex-1 p-4">
-                <Link to={`/catalogo/${companySlug}/producto/${product.slug}`}>
+                <Link to={getLink()}>
                     <h4 className="line-clamp-2 text-sm font-semibold text-slate-800 h-10 mb-1 hover:text-primary-600 transition-colors">
                         {product.name}
                     </h4>
@@ -72,7 +71,6 @@ export function ProductCard({ product, companySlug, cartEnabled = true }) {
             <CardFooter className="p-4 pt-0 flex-col gap-3">
                 {cartEnabled && (
                     <>
-                        {/* Quantity Selector */}
                         <div className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-1">
                             <button
                                 className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
@@ -93,12 +91,12 @@ export function ProductCard({ product, companySlug, cartEnabled = true }) {
 
                 <div className="flex w-full gap-2">
                     <Link
-                        to={`/catalogo/${companySlug}/producto/${product.slug}`}
+                        to={getLink()}
                         className="flex-1"
                     >
-                        <Button variant="secondary" size="sm" className="w-full">
+                        <Button variant="secondary" size="sm" className="w-full font-bold">
                             <Eye className="mr-2 h-4 w-4" />
-                            {cartEnabled ? 'Detalles' : 'Ver detalles'}
+                            {cartEnabled ? 'Ver' : 'Ver detalles'}
                         </Button>
                     </Link>
                     {cartEnabled && (
@@ -106,7 +104,7 @@ export function ProductCard({ product, companySlug, cartEnabled = true }) {
                             size="sm"
                             variant="primary"
                             onClick={handleAddToCart}
-                            className="px-3"
+                            className="px-3 shadow-md shadow-primary-200"
                         >
                             <ShoppingCart className="h-4 w-4" />
                         </Button>

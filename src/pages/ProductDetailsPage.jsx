@@ -71,6 +71,8 @@ export default function ProductDetailsPage() {
         }
     };
 
+    const isRestaurant = company.slug === 'restaurante-delicias';
+
     return (
         <div className="bg-white min-h-screen pb-20">
             {/* Mobile Header Nav */}
@@ -105,13 +107,19 @@ export default function ProductDetailsPage() {
                     <div className="flex flex-col">
                         <div className="flex flex-wrap items-center gap-2 mb-4">
                             <Badge variant="primary">{CATEGORIES.find(c => c.id === product.categoryId)?.name || product.categoryId}</Badge>
-                            {company.features?.cartEnabled !== false ? (
+
+                            {isRestaurant ? (
+                                <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
+                                    {product.stock > 0 ? 'Disponible' : 'No disponible'}
+                                </Badge>
+                            ) : company.features?.cartEnabled !== false ? (
                                 <Badge variant="success">En stock</Badge>
                             ) : (
                                 <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
                                     {product.stock > 0 ? 'Disponible' : 'No disponible'}
                                 </Badge>
                             )}
+
                             {product.rating && (
                                 <StarRating
                                     rating={product.rating}
@@ -123,7 +131,6 @@ export default function ProductDetailsPage() {
                         </div>
 
                         <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">{product.name}</h1>
-                        {/* ... rest of product info ... */}
                         <p className="text-sm font-mono text-slate-400 mt-2">SKU: {product.sku}</p>
 
                         <p className="mt-6 text-3xl font-bold text-primary-600">
@@ -141,27 +148,31 @@ export default function ProductDetailsPage() {
                             {/* Specs */}
                             <div className="grid grid-cols-2 gap-4 py-6 border-y border-slate-100">
                                 <div className="flex items-center space-x-3 text-slate-600">
-                                    {company.features?.cartEnabled !== false ? (
+                                    {isRestaurant ? (
+                                        <Utensils className="h-5 w-5 text-slate-400" />
+                                    ) : company.features?.cartEnabled !== false ? (
                                         <Package className="h-5 w-5 text-slate-400" />
                                     ) : (
                                         <Utensils className="h-5 w-5 text-slate-400" />
                                     )}
                                     <div>
                                         <p className="text-xs font-medium uppercase text-slate-400">
-                                            {company.features?.cartEnabled !== false ? 'Tamaño' : 'Tipo'}
+                                            {isRestaurant ? 'Tipo' : company.features?.cartEnabled !== false ? 'Tamaño' : 'Tipo'}
                                         </p>
                                         <p className="text-sm font-semibold">{product.size}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-3 text-slate-600">
-                                    {company.features?.cartEnabled !== false ? (
+                                    {isRestaurant ? (
+                                        <Package className="h-5 w-5 text-slate-400" />
+                                    ) : company.features?.cartEnabled !== false ? (
                                         <Truck className="h-5 w-5 text-slate-400" />
                                     ) : (
                                         <Package className="h-5 w-5 text-slate-400" />
                                     )}
                                     <div>
                                         <p className="text-xs font-medium uppercase text-slate-400">
-                                            {company.features?.cartEnabled !== false ? 'Peso' : 'Porción'}
+                                            {isRestaurant ? 'Porción' : company.features?.cartEnabled !== false ? 'Peso' : 'Porción'}
                                         </p>
                                         <p className="text-sm font-semibold">{product.weight}</p>
                                     </div>
@@ -169,7 +180,19 @@ export default function ProductDetailsPage() {
                             </div>
 
                             {/* Quantity and CTA */}
-                            {company.features?.cartEnabled !== false ? (
+                            {isRestaurant ? (
+                                <div className="pt-4 border-t border-slate-100">
+                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                                            <Utensils className="h-5 w-5 text-emerald-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-emerald-900 text-sm">Disponible en el local</h4>
+                                            <p className="text-xs text-emerald-700">Visítanos para disfrutar de este plato.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : company.features?.cartEnabled !== false ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center space-x-4">
                                         <div className="flex h-12 items-center rounded-xl border border-slate-200 px-2">

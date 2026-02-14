@@ -1,5 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
     Package,
@@ -8,70 +7,55 @@ import {
     Layers,
     MessageCircle,
     ExternalLink,
-    ChevronRight,
     Store,
     Lock,
-    Home
+    Info
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
+import { COMPANIES } from '../../data/mock';
 
-export function DashboardLayout() {
+export function DemoDashboardLayout() {
     const navigate = useNavigate();
-    const { user, profile, company, loading, signOut } = useAuth();
+    const location = useLocation();
 
-    useEffect(() => {
-        if (!loading) {
-            if (!user) {
-                navigate('/login');
-            } else if (profile?.role === 'admin') {
-                navigate('/admin');
-            }
-        }
-    }, [user, profile, loading, navigate]);
-
-    const handleLogout = async () => {
-        await signOut();
-        navigate('/login');
-    };
-
-    // If still loading in context, show nothing or a loader
-    // If not admin and no company, maybe they are in the wrong place
-    // But we let the context handle the global loading.
+    // Use the first mock company for the demo
+    const company = COMPANIES[0];
 
     const menuItems = [
-        { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
-        { name: 'Mis Productos', icon: <Package size={20} />, path: '/dashboard/productos' },
-        { name: 'Categorías', icon: <Layers size={20} />, path: '/dashboard/categorias' },
-        { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/dashboard/mensajes', badge: '3' },
-        { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/dashboard/cotizaciones' },
-        { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/dashboard/perfil' },
+        { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/demo/dashboard' },
+        { name: 'Mis Productos', icon: <Package size={20} />, path: '/demo/dashboard/productos' },
+        { name: 'Categorías', icon: <Layers size={20} />, path: '/demo/dashboard/categorias' },
+        { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/demo/dashboard/mensajes', badge: '3' },
+        { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/demo/dashboard/cotizaciones' },
+        { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/demo/dashboard/perfil' },
     ];
 
     return (
         <div className="flex h-screen w-full bg-slate-50 overscroll-none supports-[height:100dvh]:h-[100dvh]">
             {/* Sidebar for Desktop */}
             <aside className="hidden w-72 border-r border-slate-200 bg-white md:flex flex-col">
-                <div className="p-6 border-b border-slate-100">
+                <div className="p-6 border-b border-slate-100 bg-primary-50/50">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 w-full">
+                            <Info size={14} />
+                            MODO DEMOSTRACIÓN
+                        </div>
+                    </div>
                     <div className="flex items-center space-x-3">
                         <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center overflow-hidden shadow-sm ring-1 ring-slate-200 shrink-0">
-                            {company?.logo ? (
-                                <img
-                                    src={company.logo}
-                                    alt={company.name}
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                <Store className="h-6 w-6 text-primary-600" />
-                            )}
+                            <img
+                                src={company.logo}
+                                alt={company.name}
+                                className="h-full w-full object-cover"
+                            />
                         </div>
                         <div className="min-w-0">
                             <h2 className="text-sm font-bold text-slate-900 truncate">
-                                {company?.name || 'Mi Tienda'}
+                                {company.name}
                             </h2>
                             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
-                                {company ? 'Tienda Verificada' : 'Configurando...'}
+                                Tienda Verificada
                             </p>
                         </div>
                     </div>
@@ -84,13 +68,7 @@ export function DashboardLayout() {
                             <NavLink
                                 key={item.path}
                                 to={isLocked ? '#' : item.path}
-                                end={item.path === '/dashboard'}
-                                onClick={(e) => {
-                                    if (isLocked) {
-                                        e.preventDefault();
-                                        // Maybe show a toast or nothing since it's visually locked
-                                    }
-                                }}
+                                end={item.path === '/demo/dashboard'}
                                 className={({ isActive }) =>
                                     cn(
                                         "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all group",
@@ -125,23 +103,18 @@ export function DashboardLayout() {
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-slate-100 space-y-2">
-                    <NavLink to="/">
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                        >
-                            <Home size={20} className="mr-3" />
-                            Volver al Inicio
-                        </Button>
-                    </NavLink>
+                <div className="p-4 border-t border-slate-100">
+                    <div className="bg-slate-50 p-4 rounded-xl text-xs text-slate-500 mb-4">
+                        <p className="font-bold mb-1 text-slate-700">Nota:</p>
+                        Esta es una versión de prueba. Los cambios no se guardarán.
+                    </div>
                     <Button
                         variant="ghost"
-                        className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50"
-                        onClick={handleLogout}
+                        className="w-full justify-start text-slate-500 hover:text-slate-700"
+                        onClick={() => navigate('/')}
                     >
                         <LogOut size={20} className="mr-3" />
-                        Cerrar Sesión
+                        Salir del Demo
                     </Button>
                 </div>
             </aside>
@@ -151,23 +124,22 @@ export function DashboardLayout() {
                 {/* Mobile Header */}
                 <header className="flex-none h-16 flex items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden z-30">
                     <div className="flex items-center space-x-3">
+                        <div className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            DEMO
+                        </div>
                         <div className="h-8 w-8 rounded-lg bg-primary-100 flex items-center justify-center overflow-hidden shrink-0">
-                            {company?.logo ? (
-                                <img
-                                    src={company.logo}
-                                    alt={company.name}
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                <Store className="h-5 w-5 text-primary-600" />
-                            )}
+                            <img
+                                src={company.logo}
+                                alt={company.name}
+                                className="h-full w-full object-cover"
+                            />
                         </div>
                         <span className="font-bold text-slate-900 text-sm truncate max-w-[150px]">
-                            {company?.name || 'Mi Tienda'}
+                            {company.name}
                         </span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleLogout}>
-                        <LogOut size={20} className="text-red-500" />
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                        <LogOut size={20} className="text-slate-500" />
                     </Button>
                 </header>
 
@@ -178,7 +150,7 @@ export function DashboardLayout() {
                     </div>
                 </main>
 
-                {/* Mobile Bottom Navigation - FIXED */}
+                {/* Mobile Bottom Navigation */}
                 <nav className="flex-none h-16 border-t border-slate-200 bg-white md:hidden grid grid-cols-5 z-50">
                     {menuItems.slice(0, 5).map((item) => {
                         const isLocked = company?.plan === 'free' && ['Mensajes', 'Cotizaciones'].includes(item.name);
@@ -186,10 +158,7 @@ export function DashboardLayout() {
                             <NavLink
                                 key={item.path}
                                 to={isLocked ? '#' : item.path}
-                                end={item.path === '/dashboard'}
-                                onClick={(e) => {
-                                    if (isLocked) e.preventDefault();
-                                }}
+                                end={item.path === '/demo/dashboard'}
                                 className={({ isActive }) =>
                                     cn(
                                         "flex flex-col items-center justify-center text-[10px] font-bold transition-colors relative",

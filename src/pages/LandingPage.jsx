@@ -1,7 +1,9 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Smartphone, Zap, ShoppingBag, Store, Utensils } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, CheckCircle, Smartphone, Zap, ShoppingBag, Store, Utensils, Search, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
+
 import { motion } from 'framer-motion';
 
 export default function LandingPage() {
@@ -44,7 +46,7 @@ export default function LandingPage() {
                             <div className="mt-10 flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
                                 <Link to="/registro">
                                     <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold">
-                                        Empezar gratis
+                                        Regístrate Gratis
                                         <ArrowRight className="ml-2 h-5 w-5" />
                                     </Button>
                                 </Link>
@@ -62,6 +64,23 @@ export default function LandingPage() {
                                         </Button>
                                     </Link>
                                 </div>
+                            </div>
+
+                            {/* New Search Entry */}
+                            {/* Search CTA Button */}
+                            <div className="mt-14 flex flex-col items-center animate-fade-in-up delay-[400ms]">
+                                <Link to="/explorar">
+                                    <Button
+                                        size="lg"
+                                        className="h-16 px-12 rounded-2xl text-xl font-black shadow-xl shadow-primary-600/20 hover:scale-105 active:scale-95 transition-all duration-300 bg-primary-600 hover:bg-primary-700 text-white border-b-4 border-primary-800 active:border-b-0 active:translate-y-1"
+                                    >
+                                        <Search className="mr-3 h-6 w-6" />
+                                        Busca tu Tienda
+                                    </Button>
+                                </Link>
+                                <p className="mt-6 text-slate-500 font-medium tracking-wide">
+                                    Explora cientos de emprendedores locales cerca de ti
+                                </p>
                             </div>
                         </motion.div>
                     </div>
@@ -187,8 +206,8 @@ export default function LandingPage() {
                     <p className="mt-4 text-primary-100 italic">Únete a cientos de emprendedores que ya están vendiendo más.</p>
                     <div className="mt-8">
                         <Link to="/registro">
-                            <Button variant="secondary" size="lg" className="bg-white text-primary-600 hover:bg-slate-100">
-                                Crear mi catálogo ahora
+                            <Button variant="secondary" size="lg" className="bg-white text-primary-600 hover:bg-slate-100 font-bold">
+                                Regístrate ahora
                             </Button>
                         </Link>
                     </div>

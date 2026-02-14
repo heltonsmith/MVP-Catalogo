@@ -68,13 +68,13 @@ export function ChatWidget({ companyName, companyLogo, isDemo }) {
                         className="mb-4 flex h-[500px] w-[calc(100vw-2rem)] sm:w-[350px] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200"
                     >
                         {/* Chat Header */}
-                        <div className="flex items-center justify-between bg-primary-600 p-4 text-white">
+                        <div className="flex items-center justify-between bg-primary-700 p-4 text-white shadow-sm">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-white p-0.5 shadow-md">
+                                <div className="h-10 w-10 rounded-full bg-white p-0.5 shadow-md ring-2 ring-white/20">
                                     <img src={companyLogo} alt={companyName} className="h-full w-full rounded-full object-cover" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm">{companyName}</h3>
+                                    <h3 className="font-bold text-base tracking-tight">{companyName}</h3>
                                     <span className="flex items-center text-[10px] text-primary-100">
                                         <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400" />
                                         En línea ahora

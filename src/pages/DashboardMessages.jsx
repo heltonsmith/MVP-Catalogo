@@ -1,18 +1,34 @@
 import { useState, useMemo } from 'react';
-import { MessageCircle, Search, User, Send, Filter, MoreVertical, Check } from 'lucide-react';
+import { MessageCircle, Search, User, Send, Filter, MoreVertical, Check, Zap } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { cn } from '../utils';
-import { CONVERSATIONS, CHATS } from '../data/mock';
+import { CONVERSATIONS, CHATS, COMPANIES } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
+import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
+import { useLocation } from 'react-router-dom';
 
 export default function DashboardMessages() {
+    const { company: authCompany } = useAuth();
+    const location = useLocation();
+
+    // Check for demo mode
+    const isDemo = location.pathname.includes('/demo');
+    const isDemoRestaurant = location.pathname.includes('/demo/restaurante');
+    const demoCompany = isDemoRestaurant ? COMPANIES[2] : COMPANIES[0];
+
+    const company = isDemo ? { ...demoCompany, plan: 'pro' } : authCompany;
     const [selectedId, setSelectedId] = useState(1);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [localReplies, setLocalReplies] = useState({}); // { 1: [msg], 2: [msg] }
 
     const [showChatOnMobile, setShowChatOnMobile] = useState(false);
 
-    const conversations = CONVERSATIONS;
+    // Filter conversations by company in demo mode
+    const conversations = isDemo
+        ? CONVERSATIONS.filter(c => c.companyId === demoCompany.id)
+        : CONVERSATIONS;
 
     const currentChat = useMemo(() =>
         conversations.find(c => c.id === selectedId)
@@ -37,6 +53,12 @@ export default function DashboardMessages() {
         e.preventDefault();
         if (!replyText.trim()) return;
 
+        if (isDemo) {
+            showToast("Esta es una demostración. En la versión real podrás enviar mensajes.", "info");
+            setReplyText('');
+            return;
+        }
+
         const newMsg = {
             id: Date.now(),
             text: replyText,
@@ -50,6 +72,44 @@ export default function DashboardMessages() {
         }));
         setReplyText('');
     };
+
+    if (company?.plan === 'free' && !isDemo) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-180px)] bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center relative overflow-hidden">
+                {/* Decorative Background */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-50 rounded-full -mr-32 -mt-32 blur-3xl opacity-50" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-50 rounded-full -ml-32 -mb-32 blur-3xl opacity-50" />
+
+                <div className="relative z-10 max-w-sm">
+                    <div className="h-20 w-20 bg-primary-100 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-primary-100/50">
+                        <MessageCircle size={40} className="text-primary-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-3">Mensajería PRO</h2>
+                    <p className="text-slate-500 mb-8 leading-relaxed">
+                        Chatea directamente con tus clientes desde tu panel y cierra más ventas. Esta función está disponible exclusivamente para usuarios <strong>PRO</strong>.
+                    </p>
+                    <div className="space-y-3">
+                        <Button
+                            className="w-full h-12 font-bold shadow-lg shadow-primary-100 bg-primary-600 hover:bg-primary-700"
+                            onClick={() => setShowUpgradeModal(true)}
+                        >
+                            <Zap size={18} className="mr-2 fill-current" />
+                            Mejorar a PRO ahora
+                        </Button>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            Activación manual en menos de 24h
+                        </p>
+                    </div>
+                </div>
+
+                <PlanUpgradeModal
+                    isOpen={showUpgradeModal}
+                    onClose={() => setShowUpgradeModal(false)}
+                    companyId={company.id}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-[calc(100dvh-130px)] md:h-[calc(100vh-180px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">

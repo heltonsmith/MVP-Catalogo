@@ -1,15 +1,18 @@
 import { useState, useMemo } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Rocket } from 'lucide-react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { ShoppingCart, Menu, X, Rocket, LogOut, User, Store, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
 import { COMPANIES } from '../../data/mock';
 
 export function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const { carts } = useCart();
+    const { user, company, signOut, profile } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Detect current company from URL and check if cart is enabled
     const cartVisible = useMemo(() => {
@@ -27,9 +30,15 @@ export function Navbar() {
 
     const navLinks = [
         { name: 'Inicio', path: '/' },
-        { name: 'Precios', path: '/precios' },
-        { name: 'Demo Tienda', path: '/catalogo/ecoverde-spa?mode=demo' },
-        { name: 'Demo Restaurante', path: '/catalogo/restaurante-delicias?mode=demo' },
+        { name: 'Buscador Tiendas', path: '/explorar' },
+        {
+            name: 'Tiendas Demo',
+            path: '#',
+            submenu: [
+                { name: 'Tienda', path: '/catalogo/ecoverde-spa?mode=demo' },
+                { name: 'Restaurante', path: '/catalogo/restaurante-delicias?mode=demo' }
+            ]
+        },
     ];
 
     return (
@@ -47,18 +56,46 @@ export function Navbar() {
                     {/* Desktop Nav */}
                     <div className="hidden md:flex items-center space-x-8">
                         {navLinks.map((link) => (
-                            <NavLink
-                                key={link.path}
-                                to={link.path}
-                                className={({ isActive }) =>
-                                    cn(
-                                        "text-sm font-medium transition-colors hover:text-primary-600",
-                                        isActive ? "text-primary-600" : "text-slate-600"
-                                    )
-                                }
-                            >
-                                {link.name}
-                            </NavLink>
+                            <div key={link.name} className="relative group">
+                                {link.submenu ? (
+                                    <>
+                                        <button className="flex items-center text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors py-2">
+                                            {link.name}
+                                            <ChevronDown size={16} className="ml-1" />
+                                        </button>
+                                        <div className="absolute left-0 mt-0 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 pt-2">
+                                            <div className="bg-white rounded-xl shadow-xl ring-1 ring-slate-200 overflow-hidden py-1">
+                                                {link.submenu.map((subItem) => (
+                                                    <NavLink
+                                                        key={subItem.path}
+                                                        to={subItem.path}
+                                                        className={({ isActive }) =>
+                                                            cn(
+                                                                "block px-4 py-2 text-sm transition-colors hover:bg-slate-50",
+                                                                isActive ? "text-primary-600 bg-primary-50 font-medium" : "text-slate-600"
+                                                            )
+                                                        }
+                                                    >
+                                                        {subItem.name}
+                                                    </NavLink>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <NavLink
+                                        to={link.path}
+                                        className={({ isActive }) =>
+                                            cn(
+                                                "text-sm font-medium transition-colors hover:text-primary-600",
+                                                isActive ? "text-primary-600" : "text-slate-600"
+                                            )
+                                        }
+                                    >
+                                        {link.name}
+                                    </NavLink>
+                                )}
+                            </div>
                         ))}
                     </div>
 
@@ -76,12 +113,48 @@ export function Navbar() {
                             </Link>
                         )}
 
-                        <Link to="/login" className="hidden md:block">
-                            <Button variant="secondary" size="sm">Ingresar</Button>
-                        </Link>
-                        <Link to="/registro" className="hidden md:block">
-                            <Button size="sm">Empezar</Button>
-                        </Link>
+                        {user ? (
+                            <div className="hidden md:flex items-center gap-4">
+                                <div className="flex flex-col items-end mr-2">
+                                    <span className="text-sm font-bold text-slate-700">
+                                        {profile?.role === 'admin' || profile?.role === 'super_admin'
+                                            ? 'Admin Ktaloog'
+                                            : (company?.name || 'Mi Tienda')
+                                        }
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Sesión Activa</span>
+                                </div>
+                                <div className="h-8 w-px bg-slate-200 mx-2" />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => signOut()}
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                >
+                                    <LogOut size={16} className="mr-2" />
+                                    Salir
+                                </Button>
+                                <Link to="/dashboard">
+                                    <Button size="sm" className="shadow-lg shadow-primary-200">
+                                        Ir al Panel
+                                    </Button>
+                                </Link>
+                            </div>
+                        ) : (
+                            <>
+                                <Link to="/login" className="hidden md:block">
+                                    <Button variant="secondary" size="sm">Iniciar Sesión</Button>
+                                </Link>
+                                <Link to="/registro" className="hidden md:block">
+                                    <Button size="sm">Regístrate Gratis</Button>
+                                </Link>
+                                <Link to="/precios" className="hidden md:block ml-2">
+                                    <Button size="sm" className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold border-none shadow-md shadow-amber-200">
+                                        Precios
+                                    </Button>
+                                </Link>
+                            </>
+                        )}
 
                         <button
                             onClick={() => setIsOpen(!isOpen)}
@@ -98,27 +171,85 @@ export function Navbar() {
                 <div className="md:hidden border-t border-slate-100 bg-white transition-all">
                     <div className="space-y-1 px-4 py-4">
                         {navLinks.map((link) => (
-                            <NavLink
-                                key={link.path}
-                                to={link.path}
-                                onClick={() => setIsOpen(false)}
-                                className={({ isActive }) =>
-                                    cn(
-                                        "block px-3 py-2 text-base font-medium rounded-md",
-                                        isActive ? "bg-primary-50 text-primary-600" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                                    )
-                                }
-                            >
-                                {link.name}
-                            </NavLink>
+                            <div key={link.name}>
+                                {link.submenu ? (
+                                    <div className="space-y-1">
+                                        <div className="px-3 py-2 text-base font-medium text-slate-800">
+                                            {link.name}
+                                        </div>
+                                        <div className="pl-4 space-y-1 border-l-2 border-slate-100 ml-3">
+                                            {link.submenu.map((subItem) => (
+                                                <NavLink
+                                                    key={subItem.path}
+                                                    to={subItem.path}
+                                                    onClick={() => setIsOpen(false)}
+                                                    className={({ isActive }) =>
+                                                        cn(
+                                                            "block px-3 py-2 text-sm font-medium rounded-md",
+                                                            isActive ? "text-primary-600 bg-primary-50" : "text-slate-500 hover:text-slate-900"
+                                                        )
+                                                    }
+                                                >
+                                                    {subItem.name}
+                                                </NavLink>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <NavLink
+                                        to={link.path}
+                                        onClick={() => setIsOpen(false)}
+                                        className={({ isActive }) =>
+                                            cn(
+                                                "block px-3 py-2 text-base font-medium rounded-md",
+                                                isActive ? "bg-primary-50 text-primary-600" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                            )
+                                        }
+                                    >
+                                        {link.name}
+                                    </NavLink>
+                                )}
+                            </div>
                         ))}
                         <div className="pt-4 flex flex-col space-y-2">
-                            <Link to="/login" onClick={() => setIsOpen(false)}>
-                                <Button variant="secondary" className="w-full">Ingresar</Button>
-                            </Link>
-                            <Link to="/registro" onClick={() => setIsOpen(false)}>
-                                <Button className="w-full">Empezar gratis</Button>
-                            </Link>
+                            {user ? (
+                                <>
+                                    <div className="px-3 py-2 flex items-center gap-3 bg-slate-50 rounded-xl mb-2">
+                                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                                            <Store size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-900">{company?.name || 'Mi Tienda'}</p>
+                                            <p className="text-xs text-slate-500">{user.email}</p>
+                                        </div>
+                                    </div>
+                                    <Link to="/dashboard" onClick={() => setIsOpen(false)}>
+                                        <Button className="w-full">Ir al Panel</Button>
+                                    </Link>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                                        onClick={() => {
+                                            signOut();
+                                            setIsOpen(false);
+                                        }}
+                                    >
+                                        Cerrar Sesión
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Link to="/login" onClick={() => setIsOpen(false)}>
+                                        <Button variant="secondary" className="w-full">Iniciar Sesión</Button>
+                                    </Link>
+                                    <Link to="/registro" onClick={() => setIsOpen(false)}>
+                                        <Button className="w-full">Regístrate Gratis</Button>
+                                    </Link>
+                                    <Link to="/precios" onClick={() => setIsOpen(false)}>
+                                        <Button variant="ghost" className="w-full">Precios</Button>
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
