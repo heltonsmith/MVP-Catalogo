@@ -1,52 +1,102 @@
-import { useState } from 'react';
-import { MessageCircle, Search, Store, Send, Filter, ChevronRight, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MessageCircle, Search, Store, Send, Filter, ChevronRight, User, Loader2, Check } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { cn } from '../utils';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { useChat } from '../hooks/useChat';
 
 export default function UserMessages() {
-    const [selectedId, setSelectedId] = useState(1);
+    const { user } = useAuth();
+    const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [messageText, setMessageText] = useState('');
+    const [chats, setChats] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const interactions = [
-        {
-            id: 1,
-            store: "EcoVerde Spa",
-            lastMessage: "Gracias por escribirnos. Te responderemos lo antes posible.",
-            time: "10:26 AM",
-            unread: true,
-            logo: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=100"
-        },
-        {
-            id: 2,
-            store: "TechStore Chile",
-            lastMessage: "Su pedido ha sido procesado.",
-            time: "Ayer",
-            unread: false,
-            logo: "https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=100"
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const fetchChats = async () => {
+            setLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('company_id, created_at, content, is_read, sender_type')
+                    .eq('customer_id', user.id)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const uniqueChats = [];
+                const seenCompanies = new Set();
+
+                for (const msg of data) {
+                    if (!seenCompanies.has(msg.company_id)) {
+                        seenCompanies.add(msg.company_id);
+                        uniqueChats.push({
+                            ...msg,
+                            count: 1
+                        });
+                    }
+                }
+
+                if (uniqueChats.length > 0) {
+                    const companyIds = uniqueChats.map(c => c.company_id);
+                    const { data: companies } = await supabase
+                        .from('companies')
+                        .select('id, name, logo_url')
+                        .in('id', companyIds);
+
+                    const chatsWithDetails = uniqueChats.map(chat => {
+                        const company = companies?.find(c => c.id === chat.company_id);
+                        return {
+                            ...chat,
+                            companyName: company?.name || 'Tienda',
+                            companyLogo: company?.logo_url
+                        };
+                    });
+                    setChats(chatsWithDetails);
+                } else {
+                    setChats([]);
+                }
+            } catch (error) {
+                console.error("Error loading chats:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchChats();
+    }, [user?.id]);
+
+    const { messages, loading: messagesLoading, sendMessage, markAsRead } = useChat({
+        companyId: selectedCompanyId,
+        customerId: user?.id,
+        enabled: !!selectedCompanyId
+    });
+
+    useEffect(() => {
+        if (selectedCompanyId && messages.length > 0) {
+            markAsRead('store');
         }
-    ];
+    }, [selectedCompanyId, messages, markAsRead]);
 
-    const [chatHistory, setChatHistory] = useState([
-        { id: 1, text: "Hola, vi sus productos en el catálogo.", sender: 'user', time: '10:25 AM' },
-        { id: 2, text: "¿Tienen stock del Cepillo de Bambú? Me interesa comprar 5.", sender: 'user', time: '10:26 AM' },
-        { id: 3, text: "Gracias por escribirnos. Te responderemos lo antes posible.", sender: 'store', time: '10:26 AM' }
-    ]);
-
-    const handleSend = (e) => {
+    const handleSend = async (e) => {
         e.preventDefault();
         if (!messageText.trim()) return;
 
-        setChatHistory([...chatHistory, {
-            id: Date.now(),
-            text: messageText,
-            sender: 'user',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-        setMessageText('');
+        const success = await sendMessage(messageText, 'customer');
+        if (success) {
+            setMessageText('');
+        }
     };
 
-    const currentChat = interactions.find(i => i.id === selectedId);
+    const currentChat = chats.find(c => c.company_id === selectedCompanyId);
+
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin text-primary-600" /></div>
+    }
 
     return (
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -65,32 +115,41 @@ export default function UserMessages() {
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-2 pb-4">
-                        {interactions.map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => setSelectedId(item.id)}
-                                className={cn(
-                                    "w-full p-4 mb-2 flex items-start gap-3 transition-all rounded-2xl relative",
-                                    selectedId === item.id
-                                        ? "bg-white shadow-md ring-1 ring-slate-200/50"
-                                        : "hover:bg-white/50"
-                                )}
-                            >
-                                <div className="h-10 w-10 rounded-xl overflow-hidden shadow-sm shrink-0">
-                                    <img src={item.logo} alt={item.store} className="h-full w-full object-cover" />
-                                </div>
-                                <div className="flex-1 text-left min-w-0">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <h4 className="font-bold text-slate-900 text-sm truncate">{item.store}</h4>
-                                        <span className="text-[10px] text-slate-400 font-medium">{item.time}</span>
+                        {chats.length === 0 ? (
+                            <div className="text-center p-8 text-slate-400 text-sm">No tienes mensajes.</div>
+                        ) : (
+                            chats.map((item) => (
+                                <button
+                                    key={item.company_id}
+                                    onClick={() => setSelectedCompanyId(item.company_id)}
+                                    className={cn(
+                                        "w-full p-4 mb-2 flex items-start gap-3 transition-all rounded-2xl relative",
+                                        selectedCompanyId === item.company_id
+                                            ? "bg-white shadow-md ring-1 ring-slate-200/50"
+                                            : "hover:bg-white/50"
+                                    )}
+                                >
+                                    <div className="h-10 w-10 rounded-xl overflow-hidden shadow-sm shrink-0 bg-white">
+                                        {item.companyLogo ? (
+                                            <img src={item.companyLogo} alt={item.companyName} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <Store className="h-full w-full p-2 text-slate-300" />
+                                        )}
                                     </div>
-                                    <p className="text-xs text-slate-500 truncate line-clamp-1">{item.lastMessage}</p>
-                                </div>
-                                {item.unread && (
-                                    <div className="h-2 w-2 rounded-full bg-primary-600 mt-2" />
-                                )}
-                            </button>
-                        ))}
+                                    <div className="flex-1 text-left min-w-0">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className="font-bold text-slate-900 text-sm truncate">{item.companyName}</h4>
+                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 truncate line-clamp-1">
+                                            {item.sender_type === 'customer' ? 'Tú: ' : ''}{item.content}
+                                        </p>
+                                    </div>
+                                    {/** Unread indicator could go here if we tracked it */}
+                                </button>
+                            )))}
                     </div>
                 </div>
 
@@ -100,11 +159,13 @@ export default function UserMessages() {
                         <>
                             <div className="flex items-center justify-between px-8 py-5 border-b border-slate-50 shadow-sm z-10">
                                 <div className="flex items-center gap-4">
-                                    <div className="h-10 w-10 rounded-xl overflow-hidden">
-                                        <img src={currentChat.logo} alt={currentChat.store} className="h-full w-full object-cover" />
+                                    <div className="h-10 w-10 rounded-xl overflow-hidden bg-slate-100">
+                                        {currentChat.companyLogo ? (
+                                            <img src={currentChat.companyLogo} alt={currentChat.companyName} className="h-full w-full object-cover" />
+                                        ) : <Store className="h-full w-full p-2 text-slate-300" />}
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-900">{currentChat.store}</h3>
+                                        <h3 className="font-bold text-slate-900">{currentChat.companyName}</h3>
                                         <div className="flex items-center gap-1.5">
                                             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tienda en línea</span>
@@ -115,27 +176,33 @@ export default function UserMessages() {
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide bg-slate-50/20">
-                                {chatHistory.map((msg) => (
-                                    <div
-                                        key={msg.id}
-                                        className={cn(
-                                            "flex flex-col max-w-[75%]",
-                                            msg.sender === 'user' ? "ml-auto items-end" : "mr-auto items-start"
-                                        )}
-                                    >
+                                {messagesLoading ? (
+                                    <div className="flex justify-center h-full items-center"><Loader2 className="animate-spin text-slate-300" /></div>
+                                ) : (
+                                    messages.map((msg) => (
                                         <div
+                                            key={msg.id}
                                             className={cn(
-                                                "rounded-2xl px-5 py-3 text-sm shadow-sm",
-                                                msg.sender === 'user'
-                                                    ? "bg-primary-600 text-white rounded-tr-none"
-                                                    : "bg-white text-slate-700 rounded-tl-none border border-slate-100"
+                                                "flex flex-col max-w-[75%]",
+                                                msg.sender_type === 'customer' ? "ml-auto items-end" : "mr-auto items-start"
                                             )}
                                         >
-                                            {msg.text}
+                                            <div
+                                                className={cn(
+                                                    "rounded-2xl px-5 py-3 text-sm shadow-sm",
+                                                    msg.sender_type === 'customer'
+                                                        ? "bg-primary-600 text-white rounded-tr-none"
+                                                        : "bg-white text-slate-700 rounded-tl-none border border-slate-100"
+                                                )}
+                                            >
+                                                {msg.content}
+                                            </div>
+                                            <span className="mt-1.5 text-[10px] text-slate-400 font-medium uppercase flex items-center gap-1">
+                                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {msg.sender_type === 'customer' && <Check size={10} className="text-slate-300" />}
+                                            </span>
                                         </div>
-                                        <span className="mt-1.5 text-[10px] text-slate-400 font-medium uppercase">{msg.time}</span>
-                                    </div>
-                                ))}
+                                    )))}
                             </div>
 
                             <div className="p-6 bg-white border-t border-slate-100">
@@ -143,7 +210,7 @@ export default function UserMessages() {
                                     <Input
                                         value={messageText}
                                         onChange={(e) => setMessageText(e.target.value)}
-                                        placeholder={`Escribir a ${currentChat.store}...`}
+                                        placeholder={`Escribir a ${currentChat.companyName}...`}
                                         className="flex-1 h-12 bg-slate-50 border-none rounded-2xl px-6 text-sm focus:ring-2 focus:ring-primary-100"
                                     />
                                     <Button type="submit" className="h-12 px-8 rounded-2xl shadow-lg shadow-primary-100 font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-3" disabled={!messageText.trim()}>

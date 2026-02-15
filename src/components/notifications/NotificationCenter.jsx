@@ -65,15 +65,28 @@ export function NotificationCenter() {
     }, []);
 
     const fetchNotifications = async () => {
-        const { data, error } = await supabase
-            .from('notifications')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(50);
+        try {
+            const { data, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(50);
 
-        if (!error && data) {
-            setNotifications(data);
+            if (error) {
+                if (error.code === 'PGRST116' || error.status === 404) {
+                    // Table doesn't exist yet, handle gracefully
+                    setNotifications([]);
+                    return;
+                }
+                throw error;
+            }
+            if (data) {
+                setNotifications(data);
+            }
+        } catch (error) {
+            console.error('Error fetching notifications:', error);
+            setNotifications([]);
         }
     };
 

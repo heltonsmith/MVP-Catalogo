@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle } from 'lucide-react';
+import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, ExternalLink, Copy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/Badge';
 import { formatCurrency, cn } from '../utils';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../hooks/useSettings';
 
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { ProductFormModal } from '../components/dashboard/ProductFormModal';
@@ -42,9 +43,21 @@ export default function DashboardProducts() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState(null);
 
-    const isFree = company?.plan === 'free';
+    const { getSetting } = useSettings();
+    const currentPlan = company?.plan || 'free';
+    const isFree = currentPlan === 'free';
     const productCount = products.length;
-    const limitReached = isFree && productCount >= 5;
+
+    const getLimit = () => {
+        if (currentPlan === 'custom') return Infinity;
+        const limitKey = `${currentPlan}_plan_product_limit`;
+        // Fallbacks: free=5, plus=100, pro=500
+        const defaultValue = currentPlan === 'free' ? '5' : currentPlan === 'plus' ? '100' : '500';
+        return parseInt(getSetting(limitKey, defaultValue));
+    };
+
+    const productLimit = getLimit();
+    const limitReached = currentPlan !== 'custom' && productCount >= productLimit;
 
     const fetchCategories = async () => {
         if (isDemo) {
@@ -119,8 +132,26 @@ export default function DashboardProducts() {
     const handleDeleteProduct = async (id) => {
         if (!window.confirm("¿Estás seguro de que deseas eliminar este producto?")) return;
 
+        const productToDelete = products.find(p => p.id === id);
         setDeletingId(id);
+
         try {
+            // 1. Delete images from storage first
+            if (productToDelete?.product_images?.length > 0) {
+                const imagePaths = productToDelete.product_images.map(img => {
+                    // Extract path from URL: .../public/product-images/[path]
+                    const urlParts = img.image_url.split('/product-images/');
+                    return urlParts.length > 1 ? urlParts[1] : null;
+                }).filter(Boolean);
+
+                if (imagePaths.length > 0) {
+                    await supabase.storage
+                        .from('product-images')
+                        .remove(imagePaths);
+                }
+            }
+
+            // 2. Delete the product record
             const { error } = await supabase
                 .from('products')
                 .delete()
@@ -144,7 +175,7 @@ export default function DashboardProducts() {
             return;
         }
         if (limitReached) {
-            showToast("Has alcanzado el límite de 5 productos del plan Gratis. Solicita una subida a Pro para productos ilimitados.", "error");
+            showToast(`Has alcanzado el límite de ${productLimit} productos del plan Gratis. Solicita una subida a Pro para productos ilimitados.`, "error");
             return;
         }
         setProductToEdit(null);
@@ -201,40 +232,86 @@ export default function DashboardProducts() {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Upgrade Banner for Free Users */}
-            {isFree && (
-                <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+            {currentPlan !== 'custom' && (
+                <div className={cn(
+                    "p-4 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 transition-all duration-500",
+                    currentPlan === 'free' ? "bg-gradient-to-r from-amber-500 to-amber-600" :
+                        currentPlan === 'plus' ? "bg-gradient-to-r from-blue-500 to-blue-600" :
+                            "bg-gradient-to-r from-amber-600 to-amber-700"
+                )}>
                     <div className="flex items-center gap-3">
                         <div className="bg-white/20 p-2 rounded-xl">
                             <Package className="h-6 w-6 text-white" />
                         </div>
                         <div>
-                            <p className="font-bold">Límite de Plan Gratis ({productCount}/5 productos)</p>
-                            <p className="text-amber-50 text-xs">Sube a Pro para agregar productos ilimitados y fotos infinitas.</p>
+                            <p className="font-bold">Límite de Plan {currentPlan.toUpperCase()} ({productCount}/{productLimit} productos)</p>
+                            <p className="text-white/80 text-xs">Sube a un plan superior para agregar más productos y fotos.</p>
                         </div>
                     </div>
-                    <Link to="/precios">
-                        <Button variant="secondary" size="sm" className="bg-white text-amber-600 hover:bg-amber-50 border-none font-bold">
-                            Actualizar ahora
-                        </Button>
-                    </Link>
+                    {(currentPlan === 'free' || currentPlan === 'plus') && (
+                        <Link to="/precios">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className={cn(
+                                    "bg-white border-none font-bold",
+                                    currentPlan === 'free' ? "text-amber-600 hover:bg-amber-50" : "text-blue-600 hover:bg-blue-50"
+                                )}
+                            >
+                                {currentPlan === 'free' ? 'Mejorar ahora' : 'Pasar a PRO'}
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             )}
 
-            <div className="flex items-center justify-between gap-4">
-                <div>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="w-full sm:w-auto">
                     <h1 className="text-2xl font-bold text-slate-900">Mis Productos</h1>
                     <p className="text-slate-500">Gestiona el inventario de tu catálogo digital.</p>
                 </div>
-                <Button
-                    onClick={handleAddProduct}
-                    className={cn(
-                        "h-10 px-4 shrink-0 shadow-lg transition-all",
-                        limitReached ? "bg-amber-100 text-amber-600 hover:bg-amber-200 border border-amber-200" : "shadow-primary-100"
-                    )}
-                >
-                    {limitReached ? <AlertCircle className="h-5 w-5 mr-2" /> : <Plus className="h-5 w-5 mr-2" />}
-                    <span>{limitReached ? 'Limite Alcanzado' : 'Añadir Producto'}</span>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <div className="flex gap-2 mr-2 pr-4 border-r border-slate-200">
+                        <Button
+                            onClick={() => {
+                                const catalogUrl = `${window.location.origin}/catalogo/${company.slug}`;
+                                navigator.clipboard.writeText(catalogUrl);
+                                showToast("¡Enlace copiado!", "success");
+                            }}
+                            variant="secondary"
+                            size="sm"
+                            className="h-10 px-3 gap-2 font-bold"
+                            title="Copiar enlace del catálogo"
+                        >
+                            <Copy size={16} />
+                            <span className="hidden md:inline">Copiar Enlace</span>
+                        </Button>
+                        <Link
+                            to={`/catalogo/${company.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-10 px-3 gap-2 font-bold"
+                            >
+                                <ExternalLink size={16} />
+                                <span className="hidden md:inline">Ver Catálogo</span>
+                            </Button>
+                        </Link>
+                    </div>
+                    <Button
+                        onClick={handleAddProduct}
+                        className={cn(
+                            "h-10 px-4 shrink-0 shadow-lg transition-all",
+                            limitReached ? "bg-amber-100 text-amber-600 hover:bg-amber-200 border border-amber-200" : "shadow-primary-100"
+                        )}
+                    >
+                        {limitReached ? <AlertCircle className="h-5 w-5 mr-2" /> : <Plus className="h-5 w-5 mr-2" />}
+                        <span>{limitReached ? 'Limite Alcanzado' : 'Añadir Producto'}</span>
+                    </Button>
+                </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -252,12 +329,33 @@ export default function DashboardProducts() {
                 </Button>
             </div>
 
+            {/* Hidden Products Warning */}
+            {productCount > productLimit && (
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-white shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-red-500/20 p-2 rounded-xl">
+                            <AlertCircle className="h-5 w-5 text-red-400" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-sm">Hay {productCount - productLimit} productos ocultos</p>
+                            <p className="text-slate-400 text-[11px]">Tu plan actual solo permite mostrar {productLimit} productos. Los demás siguen guardados pero no son visibles para tus clientes.</p>
+                        </div>
+                    </div>
+                    <Link to="/precios">
+                        <Button variant="secondary" size="sm" className="h-8 bg-white/10 border-white/10 text-white hover:bg-white/20 text-[10px] font-bold">
+                            Recuperar Visibilidad
+                        </Button>
+                    </Link>
+                </div>
+            )}
+
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Producto</th>
+                                <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">SKU</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Categoría</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Precio</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">{isDemoRestaurant ? 'Disponibilidad' : 'Stock'}</th>
@@ -265,7 +363,10 @@ export default function DashboardProducts() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map((product) => (
+                            {products.filter(p =>
+                                p.name.toLowerCase().includes(search.toLowerCase()) ||
+                                (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()))
+                            ).slice(0, productLimit).map((product) => (
                                 <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">
@@ -281,6 +382,15 @@ export default function DashboardProducts() {
                                                 <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">{product.slug}</span>
                                             </div>
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {product.sku ? (
+                                            <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-1 rounded uppercase tracking-wider border border-primary-100/50">
+                                                {product.sku}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-300 italic">N/A</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="text-xs text-slate-600 font-medium">

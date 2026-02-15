@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileText, ExternalLink, Calendar, Clock, User, ArrowUpRight, BadgeCheck, Loader2, MessageSquare } from 'lucide-react';
+import { FileText, ExternalLink, Calendar, Clock, User, ArrowUpRight, BadgeCheck, Loader2, MessageSquare, Filter, CheckCircle2, CheckSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Input } from '../components/ui/Input';
 import { formatCurrency, cn } from '../utils';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -32,13 +33,26 @@ export default function DashboardQuotes() {
 
     const [quotes, setQuotes] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
     const fetchQuotes = async () => {
         if (isDemo) {
             setLoading(true);
             setTimeout(() => {
                 // Filter quotes by company
-                const companyQuotes = MOCK_QUOTES.filter(q => q.companyId === demoCompany.id);
+                let companyQuotes = MOCK_QUOTES.filter(q => q.companyId === demoCompany.id);
+
+                // Apply Date Filter Mock
+                if (dateRange.start) {
+                    companyQuotes = companyQuotes.filter(q => new Date(q.created_at) >= new Date(dateRange.start));
+                }
+                if (dateRange.end) {
+                    // End of day
+                    const endDate = new Date(dateRange.end);
+                    endDate.setHours(23, 59, 59, 999);
+                    companyQuotes = companyQuotes.filter(q => new Date(q.created_at) <= endDate);
+                }
+
                 setQuotes(companyQuotes);
                 setLoading(false);
             }, 600);
@@ -48,17 +62,23 @@ export default function DashboardQuotes() {
         if (!company?.id) return;
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('quotes')
-                .select(`
-    *,
-    quote_items(
-                        *,
-        products(name)
-    )
-        `)
+                .select('*, quote_items(*, products(name))')
                 .eq('company_id', company.id)
                 .order('created_at', { ascending: false });
+
+            if (dateRange.start) {
+                query = query.gte('created_at', new Date(dateRange.start).toISOString());
+            }
+            if (dateRange.end) {
+                // Set to end of day for the end date
+                const endDate = new Date(dateRange.end);
+                endDate.setHours(23, 59, 59, 999);
+                query = query.lte('created_at', endDate.toISOString());
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
             setQuotes(data || []);
@@ -72,19 +92,49 @@ export default function DashboardQuotes() {
 
     useEffect(() => {
         fetchQuotes();
-    }, [company?.id, isDemo, demoCompany.id]);
+    }, [company?.id, isDemo, demoCompany.id, dateRange]);
+
+    const updateStatus = async (quoteId, newStatus) => {
+        if (isDemo) {
+            setQuotes(quotes.map(q => q.id === quoteId ? { ...q, status: newStatus } : q));
+            showToast(`Estado actualizado a ${newStatus === 'answered' ? 'Respondida' : 'Completada'}`, "success");
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('quotes')
+                .update({ status: newStatus })
+                .eq('id', quoteId);
+
+            if (error) throw error;
+
+            setQuotes(quotes.map(q => q.id === quoteId ? { ...q, status: newStatus } : q));
+            showToast("Estado actualizado correctamente", "success");
+        } catch (error) {
+            console.error('Error updating status:', error);
+            showToast("Error al actualizar estado", "error");
+        }
+    };
 
     const getStatusStyle = (status) => {
         switch (status) {
-            case 'completed': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+            case 'completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case 'answered': return 'bg-blue-50 text-blue-600 border-blue-100'; // New answering style
             case 'pending': return 'bg-amber-50 text-amber-600 border-amber-100';
             case 'cancelled': return 'bg-red-50 text-red-400 border-red-100';
             default: return 'bg-slate-50 text-slate-500';
         }
     };
 
-    const handleAction = () => {
-        showToast("Gestión de estado próximamente", "info");
+    const getStatusLabel = (status) => {
+        switch (status) {
+            case 'completed': return 'Completada';
+            case 'answered': return 'Respondida';
+            case 'pending': return 'Pendiente';
+            case 'cancelled': return 'Cancelada';
+            default: return status;
+        }
     };
 
     if (authLoading || (loading && quotes.length === 0)) return (
@@ -96,15 +146,41 @@ export default function DashboardQuotes() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Cotizaciones WhatsApp</h1>
                     <p className="text-slate-500">Historial de presupuestos enviados a tus clientes.</p>
                 </div>
-                <Button onClick={handleAction} className="h-10 px-4 shrink-0 shadow-lg shadow-primary-100 font-bold">
-                    <BadgeCheck className="h-5 w-5 mr-2" />
-                    <span>Configurar Respuestas</span>
-                </Button>
+
+                {/* Date Filter */}
+                <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
+                    <div className="relative">
+                        <Input
+                            type="date"
+                            className="h-9 w-36 border-none bg-transparent text-xs font-bold"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        />
+                    </div>
+                    <span className="text-slate-300">-</span>
+                    <div className="relative">
+                        <Input
+                            type="date"
+                            className="h-9 w-36 border-none bg-transparent text-xs font-bold"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        />
+                    </div>
+                    {(dateRange.start || dateRange.end) && (
+                        <button
+                            onClick={() => setDateRange({ start: '', end: '' })}
+                            className="p-1 hover:bg-slate-100 rounded-full text-slate-400"
+                            title="Limpiar filtros"
+                        >
+                            <Filter size={14} className="fill-slate-400" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -122,7 +198,7 @@ export default function DashboardQuotes() {
                                             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{quote.id.split('-')[0]}</span>
                                         </div>
                                         <Badge variant="outline" className={cn("text-[10px] uppercase font-bold px-2 py-0.5", getStatusStyle(quote.status))}>
-                                            {quote.status === 'completed' ? 'Completada' : quote.status === 'pending' ? 'Pendiente' : 'Cancelada'}
+                                            {getStatusLabel(quote.status)}
                                         </Badge>
                                     </div>
 
@@ -172,21 +248,42 @@ export default function DashboardQuotes() {
                                         <p className="text-[10px] text-slate-400 font-medium leading-tight">Cliente: {quote.customer_whatsapp}</p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-1 gap-2">
-                                        <Button variant="outline" size="sm" className="w-full text-xs font-bold border-slate-200 bg-white" onClick={handleAction}>
-                                            Ver Historial
-                                        </Button>
+                                    <div className="space-y-2">
                                         <a
                                             href={`https://wa.me/${quote.customer_whatsapp.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="w-full"
+                                            className="w-full block"
                                         >
-                                            <Button variant="secondary" size="sm" className="w-full text-xs font-bold gap-2">
+                                            <Button variant="secondary" size="sm" className="w-full text-xs font-bold gap-2 bg-white border-slate-200">
                                                 <MessageSquare size={14} />
-                                                Responder
+                                                Responder WhatsApp
                                             </Button>
                                         </a >
+
+                                        {quote.status === 'pending' && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50"
+                                                onClick={() => updateStatus(quote.id, 'answered')}
+                                            >
+                                                <CheckSquare size={14} className="mr-2" />
+                                                Marcar Respondida
+                                            </Button>
+                                        )}
+
+                                        {quote.status !== 'completed' && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full text-xs font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                                onClick={() => updateStatus(quote.id, 'completed')}
+                                            >
+                                                <CheckCircle2 size={14} className="mr-2" />
+                                                Marcar Completado
+                                            </Button>
+                                        )}
                                     </div >
                                 </div >
                             </div >
@@ -200,22 +297,17 @@ export default function DashboardQuotes() {
                                 <FileText size={32} className="text-slate-200" />
                             </div>
                             <h3 className="font-bold text-slate-900">Sin cotizaciones aún</h3>
-                            <p className="text-sm text-slate-400 max-w-xs mx-auto mt-1">Cuando tus clientes te contacten por WhatsApp, verás sus pedidos aquí.</p>
+                            <p className="text-sm text-slate-400 max-w-xs mx-auto mt-1">
+                                {dateRange.start || dateRange.end
+                                    ? "No hay cotizaciones en el rango de fechas seleccionado."
+                                    : "Cuando tus clientes te contacten por WhatsApp, verás sus pedidos aquí."
+                                }
+                            </p>
                         </div>
                     )
                 }
             </div >
-
-            {/* Empty State / Info */}
-            < div className="mt-12 p-8 text-center rounded-3xl border-2 border-dashed border-slate-200" >
-                <div className="mx-auto h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                    <ExternalLink size={32} className="text-slate-300" />
-                </div>
-                <h3 className="text-slate-900 font-bold">Integración WhatsApp</h3>
-                <p className="text-slate-500 text-sm max-w-sm mx-auto mt-2">
-                    Todas las cotizaciones generadas en la demo se sincronizan automáticamente con tu historial para seguimiento comercial.
-                </p>
-            </div >
         </div >
     );
 }
+

@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Smartphone, Zap, ShoppingBag, Store, Utensils, Search, MapPin } from 'lucide-react';
+import { ArrowRight, CheckCircle, Smartphone, Zap, ShoppingBag, Store, Utensils, Search, MapPin, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
+import { useSettings } from '../hooks/useSettings';
 
 import { motion } from 'framer-motion';
 
 export default function LandingPage() {
+    const { getSetting } = useSettings();
+    const freeProductLimit = getSetting('free_plan_product_limit', '5');
+    const plusProductLimit = getSetting('plus_plan_product_limit', '100');
+    const proProductLimit = getSetting('pro_plan_product_limit', '500');
+    const proImageLimit = getSetting('pro_plan_image_limit', '5');
+
     const benefits = [
         {
             title: 'Plan Gratis de por vida',
-            description: 'Sube hasta 5 productos y ten tu catálogo profesional sin pagar un peso.',
-            icon: <CheckCircle className="text-primary-600" />,
+            description: `Sube hasta ${freeProductLimit} productos y ten tu catálogo profesional sin pagar un peso.`,
+            icon: <CheckCircle className="text-secondary-600" />,
         },
         {
             title: 'Mobile First',
@@ -23,6 +30,37 @@ export default function LandingPage() {
             description: 'Recibe cotizaciones y pedidos directamente en tu chat personal.',
             icon: <ShoppingBag className="text-primary-600" />,
         },
+    ];
+
+    const landingPlans = [
+        {
+            name: 'Gratis',
+            price: '$0',
+            description: `Hasta ${freeProductLimit} productos y presencia digital básica.`,
+            icon: <Rocket className="text-secondary-400" size={24} />,
+            color: 'slate'
+        },
+        {
+            name: 'Plus',
+            price: '$7.000',
+            period: '/mes',
+            yearlyTotal: '$84.000/año',
+            note: 'Facturación anual',
+            description: `Hasta ${plusProductLimit} productos, chat interno y WhatsApp.`,
+            icon: <Zap className="text-primary-400 fill-primary-400" size={24} />,
+            color: 'primary',
+            badge: 'Más Popular'
+        },
+        {
+            name: 'Pro',
+            price: '$16.000',
+            period: '/mes',
+            yearlyTotal: '$192.000/año',
+            note: 'Facturación anual',
+            description: `Hasta ${proProductLimit} productos, fotos HD y sin marca ktaloog.`,
+            icon: <Sparkles className="text-amber-400 fill-amber-400" size={24} />,
+            color: 'amber'
+        }
     ];
 
     return (
@@ -41,7 +79,7 @@ export default function LandingPage() {
                                 Tu catálogo digital <span className="text-primary-600">profesional</span>
                             </h1>
                             <p className="mt-6 text-xl text-slate-600">
-                                La forma más rápida de mostrar tus productos y recibir pedidos por WhatsApp. <strong>Sin comisiones</strong>. Registrate gratis y sube tus primeros 5 productos hoy.
+                                La forma más rápida de mostrar tus productos y recibir pedidos por WhatsApp. <strong>Sin comisiones</strong>. Registrate gratis y sube tus primeros {freeProductLimit} productos hoy.
                             </p>
                             <div className="mt-10 flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
                                 <Link to="/registro">
@@ -66,8 +104,6 @@ export default function LandingPage() {
                                 </div>
                             </div>
 
-                            {/* New Search Entry */}
-                            {/* Search CTA Button */}
                             <div className="mt-14 flex flex-col items-center animate-fade-in-up delay-[400ms]">
                                 <Link to="/explorar">
                                     <Button
@@ -124,77 +160,87 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* Pricing Launch Section */}
+            {/* Pricing Summary Section */}
             <section className="py-24 bg-slate-900 text-white relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-primary-600 rounded-full opacity-10" />
                 <div className="mx-auto max-w-7xl px-4 relative z-10">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                        <div className="flex flex-col justify-center">
-                            <h2 className="text-4xl font-extrabold sm:text-6xl mb-6 tracking-tight leading-tight">
-                                <span className="text-white">Lleva tu negocio al</span>
-                                <br />
-                                <span className="text-primary-400 bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-emerald-400">siguiente nivel</span>
-                            </h2>
-                            <p className="text-xl text-slate-300 mb-8 leading-relaxed max-w-xl">
-                                Nuestro plan Pro incluye productos ilimitados, hasta 6 fotos por producto, chat integrado y mucho más. Además, podrás <span className="text-white font-semibold underline decoration-primary-500/30">ocultar el branding de ktaloog en móviles</span> para una experiencia 100% propia.
-                            </p>
-                            <div className="flex flex-col gap-4">
-                                <Link to="/precios">
-                                    <Button variant="primary" size="lg" className="h-14 px-8 font-bold gap-2">
-                                        Ver todos los planes y precios
-                                        <ArrowRight size={20} />
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                        <div className="relative group">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-primary-500 to-emerald-500 rounded-[2.5rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                            <div className="relative bg-slate-800/50 backdrop-blur-xl p-8 sm:p-10 rounded-[2rem] border border-slate-700/50 shadow-2xl">
-                                <div className="flex items-center justify-between mb-8">
-                                    <h3 className="text-2xl font-bold flex items-center gap-3 text-white">
-                                        <div className="bg-primary-500/20 p-2 rounded-xl">
-                                            <Zap className="text-primary-400" size={24} />
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl font-extrabold sm:text-5xl mb-4 tracking-tight text-white leading-tight">
+                            Lleva tu negocio al <br className="sm:hidden" />
+                            <span className="text-primary-400 bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-emerald-400 italic">siguiente nivel</span>
+                        </h2>
+                        <p className="text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed font-medium">
+                            Planes diseñados para cada etapa de tu emprendimiento. <br className="hidden md:block" /> Desde gratis hasta profesionalización total.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        {landingPlans.map((plan, index) => (
+                            <motion.div
+                                key={plan.name}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                                viewport={{ once: true }}
+                                className="relative group"
+                            >
+                                {plan.badge && (
+                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+                                        <span className="bg-primary-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-primary-500/20 ring-2 ring-slate-900">
+                                            {plan.badge}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className={`h-full relative bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2.5rem] border ${plan.badge ? 'border-primary-500/40 shadow-2xl shadow-primary-500/10' : 'border-slate-700/40'} hover:border-slate-600/80 transition-all duration-300 group-hover:-translate-y-2`}>
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-4 rounded-2xl bg-slate-900/60 shadow-inner border border-slate-700/50 group-hover:scale-110 transition-transform duration-300`}>
+                                                {plan.icon}
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-white tracking-tight">{plan.name}</h3>
                                         </div>
-                                        Planes Pro
-                                    </h3>
-                                    <span className="px-3 py-1 bg-primary-500/10 text-primary-400 text-xs font-bold rounded-full border border-primary-500/20">OFERTA DE LANZAMIENTO</span>
+                                        {plan.note && (
+                                            <span className="text-[10px] text-primary-400 font-bold uppercase tracking-wider">{plan.note}</span>
+                                        )}
+                                    </div>
+
+                                    <div className="mb-8">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-4xl font-black text-white">{plan.price}</span>
+                                            {plan.period && <span className="text-slate-400 font-bold text-sm tracking-wide">{plan.period}</span>}
+                                        </div>
+                                        {plan.yearlyTotal && (
+                                            <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-widest leading-none">
+                                                {plan.yearlyTotal} total
+                                            </p>
+                                        )}
+                                        <p className="mt-4 text-slate-300 text-sm leading-relaxed font-medium opacity-80">
+                                            {plan.description}
+                                        </p>
+                                    </div>
+
+                                    <div className="pt-8 border-t border-slate-700/50 mt-auto">
+                                        <Link to="/precios">
+                                            <Button
+                                                variant={plan.badge ? "primary" : "outline"}
+                                                className={`w-full font-black h-14 rounded-2xl transition-all duration-300 text-lg shadow-sm active:scale-95 ${!plan.badge ? 'border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500' : 'shadow-primary-600/20 hover:shadow-primary-600/40'}`}
+                                            >
+                                                Saber más
+                                            </Button>
+                                        </Link>
+                                    </div>
                                 </div>
+                            </motion.div>
+                        ))}
+                    </div>
 
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between p-5 bg-slate-900/40 rounded-2xl border border-slate-700/30 hover:border-slate-600/50 transition-colors group/item">
-                                        <span className="font-semibold text-slate-300">Mensual</span>
-                                        <div className="text-right">
-                                            <span className="text-2xl font-black text-white">$9.990</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-5 bg-gradient-to-r from-primary-500/10 to-emerald-500/10 rounded-2xl border-2 border-primary-500/50 relative overflow-hidden group/best shadow-[0_0_20px_rgba(16,185,129,0.1)]">
-                                        <div className="absolute top-0 right-0">
-                                            <div className="bg-primary-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-wider">MÁS POPULAR</div>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="font-bold text-white text-lg">Semestral</span>
-                                            <span className="text-[10px] text-primary-400 font-bold uppercase tracking-widest mt-0.5 whitespace-nowrap">Ahorra $8.940</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-3xl font-black text-white">$8.500</span>
-                                            <span className="text-sm text-slate-400 font-medium ml-1">/mes</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-5 bg-slate-900/40 rounded-2xl border border-slate-700/30 hover:border-slate-600/50 transition-colors group/item">
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold text-slate-300">Anual</span>
-                                            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">Mejor relación calidad-precio</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-2xl font-black text-white">$6.500</span>
-                                            <span className="text-sm text-slate-400 font-medium ml-1">/mes</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div className="mt-20 text-center animate-pulse-slow">
+                        <Link to="/precios">
+                            <Button variant="link" className="text-primary-400 hover:text-primary-300 font-black gap-2 group text-xl tracking-tight transition-all">
+                                Ver todos los planes y características detalladas
+                                <ArrowRight className="group-hover:translate-x-2 transition-transform duration-300" size={24} />
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </section>
@@ -203,11 +249,11 @@ export default function LandingPage() {
             <section className="bg-primary-600 py-16 overflow-x-hidden">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
                     <h2 className="text-3xl font-bold text-white sm:text-4xl">¿Listo para subir tus productos?</h2>
-                    <p className="mt-4 text-primary-100 italic">Únete a cientos de emprendedores que ya están vendiendo más.</p>
-                    <div className="mt-8">
+                    <p className="mt-4 text-primary-100 italic font-medium">Únete a cientos de emprendedores que ya están vendiendo más.</p>
+                    <div className="mt-10">
                         <Link to="/registro">
-                            <Button variant="secondary" size="lg" className="bg-white text-primary-600 hover:bg-slate-100 font-bold">
-                                Regístrate ahora
+                            <Button variant="secondary" size="lg" className="bg-white text-primary-600 hover:bg-slate-50 font-black px-10 h-14 rounded-2xl shadow-xl shadow-black/10 transition-all hover:scale-105 active:scale-95">
+                                Regístrate ahora gratis
                             </Button>
                         </Link>
                     </div>

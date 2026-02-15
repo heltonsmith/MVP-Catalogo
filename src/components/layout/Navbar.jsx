@@ -127,7 +127,15 @@ export function Navbar() {
                                             ? 'Admin Ktaloog'
                                             : profile?.role === 'client'
                                                 ? profile?.full_name || 'Mi Perfil'
-                                                : (company?.name || 'Mi Tienda')
+                                                : company?.slug ? (
+                                                    <Link
+                                                        to={`/catalogo/${company.slug}`}
+                                                        className="hover:text-primary-600 transition-colors cursor-pointer"
+                                                        title="Ver mi catálogo público"
+                                                    >
+                                                        {company?.name || 'Mi Tienda'}
+                                                    </Link>
+                                                ) : (company?.name || 'Mi Tienda')
                                         }
                                     </span>
                                     <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
@@ -229,7 +237,17 @@ export function Navbar() {
                                             <Store size={20} />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-slate-900">{company?.name || 'Mi Tienda'}</p>
+                                            {company?.slug ? (
+                                                <Link
+                                                    to={`/catalogo/${company.slug}`}
+                                                    onClick={() => setIsOpen(false)}
+                                                    className="font-bold text-slate-900 hover:text-primary-600 transition-colors"
+                                                >
+                                                    {company?.name || 'Mi Tienda'}
+                                                </Link>
+                                            ) : (
+                                                <p className="font-bold text-slate-900">{company?.name || 'Mi Tienda'}</p>
+                                            )}
                                             <p className="text-xs text-slate-500">{user.email}</p>
                                         </div>
                                     </div>

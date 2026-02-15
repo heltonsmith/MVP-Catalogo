@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../hooks/useSettings';
 import { cn } from '../../utils';
 
 export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSuccess, companyId, categories = [] }) {
@@ -21,14 +22,26 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
         weight: '',
         size: '',
         slug: '',
+        sku: '',
         available: true
     });
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [images, setImages] = useState([]);
     const [imageFiles, setImageFiles] = useState([]);
+    const [removedImageUrls, setRemovedImageUrls] = useState([]);
 
-    const isPro = profile?.companies?.plan === 'pro';
-    const maxImages = isPro ? 6 : 1;
+    const { getSetting } = useSettings();
+    const currentPlan = profile?.companies?.plan || 'free';
+
+    const getImageLimit = () => {
+        if (currentPlan === 'custom') return 50; // High limit for custom
+        const limitKey = `${currentPlan}_plan_image_limit`;
+        // Fallbacks: free=1, plus=5, pro=5
+        const defaultValue = currentPlan === 'free' ? '1' : '5';
+        return parseInt(getSetting(limitKey, defaultValue));
+    };
+
+    const maxImages = getImageLimit();
 
     useEffect(() => {
         if (isOpen) {
@@ -41,11 +54,13 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                     weight: productToEdit.weight || '',
                     size: productToEdit.size || '',
                     slug: productToEdit.slug || '',
+                    sku: productToEdit.sku || '',
                     available: productToEdit.available !== false
                 });
-                // TODO: Load existing categories and images
-                setSelectedCategories([]);
-                setImages([]);
+                // Load existing categories and images (limit by plan during initialization)
+                setSelectedCategories(productToEdit.categories?.map(c => c.id) || []);
+                const existingImages = productToEdit.images || [];
+                setImages(existingImages.slice(0, maxImages));
             } else {
                 setFormData({
                     name: '',
@@ -55,12 +70,15 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                     weight: '',
                     size: '',
                     slug: '',
+                    sku: '',
                     available: true
                 });
                 setSelectedCategories([]);
                 setImages([]);
                 setImageFiles([]);
             }
+            // Reset removed images list whenever modal opens/changes product
+            setRemovedImageUrls([]);
         }
     }, [isOpen, productToEdit]);
 
@@ -92,6 +110,18 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
 
     const handleImageSelect = (e) => {
         const files = Array.from(e.target.files);
+
+        // If it's a single image plan (Free), allow replacement
+        if (maxImages === 1 && files.length > 0) {
+            // Track existing URLs for deletion if they are from storage
+            const currentStoredImages = images.map(img => img.image_url || img);
+            setRemovedImageUrls(prev => [...prev, ...currentStoredImages]);
+
+            setImages([]); // Clear existing URLs
+            setImageFiles([files[0]]); // Take only the first new file
+            return;
+        }
+
         const remainingSlots = maxImages - images.length - imageFiles.length;
 
         if (files.length > remainingSlots) {
@@ -119,6 +149,12 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
         setImageFiles(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleRemoveExistingImage = (index) => {
+        const urlToRemove = images[index].image_url || images[index];
+        setRemovedImageUrls(prev => [...prev, urlToRemove]);
+        setImages(prev => prev.filter((_, i) => i !== index));
+    };
+
     const uploadImages = async (productId) => {
         if (imageFiles.length === 0) return [];
 
@@ -143,13 +179,6 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                     .getPublicUrl(filePath);
 
                 uploadedUrls.push(publicUrl);
-
-                // Save to product_images table
-                await supabase.from('product_images').insert({
-                    product_id: productId,
-                    image_url: publicUrl,
-                    display_order: i
-                });
             }
 
             return uploadedUrls;
@@ -204,22 +233,15 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
 
             if (error) throw error;
 
-            // Upload images
-            if (imageFiles.length > 0) {
-                await uploadImages(productId);
+            // Sync categories
+            if (productToEdit) {
+                await supabase
+                    .from('product_categories')
+                    .delete()
+                    .eq('product_id', productId);
             }
 
-            // Save categories
             if (selectedCategories.length > 0) {
-                // Delete existing categories if editing
-                if (productToEdit) {
-                    await supabase
-                        .from('product_categories')
-                        .delete()
-                        .eq('product_id', productId);
-                }
-
-                // Insert new categories
                 const categoryInserts = selectedCategories.map(catId => ({
                     product_id: productId,
                     category_id: catId
@@ -228,6 +250,52 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 await supabase
                     .from('product_categories')
                     .insert(categoryInserts);
+            }
+
+            // Sync images
+            const newImageUrls = await uploadImages(productId);
+            // Current images state contains existing URLs that weren't removed
+            let allImageUrls = [...images, ...newImageUrls];
+
+            // Safety enforcement of maxImages
+            if (allImageUrls.length > maxImages) {
+                console.warn(`ProductForm: allImageUrls (${allImageUrls.length}) exceeds maxImages (${maxImages}). Trimming.`);
+                allImageUrls = allImageUrls.slice(0, maxImages);
+            }
+
+            if (productToEdit || newImageUrls.length > 0) {
+                // Clear existing image records to re-sync
+                await supabase
+                    .from('product_images')
+                    .delete()
+                    .eq('product_id', productId);
+
+                if (allImageUrls.length > 0) {
+                    const imageInserts = allImageUrls.map((url, index) => ({
+                        product_id: productId,
+                        image_url: url.image_url || url,
+                        display_order: index
+                    }));
+
+                    await supabase
+                        .from('product_images')
+                        .insert(imageInserts);
+                }
+
+                // 4. CLEANUP STORAGE: Remove files that were replaced or deleted
+                if (removedImageUrls.length > 0) {
+                    const pathsToDelete = removedImageUrls.map(url => {
+                        const urlParts = url.split('/product-images/');
+                        return urlParts.length > 1 ? urlParts[1] : null;
+                    }).filter(Boolean);
+
+                    if (pathsToDelete.length > 0) {
+                        console.log('ProductForm: Cleaning up storage files:', pathsToDelete);
+                        await supabase.storage
+                            .from('product-images')
+                            .remove(pathsToDelete);
+                    }
+                }
             }
 
             showToast(
@@ -290,8 +358,27 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
 
                                     {/* Image Grid */}
                                     <div className="grid grid-cols-3 gap-3">
+                                        {/* Existing Images */}
+                                        {images.map((url, index) => (
+                                            <div key={`existing-${index}`} className="relative aspect-square rounded-xl overflow-hidden border-2 border-slate-200 group">
+                                                <img
+                                                    src={url.image_url || url}
+                                                    alt={`Existing ${index + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveExistingImage(index)}
+                                                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {/* New Files */}
                                         {imageFiles.map((file, index) => (
-                                            <div key={index} className="relative aspect-square rounded-xl overflow-hidden border-2 border-slate-200 group">
+                                            <div key={`new-${file.name}-${index}`} className="relative aspect-square rounded-xl overflow-hidden border-2 border-slate-200 group">
                                                 <img
                                                     src={URL.createObjectURL(file)}
                                                     alt={`Preview ${index + 1}`}
@@ -328,9 +415,9 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                     </p>
                                 </div>
 
-                                {/* Product Name & Auto-generated Slug */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
+                                {/* Product Name, SKU & Auto-generated Slug */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="space-y-2 col-span-1 md:col-span-1">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nombre del Producto *</label>
                                         <div className="relative">
                                             <Package className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -345,7 +432,20 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Slug (URL) - Auto generado</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">SKU / Código</label>
+                                        <div className="relative">
+                                            <Tag className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                                            <Input
+                                                name="sku"
+                                                placeholder="Ej. ZAP-001"
+                                                value={formData.sku}
+                                                onChange={handleChange}
+                                                className="pl-9"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Slug (URL)</label>
                                         <Input
                                             disabled
                                             value={formData.slug}

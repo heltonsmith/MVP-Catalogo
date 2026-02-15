@@ -1,45 +1,133 @@
-import { Trash2, Plus, Minus, Send, Link, ChevronLeft, ShoppingCart, Store } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Plus, Minus, Send, Link, ChevronLeft, ShoppingCart, Store, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../hooks/useCart';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
 import { formatCurrency, generateWhatsAppLink } from '../utils';
 import { COMPANIES } from '../data/mock';
+import { supabase } from '../lib/supabase';
+import { useToast } from '../components/ui/Toast';
 
 export default function CartPage() {
     const { carts, updateQuantity, removeFromCart, clearCart, getCartTotal } = useCart();
     const navigate = useNavigate();
+    const { showToast } = useToast();
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+    const [customerInfo, setCustomerInfo] = useState({ name: '', whatsapp: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const companyIds = Object.keys(carts);
     const hasItems = companyIds.some(id => carts[id].length > 0);
 
-    const handleSendWhatsApp = (companyId) => {
+    const openQuoteModal = (companyId) => {
+        setSelectedCompanyId(companyId);
+        setIsModalOpen(true);
+    };
+
+    const handleSendWhatsApp = async () => {
+        if (!selectedCompanyId || !customerInfo.name || !customerInfo.whatsapp) {
+            showToast("Por favor completa todos los campos", "error");
+            return;
+        }
+
+        setIsSubmitting(true);
+        const companyId = selectedCompanyId;
         const cartItems = carts[companyId];
         const company = COMPANIES.find(c => c.id === companyId);
-        if (!company || !cartItems || cartItems.length === 0) return;
+
+        if (!company || !cartItems || cartItems.length === 0) {
+            setIsSubmitting(false);
+            return;
+        }
 
         const { totalPrice } = getCartTotal(companyId);
 
-        const baseUrl = window.location.origin;
+        try {
+            // 1. Save to Supabase
+            const { data: quote, error: quoteError } = await supabase
+                .from('quotes')
+                .insert([{
+                    company_id: companyId,
+                    customer_name: customerInfo.name,
+                    customer_whatsapp: customerInfo.whatsapp,
+                    total: totalPrice,
+                    status: 'pending'
+                }])
+                .select()
+                .single();
 
-        let message = `*Hola ${company.name}, me gustaría cotizar lo siguiente*\n\n`;
-        message += `--------------------------------\n`;
+            if (quoteError) throw quoteError;
 
-        cartItems.forEach((item, index) => {
-            const productUrl = `${baseUrl}/catalogo/${company.slug}/producto/${item.slug}`;
-            message += `${index + 1}. *${item.name}* (SKU: ${item.sku || 'N/A'})\n`;
-            message += `   Cant: ${item.quantity} x ${formatCurrency(item.price)}\n`;
-            message += `   Subtotal: ${formatCurrency(item.price * item.quantity)}\n`;
-            message += `   Ver: ${productUrl}\n\n`;
-        });
+            // 2. Save Quote Items
+            const quoteItemsToCheck = cartItems.map(item => ({
+                quote_id: quote.id,
+                product_id: item.id,
+                quantity: item.quantity,
+                price_at_time: item.price
+            }));
 
-        message += `--------------------------------\n`;
-        message += `*Total estimado: ${formatCurrency(totalPrice)}*\n\n`;
-        message += `_Enviado desde mi catálogo digital_`;
+            const { error: itemsError } = await supabase
+                .from('quote_items')
+                .insert(quoteItemsToCheck);
 
-        const link = generateWhatsAppLink(company.whatsapp, message);
-        window.open(link, '_blank');
+            if (itemsError) throw itemsError;
+
+            // 3. Generate WhatsApp Link & Redirect
+            const baseUrl = window.location.origin;
+            let message = `*Hola ${company.name}, soy ${customerInfo.name} y me gustaría cotizar lo siguiente:*\n\n`;
+            message += `--------------------------------\n`;
+
+            cartItems.forEach((item, index) => {
+                const productUrl = `${baseUrl}/catalogo/${company.slug}/producto/${item.slug}`;
+                message += `${index + 1}. *${item.name}* (SKU: ${item.sku || 'N/A'})\n`;
+                message += `   Cant: ${item.quantity} x ${formatCurrency(item.price)}\n`;
+                message += `   Subtotal: ${formatCurrency(item.price * item.quantity)}\n`;
+                message += `   Ver: ${productUrl}\n\n`;
+            });
+
+            message += `--------------------------------\n`;
+            message += `*Total estimado: ${formatCurrency(totalPrice)}*\n\n`;
+            message += `_Mis datos de contacto:_\n`;
+            message += `Name: ${customerInfo.name}\n`;
+            message += `WhatsApp: ${customerInfo.whatsapp}\n\n`;
+            message += `_Enviado desde mi catálogo digital_`;
+
+
+            const link = generateWhatsAppLink(company.whatsapp, message);
+
+            // Track quote (only for real stores, not demo)
+            if (!company.slug?.includes('demo')) {
+                try {
+                    await supabase.rpc('increment_quotes', { company_id: companyId });
+                } catch (error) {
+                    console.error('Error tracking quote:', error);
+                    // Fail silently - don't block user experience
+                }
+            }
+
+            // Close modal and clear cart for this company? 
+            // Maybe not clear cart immediately in case they want to review, 
+            // but usually a sent quote means cart is done. Let's clear it.
+            clearCart(companyId);
+            setIsModalOpen(false);
+            setCustomerInfo({ name: '', whatsapp: '' });
+
+            // Redirect
+            window.open(link, '_blank');
+            showToast("Cotización enviada y registrada con éxito", "success");
+
+        } catch (error) {
+            console.error('Error saving quote:', error);
+            showToast("Error al registrar la cotización. Intenta nuevamente.", "error");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (!hasItems) {
@@ -161,7 +249,7 @@ export default function CartPage() {
 
                                             <Button
                                                 className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg shadow-primary-100 bg-emerald-600 hover:bg-emerald-700"
-                                                onClick={() => handleSendWhatsApp(companyId)}
+                                                onClick={() => openQuoteModal(companyId)}
                                             >
                                                 <Send className="mr-2 h-5 w-5" />
                                                 Cotizar con {company?.name}
@@ -180,6 +268,64 @@ export default function CartPage() {
                     );
                 })}
             </div>
+
+            {/* Customer Info Modal */}
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                title="Finalizar Cotización"
+                maxWidth="sm"
+            >
+                <div className="p-6 space-y-6">
+                    <div className="text-center space-y-2">
+                        <div className="mx-auto h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-2">
+                            <Send size={24} />
+                        </div>
+                        <p className="text-sm text-slate-500">Ingresa tus datos para que la tienda te identifique en el mensaje de WhatsApp.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-700 uppercase mb-1.5 block">Tu Nombre</label>
+                            <Input
+                                placeholder="Ej: Juan Pérez"
+                                value={customerInfo.name}
+                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
+                                className="bg-slate-50 border-slate-200"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-700 uppercase mb-1.5 block">Tu WhatsApp</label>
+                            <Input
+                                placeholder="Ej: +569 1234 5678"
+                                value={customerInfo.whatsapp}
+                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
+                                className="bg-slate-50 border-slate-200"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <Button
+                            className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-xl shadow-lg shadow-emerald-100"
+                            onClick={handleSendWhatsApp}
+                            disabled={isSubmitting || !customerInfo.name || !customerInfo.whatsapp}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Registrando...
+                                </>
+                            ) : (
+                                <>
+                                    Confirmar y Enviar WhatsApp
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
+

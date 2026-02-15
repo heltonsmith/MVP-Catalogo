@@ -3,11 +3,16 @@ import { HelpCircle, MessageSquare, Send, CheckCircle2, LifeBuoy } from 'lucide-
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { useSettings } from '../hooks/useSettings';
 
 export default function HelpPage() {
+    const { getSetting, loading: settingsLoading } = useSettings();
     const { showToast } = useToast();
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    const proProductLimit = getSetting('pro_plan_product_limit', '500');
+    const proImageLimit = getSetting('pro_plan_image_limit', '5');
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -21,10 +26,14 @@ export default function HelpPage() {
     };
 
     const faqs = [
-        { q: '¿Cómo subo mis productos?', a: 'Desde tu Panel Admin, ve a "Productos" y haz clic en "Nuevo Producto". Solo necesitas nombre, precio y una foto.' },
-        { q: '¿Mis clientes necesitan una app?', a: 'No, tus clientes entran a través de un enlace web o escaneando tu código QR. Funciona en cualquier navegador.' },
-        { q: '¿Cómo recibo las ventas?', a: 'ktaloog es un catálogo. Los clientes te enviarán sus pedidos o consultas directamente a tu WhatsApp o chat interno.' },
-        { q: '¿Qué incluye el plan Pro?', a: 'Productos ilimitados, hasta 6 fotos por producto, sistema de mensajería, código QR, chat integrado y prioridad en soporte.' },
+        { q: '¿Cómo subo mis productos?', a: 'Desde tu Panel Admin, ve a "Productos" y haz clic en "Nuevo Producto". Solo necesitas nombre, precio y fotos. El proceso es instantáneo.' },
+        { q: '¿Mis clientes necesitan una app?', a: 'No, tus clientes entran a través de un enlace web o escaneando tu código QR. Funciona en cualquier navegador de móvil o PC sin descargar nada.' },
+        { q: '¿Cómo recibo las ventas?', a: 'ktaloog es un catálogo inteligente. Los clientes eligen productos y te envían el pedido directamente a tu WhatsApp o por el chat interno de la plataforma.' },
+        { q: '¿Qué incluye el plan Pro?', a: `Es nuestro plan más potente. Permite hasta ${proProductLimit} productos, ${proImageLimit} fotos por cada uno, chat integrado, QR personalizado y prioridad en soporte.` },
+        { q: '¿Puedo cambiar de plan después?', a: '¡Por supuesto! Puedes subir o bajar de plan en cualquier momento desde tu configuración. Si bajas de plan, tus productos excedentes se ocultarán pero nunca se borrarán.' },
+        { q: '¿Cómo funciona el código QR?', a: 'Generamos un código QR único para tu tienda. Puedes imprimirlo y ponerlo en tus mesas o local; al escanearlo, los clientes verán tu menú o catálogo al instante.' },
+        { q: '¿Es seguro mi catálogo?', a: 'Totalmente. Utilizamos infraestructura de alta seguridad y cifrada para asegurar que tus fotos, precios y datos de clientes estén protegidos 24/7.' },
+        { q: '¿Qué formas de pago puedo usar?', a: 'ktaloog facilita la muestra de productos. El pago final lo coordinas directamente con tu cliente mediante transferencia o efectivo según lo acuerden por WhatsApp.' },
     ];
 
     return (

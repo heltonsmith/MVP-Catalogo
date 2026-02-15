@@ -1,47 +1,118 @@
-import { useState, useMemo } from 'react';
-import { MessageCircle, Search, User, Send, Filter, MoreVertical, Check, Zap } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { MessageCircle, Search, User, Send, Filter, MoreVertical, Check, Zap, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { cn } from '../utils';
-import { CONVERSATIONS, CHATS, COMPANIES } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabase'; // Import supabase
+import { useChat } from '../hooks/useChat'; // Import useChat
 
 export default function DashboardMessages() {
     const { company: authCompany } = useAuth();
     const location = useLocation();
 
-    // Check for demo mode
-    const isDemo = location.pathname.includes('/demo');
-    const isDemoRestaurant = location.pathname.includes('/demo/restaurante');
-    const demoCompany = isDemoRestaurant ? COMPANIES[2] : COMPANIES[0];
-
-    const company = isDemo ? { ...demoCompany, plan: 'pro' } : authCompany;
-    const [selectedId, setSelectedId] = useState(1);
+    const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+    const [conversations, setConversations] = useState([]);
+    const [loadingConversations, setLoadingConversations] = useState(true);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [replyText, setReplyText] = useState('');
-    const [localReplies, setLocalReplies] = useState({}); // { 1: [msg], 2: [msg] }
-
     const [showChatOnMobile, setShowChatOnMobile] = useState(false);
 
-    // Filter conversations by company in demo mode
-    const conversations = isDemo
-        ? CONVERSATIONS.filter(c => c.companyId === demoCompany.id)
-        : CONVERSATIONS;
+    // Fetch conversations (unique customers who have messaged this company)
+    useEffect(() => {
+        if (!authCompany?.id) return;
 
-    const currentChat = useMemo(() =>
-        conversations.find(c => c.id === selectedId)
-        , [selectedId, conversations]);
+        const fetchConversations = async () => {
+            setLoadingConversations(true);
+            try {
+                // Determine unique customers by grouping messages
+                // This is a bit complex in raw SQL without a VIEW, so we fetch messages and group in JS for MVP
+                // Optimally, create a view: `CREATE VIEW conversations AS SELECT DISTINCT ...`
 
-    const chatHistory = useMemo(() => {
-        const baseChat = CHATS[selectedId] || [];
-        const extraReplies = localReplies[selectedId] || [];
-        return [...baseChat, ...extraReplies];
-    }, [selectedId, localReplies]);
+                // Fetch latest message per customer for this company
+                // Using a slightly inefficient but working method for now: fetch all distinct customer_ids
+                // OR better: fetch users logic.
 
-    const handleSelectChat = (id) => {
-        setSelectedId(id);
+                // Let's fetch messages, order by desc, then unique by customer_id
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('customer_id, created_at, content, is_read, sender_type')
+                    .eq('company_id', authCompany.id)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                // Group by customer_id and keep only the latest message
+                const uniqueConversations = [];
+                const seenCustomers = new Set();
+
+                // We also need customer details (name/email). 
+                // We can fetch them separately or use a join if we had the relation set up strictly in JS types
+                // Let's fetch all unique customer profiles after identifying IDs
+
+                for (const msg of data) {
+                    if (!seenCustomers.has(msg.customer_id)) {
+                        seenCustomers.add(msg.customer_id);
+                        uniqueConversations.push({
+                            ...msg,
+                            count: 1 // We could count unread here
+                        });
+                    }
+                }
+
+                // Fetch profiles for these customers
+                if (uniqueConversations.length > 0) {
+                    const customerIds = uniqueConversations.map(c => c.customer_id);
+                    const { data: profiles } = await supabase
+                        .from('profiles') // Assuming 'profiles' table exists and matches auth.users
+                        .select('id, full_name, email') // Adjust column names based on your schema
+                        .in('id', customerIds);
+
+                    // Merge profile data
+                    const conversationsWithProfiles = uniqueConversations.map(conv => {
+                        const profile = profiles?.find(p => p.id === conv.customer_id);
+                        return {
+                            ...conv,
+                            customerName: profile?.full_name || profile?.email || 'Cliente',
+                            customerEmail: profile?.email
+                        };
+                    });
+                    setConversations(conversationsWithProfiles);
+                } else {
+                    setConversations([]);
+                }
+
+            } catch (err) {
+                console.error("Error fetching conversations:", err);
+            } finally {
+                setLoadingConversations(false);
+            }
+        };
+
+        fetchConversations();
+
+        // Subscription for new conversations could go here to update the list live
+
+    }, [authCompany?.id]);
+
+
+    // Chat Hook for selected customer
+    const { messages, loading: messagesLoading, sendMessage, markAsRead } = useChat({
+        companyId: authCompany?.id,
+        customerId: selectedCustomerId,
+        enabled: !!selectedCustomerId
+    });
+
+    useEffect(() => {
+        if (selectedCustomerId && messages.length > 0) {
+            markAsRead('customer');
+        }
+    }, [selectedCustomerId, messages, markAsRead]);
+
+    const handleSelectChat = (customerId) => {
+        setSelectedCustomerId(customerId);
         setShowChatOnMobile(true);
     };
 
@@ -49,31 +120,17 @@ export default function DashboardMessages() {
         setShowChatOnMobile(false);
     };
 
-    const handleSendReply = (e) => {
+    const handleSendReply = async (e) => {
         e.preventDefault();
         if (!replyText.trim()) return;
 
-        if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás enviar mensajes.", "info");
+        const success = await sendMessage(replyText, 'store');
+        if (success) {
             setReplyText('');
-            return;
         }
-
-        const newMsg = {
-            id: Date.now(),
-            text: replyText,
-            sender: 'store',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setLocalReplies(prev => ({
-            ...prev,
-            [selectedId]: [...(prev[selectedId] || []), newMsg]
-        }));
-        setReplyText('');
     };
 
-    if (company?.plan === 'free' && !isDemo) {
+    if (authCompany?.plan === 'free') {
         return (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-180px)] bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center relative overflow-hidden">
                 {/* Decorative Background */}
@@ -105,171 +162,180 @@ export default function DashboardMessages() {
                 <PlanUpgradeModal
                     isOpen={showUpgradeModal}
                     onClose={() => setShowUpgradeModal(false)}
-                    companyId={company.id}
+                    companyId={authCompany.id}
                 />
             </div>
         );
     }
 
     return (
-        <div className="flex h-[calc(100dvh-130px)] md:h-[calc(100vh-180px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-            {/* Sidebar / List - Hidden on mobile if chat is open */}
+        <div className="flex h-[calc(100vh-140px)] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden ring-1 ring-slate-100">
+            {/* Sidebar List */}
             <div className={cn(
-                "w-full md:w-80 flex-col border-r border-slate-100 absolute inset-0 md:static z-10 bg-white md:flex transition-transform duration-300",
+                "w-full md:w-80 border-r border-slate-100 flex flex-col bg-slate-50/50 transition-all duration-300 absolute md:relative z-20 h-full",
                 showChatOnMobile ? "-translate-x-full md:translate-x-0" : "translate-x-0"
             )}>
-                <div className="p-4 border-b border-slate-100">
-                    <h1 className="text-xl font-bold text-slate-900 mb-4">Mensajes</h1>
-                    <div className="relative">
+                <div className="p-5 border-b border-slate-100 bg-white/50 backdrop-blur-md sticky top-0 z-10">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-slate-900">Mensajes</h2>
+                        <div className="flex gap-2">
+                            {/* Tools like filter could go here */}
+                        </div>
+                    </div>
+                    <div className="relative group">
                         <Input
                             placeholder="Buscar chats..."
-                            className="pl-9 bg-slate-50 border-none h-10 text-xs"
+                            className="pl-9 h-10 bg-white border-slate-200 focus:border-primary-300 transition-all rounded-xl text-sm"
                         />
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
-                    {conversations.map((chat) => (
-                        <button
-                            key={chat.id}
-                            onClick={() => handleSelectChat(chat.id)}
-                            className={cn(
-                                "group w-full p-4 flex items-start gap-3 transition-colors hover:bg-slate-50 relative border-b border-slate-50 last:border-0",
-                                selectedId === chat.id ? "bg-slate-50 md:bg-slate-50" : ""
-                            )}
-                        >
-                            {selectedId === chat.id && (
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-600 hidden md:block" />
-                            )}
-                            <div className="relative flex-shrink-0">
-                                <div className="h-12 w-12 md:h-10 md:w-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-100 shadow-sm">
-                                    {chat.avatar ? (
-                                        <img src={chat.avatar} alt={chat.user} className="h-full w-full object-cover" />
-                                    ) : (
-                                        <User size={20} className="text-slate-400" />
-                                    )}
-                                </div>
-                                {chat.status === "online" && (
-                                    <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {loadingConversations ? (
+                        <div className="flex justify-center p-4"><Loader2 className="animate-spin text-slate-400" /></div>
+                    ) : conversations.length === 0 ? (
+                        <div className="text-center p-8 text-slate-400 text-sm">No hay conversaciones aún.</div>
+                    ) : (
+                        conversations.map((conv) => (
+                            <div
+                                key={conv.customer_id}
+                                onClick={() => handleSelectChat(conv.customer_id)}
+                                className={cn(
+                                    "p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:bg-white hover:shadow-sm group relative",
+                                    selectedCustomerId === conv.customer_id ? "bg-white shadow-md border-slate-100 ring-1 ring-slate-100" : "hover:border-slate-100"
                                 )}
-                            </div>
-                            <div className="flex-1 text-left min-w-0">
-                                <div className="flex justify-between items-center mb-0.5">
-                                    <h4 className={cn("font-bold text-sm truncate", chat.unread ? "text-slate-900" : "text-slate-700")}>
-                                        {chat.user}
-                                    </h4>
-                                    <span className="text-[10px] text-slate-400 font-medium">{chat.time}</span>
+                            >
+                                {/* Indicator for active selection */}
+                                {selectedCustomerId === conv.customer_id && (
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-primary-500 rounded-r-full" />
+                                )}
+
+                                <div className="flex justify-between mb-1">
+                                    <h3 className={cn("font-bold text-sm truncate", selectedCustomerId === conv.customer_id ? "text-primary-700" : "text-slate-700")}>
+                                        {conv.customerName}
+                                    </h3>
+                                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap ml-2">
+                                        {new Date(conv.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
                                 </div>
-                                <p className={cn("text-xs truncate", chat.unread ? "font-bold text-slate-700" : "text-slate-500")}>
-                                    {chat.lastMessage}
+                                <p className={cn("text-xs line-clamp-1", conv.is_read ? "text-slate-400" : "text-slate-600 font-semibold")}>
+                                    {conv.sender_type === 'store' ? 'Tú: ' : ''}{conv.content}
                                 </p>
                             </div>
-                            {chat.unread && (
-                                <div className="h-2 w-2 rounded-full bg-primary-600 self-center" />
-                            )}
-                        </button>
-                    ))}
+                        )))}
                 </div>
             </div>
 
-            {/* Chat Area - Slide in on mobile */}
+            {/* Chat Area */}
             <div className={cn(
-                "flex-1 flex-col bg-slate-50/30 absolute inset-0 md:static z-20 bg-slate-50 transition-transform duration-300",
+                "flex-1 flex flex-col bg-slate-50/30 transition-all duration-300 absolute md:relative z-10 w-full h-full",
                 showChatOnMobile ? "translate-x-0" : "translate-x-full md:translate-x-0"
             )}>
-                {currentChat ? (
+                {selectedCustomerId ? (
                     <>
                         {/* Chat Header */}
-                        <div className="flex items-center justify-between bg-white px-4 md:px-6 py-3 md:py-4 border-b border-slate-100">
+                        <div className="h-16 px-6 border-b border-slate-100 bg-white flex items-center justify-between shrink-0 shadow-sm z-20">
                             <div className="flex items-center gap-3">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="md:hidden -ml-2 text-slate-500"
-                                    onClick={handleBackToMobileList}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-                                </Button>
-                                <div className="h-9 w-9 md:h-10 md:w-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-100 shadow-sm">
-                                    {currentChat.avatar ? (
-                                        <img src={currentChat.avatar} alt={currentChat.user} className="h-full w-full object-cover" />
-                                    ) : (
-                                        <User size={20} className="text-slate-400" />
-                                    )}
+                                {/* Only show back button on mobile */}
+                                <button onClick={handleBackToMobileList} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-slate-600">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                                </button>
+
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 border border-indigo-50 shadow-inner">
+                                    <User size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-900 text-sm">{currentChat.user}</h3>
-                                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">Activo ahora</p>
+                                    <h2 className="font-bold text-slate-800 leading-tight">
+                                        {conversations.find(c => c.customer_id === selectedCustomerId)?.customerName || 'Cliente'}
+                                    </h2>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                        </span>
+                                        <span className="text-[10px] font-bold text-emerald-600 tracking-wide uppercase">Activo ahora</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400">
+                            <div className="flex gap-2">
+                                <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-colors">
                                     <Search size={18} />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400">
+                                </button>
+                                <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-colors">
                                     <MoreVertical size={18} />
-                                </Button>
+                                </button>
                             </div>
                         </div>
 
-                        {/* Messages History */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 scrollbar-hide">
-                            {chatHistory.map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    className={cn(
-                                        "flex flex-col max-w-[85%] md:max-w-[70%]",
-                                        msg.sender === 'store' ? "ml-auto items-end" : "mr-auto items-start"
-                                    )}
-                                >
-                                    <div
-                                        className={cn(
-                                            "rounded-2xl px-4 py-2.5 md:px-5 md:py-3 text-sm shadow-sm",
-                                            msg.sender === 'store'
-                                                ? "bg-primary-600 text-white rounded-tr-none"
-                                                : "bg-white text-slate-700 rounded-tl-none border border-slate-100"
-                                        )}
-                                    >
-                                        {msg.text}
-                                    </div>
-                                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-400 font-medium uppercase tracking-tighter">
-                                        <span>{msg.time}</span>
-                                        {msg.sender === 'store' && <Check size={10} className="text-primary-500" />}
-                                    </div>
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 scroll-smooth">
+                            {messagesLoading ? (
+                                <div className="flex justify-center items-center h-full">
+                                    <Loader2 className="animate-spin text-primary-400" size={32} />
                                 </div>
-                            ))}
+                            ) : messages.length === 0 ? (
+                                <div className="text-center text-slate-400 mt-10">No hay mensajes anteriores.</div>
+                            ) : (
+                                messages.map((msg) => (
+                                    <div key={msg.id} className={cn("flex flex-col max-w-[85%] md:max-w-[70%]", msg.sender_type === 'store' ? "ml-auto items-end" : "mr-auto items-start")}>
+                                        {msg.sender_type === 'store' && (
+                                            <span className="text-[10px] text-slate-400 mb-1 px-1">Tú</span>
+                                        )}
+                                        <div className={cn(
+                                            "px-5 py-3 shadow-sm text-sm relative group",
+                                            msg.sender_type === 'store'
+                                                ? "bg-primary-600 text-white rounded-2xl rounded-tr-sm"
+                                                : "bg-white text-slate-700 border border-slate-200 rounded-2xl rounded-tl-sm"
+                                        )}>
+                                            {msg.content}
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 mt-1 px-1 font-medium flex items-center gap-1">
+                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {msg.sender_type === 'store' && (
+                                                <Check size={12} className={cn(msg.is_read ? "text-blue-500" : "text-slate-300")} />
+                                            )}
+                                        </span>
+                                    </div>
+                                )))}
                         </div>
 
-                        {/* Reply Form */}
-                        <div className="bg-white p-3 md:p-6 border-t border-slate-100">
-                            <form onSubmit={handleSendReply} className="flex items-center gap-2 md:gap-3">
-                                <Input
-                                    value={replyText}
-                                    onChange={(e) => setReplyText(e.target.value)}
-                                    placeholder="Respuesta..."
-                                    className="flex-1 bg-slate-50 border-none h-10 md:h-12 px-4 md:px-6 rounded-2xl text-sm focus:ring-1 focus:ring-primary-500"
-                                />
+                        {/* Input Area */}
+                        <div className="p-4 bg-white border-t border-slate-100">
+                            <form onSubmit={handleSendReply} className="flex gap-3 items-end max-w-4xl mx-auto">
+                                <div className="flex-1 bg-slate-50 rounded-3xl border border-slate-200 focus-within:border-primary-300 focus-within:ring-4 focus-within:ring-primary-50 transition-all flex items-center px-2">
+                                    <Input
+                                        value={replyText}
+                                        onChange={(e) => setReplyText(e.target.value)}
+                                        placeholder="Escribe un mensaje..."
+                                        className="border-none bg-transparent h-12 focus:ring-0 px-4 text-slate-700 placeholder:text-slate-400"
+                                    />
+                                </div>
                                 <Button
                                     type="submit"
-                                    className="h-10 md:h-12 w-10 md:w-auto px-0 md:px-8 rounded-full md:rounded-2xl shadow-lg shadow-primary-100 font-bold shrink-0 transition-all hover:scale-105 active:scale-95"
                                     disabled={!replyText.trim()}
+                                    className={cn(
+                                        "h-12 px-6 rounded-2xl font-bold shadow-lg transition-all flex items-center gap-2",
+                                        replyText.trim()
+                                            ? "bg-primary-600 hover:bg-primary-700 shadow-primary-200 hover:scale-105 active:scale-95"
+                                            : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                                    )}
                                 >
-                                    <Send size={18} className="md:mr-3" />
-                                    <span className="hidden md:inline tracking-wide">Enviar</span>
+                                    <span className="hidden md:inline">Enviar</span>
+                                    <Send size={18} className={cn(replyText.trim() && "fill-current")} />
                                 </Button>
                             </form>
                         </div>
                     </>
                 ) : (
-                    <div className="flex flex-1 items-center justify-center">
-                        <div className="text-center p-6">
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 mb-4 animate-bounce">
-                                <MessageCircle size={32} className="text-slate-300" />
-                            </div>
-                            <h3 className="text-slate-900 font-bold">Tus Mensajes</h3>
-                            <p className="text-slate-500 text-sm max-w-xs mx-auto">Selecciona una conversación para responder a tus clientes.</p>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50/30">
+                        <div className="h-24 w-24 bg-white rounded-[2rem] shadow-xl shadow-slate-100 flex items-center justify-center mb-6 rotate-3 transform transition-transform hover:rotate-6">
+                            <MessageCircle size={48} className="text-primary-300" />
                         </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Selecciona una conversación</h3>
+                        <p className="text-slate-500 max-w-xs mx-auto">
+                            Elige un cliente de la lista para ver su historial de mensajes y responder en tiempo real.
+                        </p>
                     </div>
                 )}
             </div>

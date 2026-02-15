@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2 } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
@@ -12,9 +12,11 @@ import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { COMPANIES } from '../data/mock';
+import { useSettings } from '../hooks/useSettings';
 
 export default function DashboardProfile() {
     const { showToast } = useToast();
+    const { getSetting } = useSettings();
     const { company: authCompany, refreshCompany } = useAuth();
     const location = useLocation();
     const [searchParams] = useSearchParams();
@@ -41,7 +43,10 @@ export default function DashboardProfile() {
         slug: '',
         description: '',
         whatsapp: '',
-        businessType: 'retail'
+        businessType: 'retail',
+        instagram: '',
+        tiktok: '',
+        website: ''
     });
     const [passwords, setPasswords] = useState({
         current: '',
@@ -56,7 +61,10 @@ export default function DashboardProfile() {
                 slug: company.slug || '',
                 description: company.description || '',
                 whatsapp: company.whatsapp || '',
-                businessType: company.business_type || 'retail'
+                businessType: company.business_type || 'retail',
+                instagram: company.socials?.instagram || '',
+                tiktok: company.socials?.tiktok || '',
+                website: company.socials?.website || company.website || ''
             });
         }
     }, [company?.id, demoCompany.id]);
@@ -104,7 +112,12 @@ export default function DashboardProfile() {
                     slug: formData.slug,
                     description: formData.description,
                     whatsapp: formData.whatsapp,
-                    business_type: formData.businessType
+                    business_type: formData.businessType,
+                    socials: {
+                        instagram: formData.instagram,
+                        tiktok: formData.tiktok,
+                        website: formData.website
+                    }
                 })
                 .eq('id', company.id);
 
@@ -311,7 +324,7 @@ export default function DashboardProfile() {
                                 </div>
                                 {!isPro && (
                                     <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-200 uppercase tracking-widest">
-                                        Solo PRO
+                                        Planes de Pago
                                     </span>
                                 )}
                             </div>
@@ -469,6 +482,40 @@ export default function DashboardProfile() {
                                         </div>
                                     </div>
 
+                                    {/* Social Media Links */}
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Presencia Digital</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-medium text-slate-500 pl-1">Instagram</label>
+                                                <Input
+                                                    value={formData.instagram}
+                                                    onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                                                    placeholder="@tu_cuenta"
+                                                    className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-medium text-slate-500 pl-1">TikTok</label>
+                                                <Input
+                                                    value={formData.tiktok}
+                                                    onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
+                                                    placeholder="@tu_cuenta"
+                                                    className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-medium text-slate-500 pl-1">Web</label>
+                                                <Input
+                                                    value={formData.website}
+                                                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                                                    placeholder="https://..."
+                                                    className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-6">
                                         <div className="flex flex-col gap-2">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tienda de Ventas</label>
@@ -537,7 +584,7 @@ export default function DashboardProfile() {
                                 </div>
                                 {!isPro && (
                                     <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-1 rounded-full border border-primary-200 uppercase tracking-widest">
-                                        Solo PRO
+                                        Planes de Pago
                                     </span>
                                 )}
                             </div>
@@ -572,7 +619,7 @@ export default function DashboardProfile() {
                                             <div className="h-12 w-12 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                                 <Sparkles className="text-primary-600" size={24} />
                                             </div>
-                                            <h4 className="font-bold text-slate-900 mb-2">Función Exclusiva PRO</h4>
+                                            <h4 className="font-bold text-slate-900 mb-2">Función Exclusiva de Planes Pagados</h4>
                                             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
                                                 Genera códigos QR personalizados para que tus clientes accedan a tu catálogo al instante.
                                             </p>
@@ -580,7 +627,7 @@ export default function DashboardProfile() {
                                                 onClick={() => setShowUpgradeModal(true)}
                                                 className="w-full bg-primary-600 hover:bg-primary-700 font-bold shadow-lg shadow-primary-100"
                                             >
-                                                Subir a PRO ahora
+                                                Mejorar Plan
                                             </Button>
                                         </div>
                                     </div>
@@ -596,7 +643,7 @@ export default function DashboardProfile() {
                                 </div>
                                 {!isPro && (
                                     <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-1 rounded-full border border-primary-200 uppercase tracking-widest">
-                                        Solo PRO
+                                        Planes de Pago
                                     </span>
                                 )}
                             </div>
@@ -680,47 +727,58 @@ export default function DashboardProfile() {
                             <div className="flex items-center gap-4 mb-4">
                                 <div className={cn(
                                     "h-12 w-12 rounded-2xl flex items-center justify-center border shadow-sm group-hover:scale-110 transition-transform duration-500",
-                                    company.plan === 'free' ? "bg-primary-50 border-primary-100" : "bg-emerald-50 border-emerald-100"
+                                    company.plan === 'free' ? "bg-slate-50 border-slate-100" :
+                                        company.plan === 'plus' ? "bg-blue-50 border-blue-100" :
+                                            company.plan === 'pro' ? "bg-amber-50 border-amber-100" :
+                                                "bg-emerald-50 border-emerald-100"
                                 )}>
-                                    <Crown size={24} className={cn(
-                                        "fill-current/20",
-                                        company.plan === 'free' ? "text-primary-600" : "text-emerald-600"
-                                    )} />
+                                    {company.plan === 'free' && <Rocket size={24} className="text-secondary-500 fill-secondary-500/10" />}
+                                    {company.plan === 'plus' && <Zap size={24} className="text-blue-500 fill-blue-500/10" />}
+                                    {company.plan === 'pro' && <Sparkles size={24} className="text-amber-500 fill-amber-500/10" />}
+                                    {company.plan === 'custom' && <Shield size={24} className="text-slate-800 fill-slate-800/10" />}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h4 className="font-bold text-lg leading-tight text-slate-900">
-                                            {company.plan === 'free' ? 'Plan Gratuito' : 'Plan Premium'}
+                                            Plan {company.plan === 'free' ? 'Gratuito' : company.plan.charAt(0).toUpperCase() + company.plan.slice(1)}
                                         </h4>
                                         <span className={cn(
                                             "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                            company.plan === 'free' ? "bg-slate-100 text-slate-600 border-slate-200" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                            company.plan === 'free' ? "bg-slate-100 text-slate-600 border-slate-200" :
+                                                company.plan === 'plus' ? "bg-blue-100 text-blue-800 border-blue-200" :
+                                                    company.plan === 'pro' ? "bg-amber-100 text-amber-800 border-amber-200" :
+                                                        "bg-emerald-100 text-emerald-800 border-emerald-200"
                                         )}>
                                             {company.plan.toUpperCase()}
                                         </span>
                                     </div>
                                     <p className="text-slate-500 text-[11px] font-medium mt-0.5">
-                                        {company.plan === 'free' ? 'Límite de 5 productos' : 'Suscripción activa'}
+                                        {company.plan === 'free' ? `Límite de ${getSetting('free_plan_product_limit', '5')} productos` :
+                                            company.plan === 'plus' ? `Límite de ${getSetting('plus_plan_product_limit', '100')} productos` :
+                                                company.plan === 'pro' ? `Límite de ${getSetting('pro_plan_product_limit', '500')} productos` :
+                                                    'Suscripción personalizada activa'}
                                     </p>
                                 </div>
                             </div>
 
                             <p className="text-slate-600 text-xs mb-6 leading-relaxed border-t border-slate-100 pt-4">
                                 {company.plan === 'free'
-                                    ? "Estás usando la versión básica. Sube a PRO para desbloquear productos ilimitados, analíticas y más."
-                                    : "Acceso total a Catálogo Ilimitado, Analíticas IA y soporte prioritario 24/7."
+                                    ? "Estás usando la versión básica. Sube a un plan superior para desbloquear más productos, fotos y analíticas."
+                                    : "Disfrutas de mayor capacidad y funciones avanzadas para potenciar tu negocio."
                                 }
                             </p>
 
                             <Button
                                 className={cn(
                                     "w-full font-bold shadow-lg",
-                                    company.plan === 'free' ? "bg-primary-600 hover:bg-primary-700 shadow-primary-100" : "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
+                                    company.plan === 'free' ? "bg-primary-600 hover:bg-primary-700 shadow-primary-100" :
+                                        company.plan === 'plus' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" :
+                                            "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
                                 )}
                                 onClick={() => setShowUpgradeModal(true)}
                             >
                                 <Sparkles size={16} className="mr-2 text-yellow-300" />
-                                {company.plan === 'free' ? 'Mejorar a PRO' : 'Gestionar Plan'}
+                                {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar / Cambiar Plan'}
                             </Button>
                         </CardContent>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50/50 rounded-full -mr-10 -mt-10 blur-3xl pointer-events-none" />

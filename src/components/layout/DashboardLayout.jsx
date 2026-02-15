@@ -17,9 +17,14 @@ import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
 
+import { useUnreadMessages } from '../../hooks/useUnreadMessages';
+
 export function DashboardLayout() {
     const navigate = useNavigate();
     const { user, profile, company, loading, signOut } = useAuth();
+
+    // Fetch unread messages count
+    const { unreadCount } = useUnreadMessages(company?.id);
 
     useEffect(() => {
         if (!loading) {
@@ -36,15 +41,16 @@ export function DashboardLayout() {
         navigate('/login');
     };
 
-    // If still loading in context, show nothing or a loader
-    // If not admin and no company, maybe they are in the wrong place
-    // But we let the context handle the global loading.
-
     const menuItems = [
         { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
         { name: 'Mis Productos', icon: <Package size={20} />, path: '/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/dashboard/categorias' },
-        { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/dashboard/mensajes', badge: '3' },
+        {
+            name: 'Mensajes',
+            icon: <MessageCircle size={20} />,
+            path: '/dashboard/mensajes',
+            badge: unreadCount > 0 ? unreadCount.toString() : null
+        },
         { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/dashboard/cotizaciones' },
         { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/dashboard/perfil' },
     ];

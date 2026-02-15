@@ -10,7 +10,7 @@ import { useCart } from '../../hooks/useCart';
 export function ProductCard({ product, companySlug, cartEnabled = true, isDemo = false }) {
     const { addToCart } = useCart();
     const [quantity, setQuantity] = useState(1);
-    const mainImage = product.images[0];
+    const mainImage = product.images?.[0] || product.image || 'https://placehold.co/600x600?text=Sin+Imagen';
 
     const getLink = () => {
         const baseLink = `/catalogo/${companySlug}/producto/${product.slug}`;

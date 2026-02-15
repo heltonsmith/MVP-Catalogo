@@ -13,6 +13,7 @@ import { ChatWidget } from '../components/chat/ChatWidget';
 import { MailboxPreview } from '../components/chat/MailboxPreview';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../hooks/useSettings';
 import { NotificationCenter } from '../components/notifications/NotificationCenter';
 import { cn, formatCurrency } from '../utils';
 import NotFoundPage from './NotFoundPage';
@@ -38,6 +39,17 @@ export default function CatalogPage() {
     const [isFavorite, setIsFavorite] = useState(false);
     const [hasReviewed, setHasReviewed] = useState(false);
     const [tempReview, setTempReview] = useState({ rating: 0, comment: '' });
+    const { getSetting } = useSettings();
+
+    const getLimit = () => {
+        if (!company) return 10;
+        if (company.plan === 'custom') return Infinity;
+        const limitKey = `${company.plan}_plan_product_limit`;
+        const defaultValue = company.plan === 'free' ? '5' : company.plan === 'plus' ? '100' : '500';
+        return parseInt(getSetting(limitKey, defaultValue));
+    };
+
+    const productLimit = getLimit();
 
     useEffect(() => {
         const fetchCatalogData = async () => {
@@ -98,7 +110,7 @@ export default function CatalogPage() {
                 const { data: reviewsData } = await supabase
                     .from('reviews')
                     .select('rating')
-                    .eq('target_id', companyData.id);
+                    .eq('company_id', companyData.id);
 
                 const realRating = reviewsData && reviewsData.length > 0
                     ? parseFloat((reviewsData.reduce((acc, r) => acc + r.rating, 0) / reviewsData.length).toFixed(1))
@@ -110,27 +122,42 @@ export default function CatalogPage() {
                     reviews: reviewsData || []
                 });
 
-                // 2. Fetch Products and Categories
+                // 3. Fetch Products with new schema
                 const { data: productsData, error: productsError } = await supabase
                     .from('products')
-                    .select('*, categories(id, name)')
+                    .select(`
+                        *,
+                        product_images(image_url, display_order),
+                        product_categories(
+                            categories(id, name)
+                        )
+                    `)
                     .eq('company_id', companyData.id)
                     .eq('available', true);
 
                 if (productsError) throw productsError;
 
-                setProducts(productsData || []);
+                // Transform products to include categories array and images
+                const transformedProducts = (productsData || []).map(product => ({
+                    ...product,
+                    categories: product.product_categories?.map(pc => pc.categories) || [],
+                    images: product.product_images?.sort((a, b) => a.display_order - b.display_order).map(img => img.image_url) || []
+                }));
+
+                setProducts(transformedProducts);
 
                 // Extract unique categories from products
                 const uniqueCategories = [];
                 const categoryIds = new Set();
 
-                productsData.forEach(p => {
-                    if (p.categories) {
-                        if (!categoryIds.has(p.categories.id)) {
-                            categoryIds.add(p.categories.id);
-                            uniqueCategories.push(p.categories);
-                        }
+                transformedProducts.forEach(p => {
+                    if (p.categories && Array.isArray(p.categories)) {
+                        p.categories.forEach(cat => {
+                            if (cat && !categoryIds.has(cat.id)) {
+                                categoryIds.add(cat.id);
+                                uniqueCategories.push(cat);
+                            }
+                        });
                     }
                 });
                 setCategories(uniqueCategories);
@@ -147,6 +174,24 @@ export default function CatalogPage() {
             fetchCatalogData();
         }
     }, [companySlug]);
+
+    // Track store view
+    useEffect(() => {
+        const trackView = async () => {
+            // Only track views for real stores (not demo stores)
+            if (company && company.id && !company.slug?.includes('demo')) {
+                try {
+                    await supabase.rpc('increment_views', { company_id: company.id });
+                } catch (error) {
+                    console.error('Error tracking view:', error);
+                    // Fail silently - don't block user experience
+                }
+            }
+        };
+
+        trackView();
+    }, [company?.id]);
+
 
     useEffect(() => {
         if (user && company) {
@@ -252,10 +297,11 @@ export default function CatalogPage() {
         const matchesSearch = p.name ? p.name.toLowerCase().includes(search.toLowerCase()) : false;
         const matchesCategory = selectedCategory === 'all' ||
             (p.categories && (
-                typeof p.categories.id === 'string' && p.categories.id.includes(selectedCategory)
+                (Array.isArray(p.categories) && p.categories.some(cat => cat.id === selectedCategory)) ||
+                (typeof p.categories.id === 'string' && p.categories.id.includes(selectedCategory))
             ));
         return matchesSearch && matchesCategory;
-    });
+    }).slice(0, productLimit);
 
     const [editMode, setEditMode] = useState(null); // 'banner' or 'logo'
     const [isDragging, setIsDragging] = useState(false);
@@ -498,7 +544,7 @@ export default function CatalogPage() {
                                     <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 sm:line-clamp-none opacity-90 mb-1 pr-6">{company.description || (isOwner ? 'Añade una descripción para tu tienda...' : '')}</p>
                                     {isOwner && (
                                         <button
-                                            onClick={() => navigate('/dashboard/profile')}
+                                            onClick={() => navigate('/dashboard/perfil')}
                                             className="absolute right-0 top-0 p-1 opacity-0 group-hover/desc:opacity-100 transition-opacity text-white hover:text-primary-400"
                                             title="Editar descripción"
                                         >
@@ -588,7 +634,7 @@ export default function CatalogPage() {
                                 )}
                                 {isOwner && (!company.website || !company.socials?.instagram || !company.socials?.tiktok) && (
                                     <button
-                                        onClick={() => navigate('/dashboard/profile')}
+                                        onClick={() => navigate('/dashboard/perfil')}
                                         className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-white/30 text-white/50 hover:text-white hover:border-white transition-all"
                                         title="Agregar redes sociales"
                                     >

@@ -1,57 +1,121 @@
-import { Check, X, Rocket, Shield, Zap, MessageCircle, QrCode, Globe } from 'lucide-react';
+import { Check, X, Rocket, Shield, Zap, MessageCircle, QrCode, Globe, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Link } from 'react-router-dom';
+import { useSettings } from '../hooks/useSettings';
+import { Loader2 } from 'lucide-react';
 
 export default function PricingPage() {
+    const { getSetting, loading } = useSettings();
+
+    if (loading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-50">
+                <Loader2 className="h-10 w-10 animate-spin text-primary-600" />
+            </div>
+        );
+    }
+
+    const freeProductLimit = getSetting('free_plan_product_limit', '5');
+    const freeImageLimit = getSetting('free_plan_image_limit', '1');
+    const plusProductLimit = getSetting('plus_plan_product_limit', '100');
+    const plusImageLimit = getSetting('plus_plan_image_limit', '5');
+    const proProductLimit = getSetting('pro_plan_product_limit', '500');
+    const proImageLimit = getSetting('pro_plan_image_limit', '5');
+    const customProductLimit = getSetting('custom_plan_product_limit', '1000');
+    const customImageLimit = getSetting('custom_plan_image_limit', '10');
+
     const plans = [
         {
             name: 'Gratis',
             price: '$0',
+            icon: <Rocket className="text-secondary-500" size={24} />,
             description: 'Ideal para probar la plataforma y empezar tu presencia digital.',
             features: [
-                { text: 'Máximo 5 productos', included: true },
-                { text: '1 foto por producto', included: true },
+                { text: `Hasta ${freeProductLimit} productos`, included: true },
+                { text: `${freeImageLimit} foto por producto`, included: true },
                 { text: 'Redes sociales vinculadas', included: true },
                 { text: 'Dashboard básico', included: true },
                 { text: 'Chat interno', included: false },
-                { text: 'Enlaces a tu web propia', included: false },
                 { text: 'Cotizaciones por WhatsApp', included: false },
                 { text: 'Código QR para compartir', included: false },
-                { text: 'Sistema de mensajería interna', included: false },
-                { text: 'Ocultar branding en móvil', included: false },
+                { text: 'Sin soporte', included: false },
             ],
             cta: 'Empezar ya',
             link: '/registro',
             variant: 'secondary'
         },
         {
-            name: 'Pro',
+            name: 'Plus',
             price: '$9.990',
             period: '/mes',
+            icon: <Zap className="text-primary-600 fill-primary-600" size={24} />,
             badge: 'Más popular',
-            description: 'Todas las herramientas para escalar tu negocio y profesionalizar tu marca.',
+            description: 'Para negocios en crecimiento que necesitan más capacidad.',
             features: [
-                { text: 'Productos ilimitados', included: true },
-                { text: 'Fotos ilimitadas por producto', included: true },
+                { text: `Hasta ${plusProductLimit} productos`, included: true },
+                { text: `Hasta ${plusImageLimit} fotos por producto`, included: true },
                 { text: 'Redes sociales vinculadas', included: true },
                 { text: 'Dashboard avanzado', included: true },
                 { text: 'Chat interno integrado', included: true },
-                { text: 'Enlace a tu sitio web', included: true },
-                { text: 'Cotizaciones directas WhatsApp', included: true },
+                { text: 'Cotizaciones WhatsApp', included: true },
                 { text: 'Código QR personalizado', included: true },
-                { text: 'Mensajería interna con clientes', included: true },
-                { text: 'Modo Landing Page (vía /landing)', included: true },
+                { text: 'Soporte prioritario', included: true },
             ],
-            cta: 'Subir a Pro',
+            cta: 'Elegir Plus',
             link: '/registro',
             variant: 'primary'
+        },
+        {
+            name: 'Pro',
+            price: '$19.990',
+            period: '/mes',
+            icon: <Sparkles className="text-amber-500 fill-amber-500" size={24} />,
+            description: 'Máxima potencia para grandes inventarios y presencia profesional.',
+            features: [
+                { text: `Hasta ${proProductLimit} productos`, included: true },
+                { text: `Hasta ${proImageLimit} fotos por producto`, included: true },
+                { text: 'Redes sociales vinculadas', included: true },
+                { text: 'Dashboard avanzado', included: true },
+                { text: 'Chat interno integrado', included: true },
+                { text: 'Cotizaciones WhatsApp', included: true },
+                { text: 'Código QR personalizado', included: true },
+                { text: 'Soporte prioritario avanzado', included: true },
+            ],
+            cta: 'Elegir Pro',
+            link: '/registro',
+            variant: 'secondary',
+            isSpecial: true
+        },
+        {
+            name: 'Personalizado',
+            price: 'Custom',
+            icon: <Shield className="text-slate-800 fill-slate-800" size={24} />,
+            description: 'Soluciones a medida para grandes empresas y emprendimientos.',
+            features: [
+                { text: `Más de ${customProductLimit} productos`, included: true },
+                { text: `Hasta ${customImageLimit} fotos por producto`, included: true },
+                { text: 'Soporte dedicado 24/7', included: true },
+                { text: 'Funciones a medida', included: true },
+                { text: 'Múltiples sucursales', included: true },
+                { text: 'Soporte prioritario 24x7', included: true },
+            ],
+            cta: 'Contactar',
+            link: `https://wa.me/56912345678?text=${encodeURIComponent('Hola, me interesa el Plan Personalizado para mi empresa.')}`,
+            variant: 'outline',
+            isExternal: true
         }
     ];
 
-    const launchOffers = [
-        { period: 'Mensual', price: '$9.990', savings: null },
-        { period: 'Cada 6 meses', price: '$8.500', savings: 'Ahorras 15%' },
-        { period: 'Por 1 año', price: '$6.500', savings: 'Ahorras 35%' },
+    const plusOffers = [
+        { period: 'Mensual', price: '$9.990/mes', total: '$119.880/año', savings: null },
+        { period: 'Cada 6 meses', price: '$8.500/mes', total: '$102.000/año', savings: 'Ahorras 15%' },
+        { period: 'Por 1 año', price: '$7.000/mes', total: '$84.000/año', savings: 'Ahorras 30%' },
+    ];
+
+    const proOffers = [
+        { period: 'Mensual', price: '$19.990/mes', total: '$239.880/año', savings: null },
+        { period: 'Cada 6 meses', price: '$18.000/mes', total: '$216.000/año', savings: 'Ahorras 10%' },
+        { period: 'Por 1 año', price: '$16.000/mes', total: '$192.000/año', savings: 'Ahorras 20%' },
     ];
 
     return (
@@ -70,47 +134,81 @@ export default function PricingPage() {
                 {/* Launch Offers Banner */}
                 <div className="bg-white rounded-3xl shadow-xl p-8 mb-16 border border-primary-100 relative overflow-hidden">
                     <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary-50 rounded-full opacity-50" />
-                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                        <div className="flex-1">
-                            <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                                <Rocket className="text-primary-600" />
-                                Ofertas de Lanzamiento PRO
-                            </h3>
-                            <p className="text-slate-500 mt-2">Aprovecha nuestras tarifas especiales por tiempo limitado.</p>
+                    <div className="relative z-10">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8">
+                            <div className="flex-1">
+                                <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                                    <Rocket className="text-primary-600" />
+                                    Ofertas Plan PLUS
+                                </h3>
+                                <p className="text-slate-500 mt-2">Para negocios que necesitan hasta 100 productos.</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
+                                {plusOffers.map((offer) => (
+                                    <div key={offer.period} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col justify-center gap-1">
+                                        <p className="text-sm text-slate-500 font-medium">{offer.period}</p>
+                                        <p className="text-2xl font-bold text-primary-600 leading-none">{offer.price}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{offer.total}</p>
+                                        {offer.savings && (
+                                            <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase">
+                                                {offer.savings}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
-                            {launchOffers.map((offer) => (
-                                <div key={offer.period} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
-                                    <p className="text-sm text-slate-500 font-medium">{offer.period}</p>
-                                    <p className="text-2xl font-bold text-primary-600">{offer.price}</p>
-                                    {offer.savings && (
-                                        <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase">
-                                            {offer.savings}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
+
+                        <div className="h-px bg-slate-100 w-full mb-8" />
+
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                            <div className="flex-1">
+                                <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                                    <Zap className="text-amber-500" />
+                                    Ofertas Plan PRO
+                                </h3>
+                                <p className="text-slate-500 mt-2">Para inventarios grandes de hasta 500 productos.</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
+                                {proOffers.map((offer) => (
+                                    <div key={offer.period} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col justify-center gap-1">
+                                        <p className="text-sm text-slate-500 font-medium">{offer.period}</p>
+                                        <p className="text-2xl font-bold text-amber-600 leading-none">{offer.price}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{offer.total}</p>
+                                        {offer.savings && (
+                                            <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase">
+                                                {offer.savings}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {plans.map((plan) => (
-                        <div key={plan.name} className={`relative flex flex-col bg-white rounded-3xl shadow-lg border ${plan.badge ? 'border-primary-200 ring-2 ring-primary-50' : 'border-slate-100'}`}>
+                        <div key={plan.name} className={`relative flex flex-col bg-white rounded-3xl shadow-lg border ${plan.badge ? 'border-primary-200 ring-2 ring-primary-50' : plan.isSpecial ? 'border-amber-200 ring-2 ring-amber-50' : 'border-slate-100'}`}>
                             {plan.badge && (
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
                                     {plan.badge}
                                 </div>
                             )}
-                            <div className="p-8">
-                                <h3 className="text-2xl font-bold text-slate-900">{plan.name}</h3>
+                            <div className="p-8 flex flex-col h-full">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-2 bg-slate-50 rounded-xl">
+                                        {plan.icon}
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-slate-900">{plan.name}</h3>
+                                </div>
                                 <div className="mt-4 flex items-baseline">
                                     <span className="text-4xl font-extrabold tracking-tight text-slate-900">{plan.price}</span>
                                     {plan.period && <span className="ml-1 text-xl font-semibold text-slate-500">{plan.period}</span>}
                                 </div>
-                                <p className="mt-4 text-slate-500">{plan.description}</p>
+                                <p className="mt-4 text-slate-500 text-sm">{plan.description}</p>
 
-                                <ul className="mt-8 space-y-4">
+                                <ul className="mt-8 space-y-4 flex-1">
                                     {plan.features.map((feature, idx) => (
                                         <li key={idx} className="flex items-start">
                                             <div className="flex-shrink-0">
@@ -128,14 +226,25 @@ export default function PricingPage() {
                                 </ul>
 
                                 <div className="mt-10">
-                                    <Link to={plan.link}>
-                                        <Button
-                                            variant={plan.variant}
-                                            className="w-full h-12 text-lg font-bold rounded-xl"
-                                        >
-                                            {plan.cta}
-                                        </Button>
-                                    </Link>
+                                    {plan.isExternal ? (
+                                        <a href={plan.link} target="_blank" rel="noopener noreferrer">
+                                            <Button
+                                                variant={plan.variant}
+                                                className="w-full h-12 text-lg font-bold rounded-xl"
+                                            >
+                                                {plan.cta}
+                                            </Button>
+                                        </a>
+                                    ) : (
+                                        <Link to={plan.link}>
+                                            <Button
+                                                variant={plan.variant}
+                                                className="w-full h-12 text-lg font-bold rounded-xl"
+                                            >
+                                                {plan.cta}
+                                            </Button>
+                                        </Link>
+                                    )}
                                 </div>
                             </div>
                         </div>

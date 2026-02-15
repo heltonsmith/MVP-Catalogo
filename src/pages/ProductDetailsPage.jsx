@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ShoppingCart, Share2, ShieldCheck, Package, Truck, Utensils, User } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Share2, ShieldCheck, Package, Truck, Utensils, User, Loader2 } from 'lucide-react';
 import { PRODUCTS, COMPANIES, CATEGORIES } from '../data/mock';
+import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { StarRating } from '../components/ui/StarRating';
@@ -23,15 +24,115 @@ export default function ProductDetailsPage() {
     const [quantity, setQuantity] = useState(1);
     const [isReviewsOpen, setIsReviewsOpen] = useState(false);
 
-    const product = useMemo(() =>
-        PRODUCTS.find(p => p.slug === productSlug),
-        [productSlug]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [product, setProduct] = useState(null);
+    const [company, setCompany] = useState(null);
 
-    const company = useMemo(() =>
-        COMPANIES.find(c => c.slug === companySlug),
-        [companySlug]);
+    useEffect(() => {
+        const fetchProductData = async () => {
+            if (isDemo) {
+                const demoProduct = PRODUCTS.find(p => p.slug === productSlug);
+                const demoCompany = COMPANIES.find(c => c.slug === companySlug);
 
-    if (!product || !company) {
+                if (demoProduct && demoCompany) {
+                    setProduct({
+                        ...demoProduct,
+                        images: demoProduct.images || []
+                    });
+                    setCompany(demoCompany);
+                } else {
+                    setError('Not found');
+                }
+                setLoading(false);
+                return;
+            }
+
+            try {
+                setLoading(true);
+
+                // 1. Fetch Company
+                const { data: companyData, error: companyError } = await supabase
+                    .from('companies')
+                    .select('*')
+                    .eq('slug', companySlug)
+                    .single();
+
+                if (companyError || !companyData) throw new Error('Company not found');
+                setCompany(companyData);
+
+                // 2. Fetch Product with images and categories
+                const { data: productData, error: productError } = await supabase
+                    .from('products')
+                    .select(`
+                        *,
+                        product_images(image_url, display_order),
+                        product_categories(
+                            categories(id, name)
+                        )
+                    `)
+                    .eq('slug', productSlug)
+                    .eq('company_id', companyData.id)
+                    .single();
+
+                if (productError || !productData) throw new Error('Product not found');
+
+                // 3. Fetch Reviews
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select('*')
+                    .eq('product_id', productData.id)
+                    .order('created_at', { ascending: false });
+
+                // Transform reviews to match mock structure
+                const transformedReviews = (reviewsData || []).map(r => ({
+                    id: r.id,
+                    user: r.customer_name || 'Anónimo',
+                    date: new Date(r.created_at).toLocaleDateString(),
+                    rating: r.rating,
+                    comment: r.comment
+                }));
+
+                const rating = transformedReviews.length > 0
+                    ? parseFloat((transformedReviews.reduce((acc, r) => acc + r.rating, 0) / transformedReviews.length).toFixed(1))
+                    : 0;
+
+                // Transform product to match expected UI structure
+                const categories = productData.product_categories?.map(pc => pc.categories) || [];
+                const transformedProduct = {
+                    ...productData,
+                    categories: categories,
+                    categoryId: categories[0]?.id,
+                    categoryName: categories[0]?.name,
+                    images: productData.product_images?.length > 0
+                        ? productData.product_images.sort((a, b) => a.display_order - b.display_order).map(img => img.image_url)
+                        : productData.image ? [productData.image] : [],
+                    reviews: transformedReviews,
+                    rating: rating
+                };
+
+                setProduct(transformedProduct);
+            } catch (err) {
+                console.error('Error fetching product detail:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProductData();
+    }, [productSlug, companySlug, isDemo]);
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen py-20 gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary-600" />
+                <p className="text-slate-500 font-bold animate-pulse">Cargando detalles...</p>
+            </div>
+        );
+    }
+
+    if (error || !product || !company) {
         return <NotFoundPage />;
     }
 
@@ -106,21 +207,27 @@ export default function ProductDetailsPage() {
                     {/* Product Info */}
                     <div className="flex flex-col">
                         <div className="flex flex-wrap items-center gap-2 mb-4">
-                            <Badge variant="primary">{CATEGORIES.find(c => c.id === product.categoryId)?.name || product.categoryId}</Badge>
+                            {product.categories?.map((cat, idx) => (
+                                <Badge key={cat.id || idx} variant="primary">
+                                    {cat.name}
+                                </Badge>
+                            ))}
 
                             {isRestaurant ? (
                                 <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
-                                    {product.stock > 0 ? 'Disponible' : 'No disponible'}
+                                    {product.stock > 0 ? `Disponible (Stock: ${product.stock})` : 'No disponible'}
                                 </Badge>
                             ) : company.features?.cartEnabled !== false ? (
-                                <Badge variant="success">En stock</Badge>
+                                <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
+                                    {product.stock > 0 ? `En stock: ${product.stock}` : 'Sin stock'}
+                                </Badge>
                             ) : (
                                 <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
-                                    {product.stock > 0 ? 'Disponible' : 'No disponible'}
+                                    {product.stock > 0 ? `Disponible: ${product.stock}` : 'No disponible'}
                                 </Badge>
                             )}
 
-                            {product.rating && (
+                            {product.rating > 0 && (
                                 <StarRating
                                     rating={product.rating}
                                     count={product.reviews?.length}
