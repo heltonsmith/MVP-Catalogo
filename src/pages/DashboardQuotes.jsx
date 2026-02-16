@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileText, ExternalLink, Calendar, Clock, User, ArrowUpRight, BadgeCheck, Loader2, MessageSquare, Filter, CheckCircle2, CheckSquare } from 'lucide-react';
+import { FileText, ExternalLink, Calendar, Clock, User, ArrowUpRight, BadgeCheck, Loader2, MessageSquare, Filter, CheckCircle2, CheckSquare, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { QUOTES as MOCK_QUOTES, COMPANIES } from '../data/mock';
+import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 
 export default function DashboardQuotes() {
     const { company: authCompany, loading: authLoading } = useAuth();
@@ -34,6 +35,7 @@ export default function DashboardQuotes() {
     const [quotes, setQuotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
     const fetchQuotes = async () => {
         if (isDemo) {
@@ -141,6 +143,11 @@ export default function DashboardQuotes() {
         <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary-600" />
             <p className="text-slate-500 font-bold animate-pulse">Cargando cotizaciones...</p>
+            <PlanUpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                companyId={company?.id}
+            />
         </div>
     );
 
@@ -152,146 +159,159 @@ export default function DashboardQuotes() {
                     <p className="text-slate-500">Historial de presupuestos enviados a tus clientes.</p>
                 </div>
 
-                {/* Date Filter */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
-                    <div className="relative">
-                        <Input
-                            type="date"
-                            className="h-9 w-36 border-none bg-transparent text-xs font-bold"
-                            value={dateRange.start}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                        />
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    {/* Date Filter */}
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
+                        <div className="relative">
+                            <Input
+                                type="date"
+                                className="h-9 w-36 border-none bg-transparent text-xs font-bold"
+                                value={dateRange.start}
+                                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            />
+                        </div>
+                        <span className="text-slate-300">-</span>
+                        <div className="relative">
+                            <Input
+                                type="date"
+                                className="h-9 w-36 border-none bg-transparent text-xs font-bold"
+                                value={dateRange.end}
+                                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            />
+                        </div>
+                        {(dateRange.start || dateRange.end) && (
+                            <button
+                                onClick={() => setDateRange({ start: '', end: '' })}
+                                className="p-1 hover:bg-slate-100 rounded-full text-slate-400"
+                                title="Limpiar filtros"
+                            >
+                                <Filter size={14} className="fill-slate-400" />
+                            </button>
+                        )}
                     </div>
-                    <span className="text-slate-300">-</span>
-                    <div className="relative">
-                        <Input
-                            type="date"
-                            className="h-9 w-36 border-none bg-transparent text-xs font-bold"
-                            value={dateRange.end}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                        />
-                    </div>
-                    {(dateRange.start || dateRange.end) && (
-                        <button
-                            onClick={() => setDateRange({ start: '', end: '' })}
-                            className="p-1 hover:bg-slate-100 rounded-full text-slate-400"
-                            title="Limpiar filtros"
+
+                    {company?.plan === 'free' && (
+                        <Button
+                            onClick={() => setShowUpgradeModal(true)}
+                            variant="secondary"
+                            className="font-bold bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 h-11"
                         >
-                            <Filter size={14} className="fill-slate-400" />
-                        </button>
+                            <Zap size={18} className="mr-2 fill-current" />
+                            Mejorar tu plan
+                        </Button>
                     )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-                {quotes.map((quote) => (
-                    <Card key={quote.id} className="border-none shadow-sm overflow-hidden hover:shadow-md transition-all group ring-1 ring-slate-100/50">
-                        <CardContent className="p-0">
-                            <div className="flex flex-col md:flex-row">
-                                {/* Quote Main Info */}
-                                <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-slate-100">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-8 w-8 rounded-lg bg-primary-50 flex items-center justify-center">
-                                                <FileText size={18} className="text-primary-600" />
+            <div className="grid grid-cols-1 gap-6 relative min-h-[400px]">
+                <div className={cn("grid grid-cols-1 gap-6 transition-all duration-500", company?.plan === 'free' && "blur-[8px] grayscale opacity-30 select-none pointer-events-none")}>
+                    {quotes.map((quote) => (
+                        <Card key={quote.id} className="border-none shadow-sm overflow-hidden hover:shadow-md transition-all group ring-1 ring-slate-100/50">
+                            <CardContent className="p-0">
+                                <div className="flex flex-col md:flex-row">
+                                    {/* Quote Main Info */}
+                                    <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-slate-100">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-8 w-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                                                    <FileText size={18} className="text-primary-600" />
+                                                </div>
+                                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{quote.id.split('-')[0]}</span>
                                             </div>
-                                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">{quote.id.split('-')[0]}</span>
+                                            <Badge variant="outline" className={cn("text-[10px] uppercase font-bold px-2 py-0.5", getStatusStyle(quote.status))}>
+                                                {getStatusLabel(quote.status)}
+                                            </Badge>
                                         </div>
-                                        <Badge variant="outline" className={cn("text-[10px] uppercase font-bold px-2 py-0.5", getStatusStyle(quote.status))}>
-                                            {getStatusLabel(quote.status)}
-                                        </Badge>
-                                    </div>
 
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                                                <User size={18} className="text-slate-400" />
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
+                                                    <User size={18} className="text-slate-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-800">{quote.customer_name}</p>
+                                                    <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">
+                                                        <span className="flex items-center gap-1"><Calendar size={10} /> {new Date(quote.created_at).toLocaleDateString()}</span>
+                                                        <span className="flex items-center gap-1"><Clock size={10} /> {new Date(quote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-800">{quote.customer_name}</p>
-                                                <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">
-                                                    <span className="flex items-center gap-1"><Calendar size={10} /> {new Date(quote.created_at).toLocaleDateString()}</span>
-                                                    <span className="flex items-center gap-1"><Clock size={10} /> {new Date(quote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+
+                                            <div className="bg-slate-50/70 rounded-2xl p-4 space-y-2 border border-slate-100">
+                                                {quote.quote_items.map((item, i) => (
+                                                    <div key={i} className="flex justify-between text-xs">
+                                                        <span className="text-slate-600 font-medium">
+                                                            <span className="font-bold text-primary-600">{item.quantity}x</span> {item.products?.name}
+                                                        </span>
+                                                        <span className="font-bold text-slate-800">{formatCurrency(item.price_at_time * item.quantity)}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-center">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Cotizado</span>
+                                                    <span className="text-sm font-bold text-primary-600">{formatCurrency(quote.total)}</span>
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <div className="bg-slate-50/70 rounded-2xl p-4 space-y-2 border border-slate-100">
-                                            {quote.quote_items.map((item, i) => (
-                                                <div key={i} className="flex justify-between text-xs">
-                                                    <span className="text-slate-600 font-medium">
-                                                        <span className="font-bold text-primary-600">{item.quantity}x</span> {item.products?.name}
-                                                    </span>
-                                                    <span className="font-bold text-slate-800">{formatCurrency(item.price_at_time * item.quantity)}</span>
+                                    {/* Quote Sidebar Actions */}
+                                    <div className="w-full md:w-64 p-6 bg-slate-50/30 flex flex-col justify-between gap-4">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50/50 px-3 py-2 rounded-lg border border-emerald-100">
+                                                <BadgeCheck size={14} />
+                                                Venta vía WhatsApp
+                                            </div>
+                                            {quote.notes && (
+                                                <div className="p-3 bg-white rounded-xl border border-slate-100 text-[11px] text-slate-500 italic">
+                                                    "{quote.notes}"
                                                 </div>
-                                            ))}
-                                            <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-center">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Cotizado</span>
-                                                <span className="text-sm font-bold text-primary-600">{formatCurrency(quote.total)}</span>
-                                            </div>
+                                            )}
+                                            <p className="text-[10px] text-slate-400 font-medium leading-tight">Cliente: {quote.customer_whatsapp}</p>
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Quote Sidebar Actions */}
-                                <div className="w-full md:w-64 p-6 bg-slate-50/30 flex flex-col justify-between gap-4">
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50/50 px-3 py-2 rounded-lg border border-emerald-100">
-                                            <BadgeCheck size={14} />
-                                            Venta vía WhatsApp
-                                        </div>
-                                        {quote.notes && (
-                                            <div className="p-3 bg-white rounded-xl border border-slate-100 text-[11px] text-slate-500 italic">
-                                                "{quote.notes}"
-                                            </div>
-                                        )}
-                                        <p className="text-[10px] text-slate-400 font-medium leading-tight">Cliente: {quote.customer_whatsapp}</p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <a
-                                            href={`https://wa.me/${quote.customer_whatsapp.replace(/\D/g, '')}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="w-full block"
-                                        >
-                                            <Button variant="secondary" size="sm" className="w-full text-xs font-bold gap-2 bg-white border-slate-200">
-                                                <MessageSquare size={14} />
-                                                Responder WhatsApp
-                                            </Button>
-                                        </a >
-
-                                        {quote.status === 'pending' && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="w-full text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50"
-                                                onClick={() => updateStatus(quote.id, 'answered')}
+                                        <div className="space-y-2">
+                                            <a
+                                                href={`https://wa.me/${quote.customer_whatsapp.replace(/\D/g, '')}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="w-full block"
                                             >
-                                                <CheckSquare size={14} className="mr-2" />
-                                                Marcar Respondida
-                                            </Button>
-                                        )}
+                                                <Button variant="secondary" size="sm" className="w-full text-xs font-bold gap-2 bg-white border-slate-200">
+                                                    <MessageSquare size={14} />
+                                                    Responder WhatsApp
+                                                </Button>
+                                            </a >
 
-                                        {quote.status !== 'completed' && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="w-full text-xs font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                                                onClick={() => updateStatus(quote.id, 'completed')}
-                                            >
-                                                <CheckCircle2 size={14} className="mr-2" />
-                                                Marcar Completado
-                                            </Button>
-                                        )}
+                                            {quote.status === 'pending' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50"
+                                                    onClick={() => updateStatus(quote.id, 'answered')}
+                                                >
+                                                    <CheckSquare size={14} className="mr-2" />
+                                                    Marcar Respondida
+                                                </Button>
+                                            )}
+
+                                            {quote.status !== 'completed' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full text-xs font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                                    onClick={() => updateStatus(quote.id, 'completed')}
+                                                >
+                                                    <CheckCircle2 size={14} className="mr-2" />
+                                                    Marcar Completado
+                                                </Button>
+                                            )}
+                                        </div >
                                     </div >
                                 </div >
-                            </div >
-                        </CardContent >
-                    </Card >
-                ))}
-                {
-                    quotes.length === 0 && !loading && (
+                            </CardContent >
+                        </Card >
+                    ))}
+                    {quotes.length === 0 && !loading && (
                         <div className="py-24 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
                             <div className="mx-auto h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4">
                                 <FileText size={32} className="text-slate-200" />
@@ -304,8 +324,30 @@ export default function DashboardQuotes() {
                                 }
                             </p>
                         </div>
-                    )
-                }
+                    )}
+                </div>
+
+                {company?.plan === 'free' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-10 bg-white/5 backdrop-blur-[2px]">
+                        <div className="bg-white/90 backdrop-blur-md p-10 rounded-[32px] border border-amber-100 shadow-2xl max-w-md animate-in zoom-in-95 duration-300">
+                            <div className="h-16 w-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                <Zap className="text-amber-500 fill-amber-500/20" size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">Panel de Cotizaciones PRO</h3>
+                            <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                                Gestiona todos tus pedidos de WhatsApp desde un solo lugar, marca estados, lleva el historial de clientes y potencia tus ventas.
+                            </p>
+                            <Button
+                                onClick={() => setShowUpgradeModal(true)}
+                                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-amber-200"
+                            >
+                                <Sparkles size={18} className="mr-2" />
+                                Desbloquear ahora
+                            </Button>
+                            <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Disponible en todos los planes de pago</p>
+                        </div>
+                    </div>
+                )}
             </div >
         </div >
     );

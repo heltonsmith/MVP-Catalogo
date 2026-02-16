@@ -45,7 +45,9 @@ export function useUnreadMessages(companyId) {
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
         };
     }, [companyId]);
 

@@ -131,6 +131,7 @@ export function NotificationCenter() {
             case 'stock': return <Package className="text-amber-500" size={16} />;
             case 'chat':
             case 'message': return <MessageCircle className="text-emerald-500" size={16} />;
+            case 'system': return <Sparkles className="text-primary-500" size={16} />;
             default: return <AlertCircle className="text-slate-500" size={16} />;
         }
     };
@@ -218,7 +219,8 @@ export function NotificationCenter() {
                                             "flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center mt-0.5",
                                             notification.type === 'quote' ? 'bg-blue-50' :
                                                 notification.type === 'stock' ? 'bg-amber-50' :
-                                                    notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50' : 'bg-slate-50'
+                                                    notification.type === 'system' ? 'bg-primary-50' :
+                                                        notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50' : 'bg-slate-50'
                                         )}>
                                             {getIcon(notification.type)}
                                         </div>

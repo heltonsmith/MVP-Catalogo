@@ -192,10 +192,28 @@ export default function DashboardOverview() {
                                     {stat.trend}
                                 </div>
                             </div>
-                            <div className="mt-4">
+                            <div className={cn("mt-4", stat.name === 'Cotizaciones' && company.plan === 'free' && "blur-[3px] select-none pointer-events-none opacity-50")}>
                                 <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest">{stat.name}</h3>
                                 <p className="text-3xl font-bold text-slate-900 mt-1">{stat.value}</p>
                             </div>
+
+                            {stat.name === 'Cotizaciones' && company.plan === 'free' && (
+                                <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-center">
+                                    <Button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setShowUpgradeModal(true);
+                                        }}
+                                        variant="outline"
+                                        size="default"
+                                        className="w-full text-xs font-bold h-9 gap-2 border-amber-200 text-amber-600 hover:bg-amber-50 shadow-sm"
+                                    >
+                                        <Zap size={14} className="fill-current" />
+                                        Mejorar Plan
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 ))}
@@ -325,18 +343,38 @@ export default function DashboardOverview() {
                                 <DollarSign size={16} className="text-purple-500" />
                                 Más Cotizados
                             </div>
-                            <div className="p-4 space-y-4">
-                                {topQuoted.map(product => (
-                                    <div key={product.id} className="flex items-center justify-between group cursor-pointer">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-100">
-                                                <img src={product.images[0]} className="h-full w-full object-cover" />
+                            <div className="p-4 space-y-4 relative">
+                                <div className={cn("space-y-4 transition-all duration-500", company.plan === 'free' && "blur-[4px] grayscale opacity-40 select-none pointer-events-none")}>
+                                    {topQuoted.length > 0 ? topQuoted.map(product => (
+                                        <div key={product.id} className="flex items-center justify-between group cursor-pointer">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-100">
+                                                    <img src={product.images[0]} className="h-full w-full object-cover" />
+                                                </div>
+                                                <span className="text-sm font-semibold text-slate-600 group-hover:text-primary-600 transition-colors line-clamp-1">{product.name}</span>
                                             </div>
-                                            <span className="text-sm font-semibold text-slate-600 group-hover:text-primary-600 transition-colors line-clamp-1">{product.name}</span>
+                                            <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">{product.quotesCount}</span>
                                         </div>
-                                        <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">{product.quotesCount}</span>
+                                    )) : (
+                                        <div className="py-8 text-center text-slate-400 text-xs italic font-medium">
+                                            Aún no hay cotizaciones registradas
+                                        </div>
+                                    )}
+                                </div>
+
+                                {company.plan === 'free' && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-white/10 backdrop-blur-[1px] z-10">
+                                        <Button
+                                            onClick={() => setShowUpgradeModal(true)}
+                                            variant="secondary"
+                                            size="sm"
+                                            className="font-bold bg-white/90 border-amber-100 text-amber-600 hover:bg-white shadow-sm text-[10px]"
+                                        >
+                                            <Zap size={14} className="mr-2 fill-current" />
+                                            Ver Analíticas
+                                        </Button>
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </Card>
                     </div>
@@ -384,40 +422,63 @@ export default function DashboardOverview() {
                             <MessageCircle size={18} className="text-primary-600" />
                             Actividad Reciente (WhatsApp)
                         </div>
-                        <div className="p-0 overflow-hidden divide-y divide-slate-50">
-                            {recentActivity.length > 0 ? (
-                                recentActivity.map(act => (
-                                    <div key={act.id} className="p-4 hover:bg-slate-50/50 transition-all cursor-pointer group">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{act.time}</span>
-                                            <span className={cn(
-                                                "text-[9px] font-bold px-1.5 py-0.5 rounded-md",
-                                                act.status === 'Enviado' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-primary-50 text-primary-600 border border-primary-100"
-                                            )}>
-                                                {act.status}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                                                <span className="text-[10px] font-bold text-slate-600">{act.user[0]}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-700">
-                                                <span className="font-bold">{act.user}</span> {act.type === 'quote' ? 'cotizó' : 'escribió'}:
-                                                <span className="block italic text-slate-500 mt-0.5 truncate group-hover:text-primary-600">
-                                                    {act.type === 'quote' ? act.product : act.text}
+                        <div className="p-0 overflow-hidden divide-y divide-slate-50 relative min-h-[200px]">
+                            <div className={cn("transition-all duration-500", company.plan === 'free' && "blur-[5px] grayscale opacity-30 select-none pointer-events-none")}>
+                                {recentActivity.length > 0 ? (
+                                    recentActivity.map(act => (
+                                        <div key={act.id} className="p-4 hover:bg-slate-50/50 transition-all cursor-pointer group">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{act.time}</span>
+                                                <span className={cn(
+                                                    "text-[9px] font-bold px-1.5 py-0.5 rounded-md",
+                                                    act.status === 'Enviado' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-primary-50 text-primary-600 border border-primary-100"
+                                                )}>
+                                                    {act.status}
                                                 </span>
-                                            </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                                    <span className="text-[10px] font-bold text-slate-600">{act.user[0]}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-700">
+                                                    <span className="font-bold">{act.user}</span> {act.type === 'quote' ? 'cotizó' : 'escribió'}:
+                                                    <span className="block italic text-slate-500 mt-0.5 truncate group-hover:text-primary-600">
+                                                        {act.type === 'quote' ? act.product : act.text}
+                                                    </span>
+                                                </p>
+                                            </div>
                                         </div>
+                                    ))
+                                ) : (
+                                    <div className="p-12 text-center text-slate-400">
+                                        <MessageCircle size={32} className="mx-auto opacity-20 mb-3" />
+                                        <p className="text-xs font-bold uppercase tracking-widest">Sin actividad todavía</p>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="p-12 text-center text-slate-400">
-                                    <MessageCircle size={32} className="mx-auto opacity-20 mb-3" />
-                                    <p className="text-xs font-bold uppercase tracking-widest">Sin actividad todavía</p>
+                                )}
+                            </div>
+
+                            {company.plan === 'free' && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-white/10 backdrop-blur-[1px]">
+                                    <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center mb-3">
+                                        <Zap className="text-amber-500 fill-amber-500/20" size={20} />
+                                    </div>
+                                    <h4 className="font-bold text-slate-900 text-xs mb-1">Función Premium</h4>
+                                    <p className="text-[10px] text-slate-500 mb-4 px-4 overflow-hidden line-clamp-2">Visualiza la actividad y pedidos de tus clientes en tiempo real.</p>
+                                    <Button
+                                        onClick={() => setShowUpgradeModal(true)}
+                                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold h-8 text-[10px] shadow-lg shadow-amber-200 px-6 rounded-lg"
+                                    >
+                                        Mejorar Plan
+                                    </Button>
                                 </div>
                             )}
+
                             <div className="p-3 bg-slate-50/50">
-                                <Button variant="ghost" className="w-full h-8 text-xs font-bold text-slate-400 hover:text-primary-600">
+                                <Button
+                                    onClick={() => company.plan === 'free' ? setShowUpgradeModal(true) : null}
+                                    variant="ghost"
+                                    className="w-full h-8 text-xs font-bold text-slate-400 hover:text-primary-600"
+                                >
                                     Ver historial completo
                                 </Button>
                             </div>

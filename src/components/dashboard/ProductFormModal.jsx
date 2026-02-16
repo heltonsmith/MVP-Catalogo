@@ -31,7 +31,9 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
     const [removedImageUrls, setRemovedImageUrls] = useState([]);
 
     const { getSetting } = useSettings();
-    const currentPlan = profile?.companies?.plan || 'free';
+    const { company } = useAuth();
+    const currentPlan = company?.plan || profile?.companies?.plan || 'free';
+    const isPro = currentPlan === 'pro' || currentPlan === 'custom' || currentPlan === 'plus';
 
     const getImageLimit = () => {
         if (currentPlan === 'custom') return 50; // High limit for custom

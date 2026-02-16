@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
@@ -38,6 +38,9 @@ export default function DashboardProfile() {
     const isPro = company?.plan !== 'free';
     const [loading, setLoading] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [upgradeHistory, setUpgradeHistory] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
     const [formData, setFormData] = useState({
         name: '',
         slug: '',
@@ -68,6 +71,31 @@ export default function DashboardProfile() {
             });
         }
     }, [company?.id, demoCompany.id]);
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (!company?.id || isDemo) return;
+            setLoadingHistory(true);
+            try {
+                const { data, error } = await supabase
+                    .from('upgrade_requests')
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                setUpgradeHistory(data || []);
+            } catch (error) {
+                console.error('Error fetching upgrade history:', error);
+            } finally {
+                setLoadingHistory(false);
+            }
+        };
+
+        if (activeTab === 'messages') {
+            fetchHistory();
+        }
+    }, [activeTab, company?.id, isDemo]);
 
     if (!company && !isDemo) return null;
     if (!company && isDemo) return <div className="p-8 text-center">Cargando datos de demostración...</div>;
@@ -160,7 +188,6 @@ export default function DashboardProfile() {
                 .upload(filePath, file);
 
             if (uploadError) {
-                // If bucket doesn't exist, this might fail. In a real app we'd handle it.
                 if (uploadError.message.includes('bucket not found')) {
                     throw new Error("El sistema de almacenamiento no está configurado. Contacta al soporte.");
                 }
@@ -223,6 +250,83 @@ export default function DashboardProfile() {
 
     const renderContent = () => {
         switch (activeTab) {
+            case 'messages':
+                return (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <Card className="border-none shadow-sm bg-white overflow-hidden">
+                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center gap-2">
+                                <MessageSquare size={18} className="text-primary-500" />
+                                Mensajes del Sistema
+                            </div>
+                            <CardContent className="p-6">
+                                {loadingHistory ? (
+                                    <div className="flex justify-center py-12">
+                                        <Loader2 className="animate-spin text-primary-500" size={32} />
+                                    </div>
+                                ) : upgradeHistory.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {upgradeHistory.map((req) => (
+                                            <div key={req.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white transition-all">
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={cn(
+                                                            "h-10 w-10 rounded-lg flex items-center justify-center border",
+                                                            req.status === 'pending' ? "bg-amber-50 border-amber-100 text-amber-600" :
+                                                                req.status === 'approved' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                                                                    "bg-red-50 border-red-100 text-red-600"
+                                                        )}>
+                                                            {req.status === 'pending' ? <Clock size={20} /> :
+                                                                req.status === 'approved' ? <CheckCircle2 size={20} /> :
+                                                                    <XCircle size={20} />}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-slate-900 text-sm">
+                                                                Solicitud Plan {req.requested_plan.toUpperCase()}
+                                                            </h4>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className={cn(
+                                                                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                                                                    req.status === 'pending' ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                                                        req.status === 'approved' ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                                                                            "bg-red-100 text-red-700 border-red-200"
+                                                                )}>
+                                                                    {req.status === 'pending' ? 'Pendiente' : req.status === 'approved' ? 'Aprobado' : 'Rechazado'}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400">
+                                                                    {new Date(req.created_at).toLocaleDateString()}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {req.admin_message ? (
+                                                    <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                                                        <p className="text-[11px] font-bold text-primary-600 mb-1">Respuesta del Administrador:</p>
+                                                        <p className="text-xs text-slate-600 italic">
+                                                            "{req.admin_message}"
+                                                        </p>
+                                                    </div>
+                                                ) : req.status === 'pending' ? (
+                                                    <p className="text-[11px] text-slate-500 italic">
+                                                        Estamos revisando tu solicitud. Te avisaremos pronto.
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 px-6">
+                                        <div className="h-12 w-12 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <MessageSquare size={24} />
+                                        </div>
+                                        <p className="text-sm text-slate-500 font-medium">No hay mensajes del sistema.</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                );
             case 'notifications':
                 return (
                     <Card className="border-none shadow-sm bg-white animate-in fade-in slide-in-from-right-4 duration-300">
@@ -289,27 +393,6 @@ export default function DashboardProfile() {
                                     </Button>
                                 </div>
                             </form>
-
-                            <div className="border-t border-slate-100 pt-6 mt-6">
-                                <h4 className="font-bold text-slate-900 text-sm mb-4">Sesiones Activas</h4>
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200">
-                                            <monitor size={20} className="text-slate-400" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-slate-700 text-sm">Windows PC - Chrome</p>
-                                            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                Activo ahora
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-500">
-                                        Cerrar sesión
-                                    </Button>
-                                </div>
-                            </div>
                         </CardContent>
                     </Card>
                 );
@@ -516,59 +599,35 @@ export default function DashboardProfile() {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-6">
-                                        <div className="flex flex-col gap-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tienda de Ventas</label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                {[
-                                                    { id: 'retail', label: 'Detalle' },
-                                                    { id: 'wholesale', label: 'Mayorista' },
-                                                    { id: 'mixed', label: 'Detalle y Mayorista' }
-                                                ].map((type) => (
-                                                    <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
-                                                        <input
-                                                            type="radio"
-                                                            name="businessType"
-                                                            value={type.id}
-                                                            className="sr-only"
-                                                            checked={formData.businessType === type.id}
-                                                            onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
-                                                        />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
-                                                            {type.label}
-                                                        </span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col gap-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Negocios</label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                {[
-                                                    { id: 'restaurant', label: 'Restaurante' }
-                                                ].map((type) => (
-                                                    <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
-                                                        <input
-                                                            type="radio"
-                                                            name="businessType"
-                                                            value={type.id}
-                                                            className="sr-only"
-                                                            checked={formData.businessType === type.id}
-                                                            onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
-                                                        />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
-                                                            {type.label}
-                                                        </span>
-                                                    </label>
-                                                ))}
-                                            </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tipo de Negocio</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                            {[
+                                                { id: 'retail', label: 'Detalle' },
+                                                { id: 'wholesale', label: 'Mayorista' },
+                                                { id: 'mixed', label: 'Detalle y Mayorista' },
+                                                { id: 'restaurant', label: 'Restaurante' }
+                                            ].map((type) => (
+                                                <label key={type.id} className="flex items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50">
+                                                    <input
+                                                        type="radio"
+                                                        name="businessType"
+                                                        value={type.id}
+                                                        className="sr-only"
+                                                        checked={formData.businessType === type.id}
+                                                        onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
+                                                    />
+                                                    <span className="text-xs font-bold text-slate-600">
+                                                        {type.label}
+                                                    </span>
+                                                </label>
+                                            ))}
                                         </div>
                                     </div>
 
                                     <div className="pt-4 border-t border-slate-50 flex justify-end">
-                                        <Button type="submit" disabled={loading} className="font-bold py-6 px-10 rounded-2xl">
-                                            {loading ? <Loader2 size={20} className="animate-spin mr-2" /> : <Save size={20} className="mr-2" />}
+                                        <Button type="submit" disabled={loading} className="font-bold">
+                                            {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
                                             Guardar información
                                         </Button>
                                     </div>
@@ -635,11 +694,12 @@ export default function DashboardProfile() {
                             </CardContent>
                         </Card>
 
+                        {/* Marca Blanca Section */}
                         <Card className="border-none shadow-sm overflow-hidden bg-white">
                             <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Smartphone size={18} className="text-primary-500" />
-                                    Preferencias de Marca
+                                    <Sparkles size={18} className="text-primary-500" />
+                                    Marca Propia (White Label)
                                 </div>
                                 {!isPro && (
                                     <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-1 rounded-full border border-primary-200 uppercase tracking-widest">
@@ -648,13 +708,15 @@ export default function DashboardProfile() {
                                 )}
                             </div>
                             <CardContent className="p-6 relative">
-                                <div className={cn("flex items-center justify-between transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none")}>
+                                <div className={cn("flex items-center justify-between transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none select-none")}>
                                     <div>
-                                        <h4 className="font-bold text-slate-900 text-sm">Ocultar branding de Ktaloog</h4>
-                                        <p className="text-xs text-slate-500">Elimina el logo de la plataforma en la versión móvil de tu catálogo.</p>
+                                        <h4 className="font-bold text-slate-900 text-sm">Ocultar logotipo de la plataforma</h4>
+                                        <p className="text-xs text-slate-500 mt-1">Remueve la mención "Catálogo por ktaloog" al final de tu tienda.</p>
                                     </div>
-                                    <div className="h-6 w-11 bg-slate-200 rounded-full relative cursor-pointer" onClick={handleDemoAction}>
-                                        <div className="absolute left-1 top-1 h-4 w-4 bg-white rounded-full shadow-sm" />
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-6 w-11 bg-slate-100 rounded-full relative cursor-not-allowed">
+                                            <div className="absolute left-1 top-1 h-4 w-4 bg-slate-400 rounded-full shadow-sm" />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -666,7 +728,7 @@ export default function DashboardProfile() {
                                             className="bg-white/80 backdrop-blur-sm border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 font-bold rounded-xl"
                                         >
                                             <Sparkles size={16} className="mr-2" />
-                                            Desbloquear Marca Blanca
+                                            Mejorar Plan
                                         </Button>
                                     </div>
                                 )}
@@ -702,6 +764,7 @@ export default function DashboardProfile() {
                     <div className="bg-white rounded-3xl border border-slate-100 p-2 shadow-sm">
                         {[
                             { id: 'profile', name: 'Perfil de Tienda', icon: <User size={18} /> },
+                            { id: 'messages', name: 'Mensajes Sistema', icon: <MessageSquare size={18} /> },
                             { id: 'notifications', name: 'Notificaciones', icon: <Bell size={18} /> },
                             { id: 'security', name: 'Seguridad', icon: <Shield size={18} /> },
                             { id: 'whatsapp', name: 'Integración WhatsApp', icon: <Smartphone size={18} /> },
@@ -753,19 +816,13 @@ export default function DashboardProfile() {
                                         </span>
                                     </div>
                                     <p className="text-slate-500 text-[11px] font-medium mt-0.5">
-                                        {company.plan === 'free' ? `Límite de ${getSetting('free_plan_product_limit', '5')} productos` :
-                                            company.plan === 'plus' ? `Límite de ${getSetting('plus_plan_product_limit', '100')} productos` :
-                                                company.plan === 'pro' ? `Límite de ${getSetting('pro_plan_product_limit', '500')} productos` :
-                                                    'Suscripción personalizada activa'}
+                                        Límite de productos activo
                                     </p>
                                 </div>
                             </div>
 
                             <p className="text-slate-600 text-xs mb-6 leading-relaxed border-t border-slate-100 pt-4">
-                                {company.plan === 'free'
-                                    ? "Estás usando la versión básica. Sube a un plan superior para desbloquear más productos, fotos y analíticas."
-                                    : "Disfrutas de mayor capacidad y funciones avanzadas para potenciar tu negocio."
-                                }
+                                Mejora tu plan para desbloquear más productos, fotos y analíticas avanzadas.
                             </p>
 
                             <Button
@@ -778,12 +835,9 @@ export default function DashboardProfile() {
                                 onClick={() => setShowUpgradeModal(true)}
                             >
                                 <Sparkles size={16} className="mr-2 text-yellow-300" />
-                                {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar / Cambiar Plan'}
+                                {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar Plan'}
                             </Button>
                         </CardContent>
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50/50 rounded-full -mr-10 -mt-10 blur-3xl pointer-events-none" />
-                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-50/50 rounded-full -ml-10 -mb-10 blur-2xl pointer-events-none" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                     </Card>
                 </div>
 

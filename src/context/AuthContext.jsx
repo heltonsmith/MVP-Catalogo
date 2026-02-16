@@ -7,7 +7,10 @@ const withTimeout = (promise, ms, defaultValue = null) => {
     return Promise.race([
         promise,
         new Promise((resolve) => setTimeout(() => {
-            console.warn(`Auth: Timeout after ${ms}ms`);
+            // Only log warning if it's a long timeout (likely a real issue)
+            if (ms > 5000) {
+                console.warn(`Auth: Timeout after ${ms}ms - continuing with default value`);
+            }
             resolve(defaultValue);
         }, ms))
     ]);
@@ -31,19 +34,17 @@ export const AuthProvider = ({ children }) => {
         try {
             const fetchProfile = async () => {
                 const query = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-                const { data } = await withTimeout(query, 10000, { data: null });
+                const { data } = await withTimeout(query, 15000, { data: null });
                 if (data) {
-                    console.log('Auth: Profile loaded, role:', data.role);
                     setProfile(data);
                 } else {
-                    console.warn('Auth: No profile found for UID:', userId);
                     setProfile(null);
                 }
             };
 
             const fetchCompany = async () => {
                 const query = supabase.from('companies').select('*').eq('user_id', userId).maybeSingle();
-                const { data } = await withTimeout(query, 10000, { data: null });
+                const { data } = await withTimeout(query, 15000, { data: null });
                 if (data) {
                     console.log('Auth: Company loaded');
                     setCompany(data);
@@ -69,10 +70,10 @@ export const AuthProvider = ({ children }) => {
         // Safety: Global timeout to ensure "Cargando..." never stays forever
         const globalTimeout = setTimeout(() => {
             if (isMounted && loading) {
-                console.warn('Auth: Global safety timeout forced loading: false');
+                console.log('Auth: Global safety timeout reached');
                 setLoading(false);
             }
-        }, 12000);
+        }, 20000);
 
         const init = async () => {
             console.log('Auth: Running initialization...');
