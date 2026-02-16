@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Eye, Star, Plus, Minus } from 'lucide-react';
+import { ShoppingCart, Eye, Star, Plus, Minus, Check } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatCurrency } from '../../utils';
 import { useCart } from '../../hooks/useCart';
+import { useToast } from '../ui/Toast';
 
 export function ProductCard({ product, companySlug, cartEnabled = true, isDemo = false }) {
     const { addToCart } = useCart();
+    const { showToast } = useToast();
     const [quantity, setQuantity] = useState(1);
     const mainImage = product.images?.[0] || product.image || 'https://placehold.co/600x600?text=Sin+Imagen';
 
@@ -20,6 +22,7 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
     const handleAddToCart = () => {
         if (cartEnabled) {
             addToCart(product, quantity);
+            showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
             setQuantity(1);
         }
     };

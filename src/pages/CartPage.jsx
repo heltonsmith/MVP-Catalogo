@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Trash2, Plus, Minus, Send, Link, ChevronLeft, ShoppingCart, Store, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trash2, Plus, Minus, Send, ChevronLeft, ShoppingCart, Store, Loader2, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../hooks/useCart';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -13,25 +14,80 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toast';
 
 export default function CartPage() {
-    const { carts, updateQuantity, removeFromCart, clearCart, getCartTotal } = useCart();
+    const { carts, updateQuantity, removeFromCart, clearCart, getCartTotal, companyInfo, getEffectivePrice } = useCart();
+    const { user, profile } = useAuth();
     const navigate = useNavigate();
     const { showToast } = useToast();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
-    const [customerInfo, setCustomerInfo] = useState({ name: '', whatsapp: '' });
+    const [customerInfo, setCustomerInfo] = useState({ name: '', email: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // Resolved company data from Supabase (fallback)
+    const [resolvedCompanies, setResolvedCompanies] = useState({});
 
     const companyIds = Object.keys(carts);
     const hasItems = companyIds.some(id => carts[id].length > 0);
+
+    // Pre-fill customer info from auth profile
+    useEffect(() => {
+        if (profile) {
+            setCustomerInfo(prev => ({
+                name: prev.name || profile.full_name || '',
+                email: prev.email || profile.email || ''
+            }));
+        }
+        if (user && !profile?.email) {
+            setCustomerInfo(prev => ({
+                ...prev,
+                email: prev.email || user.email || ''
+            }));
+        }
+    }, [profile, user]);
+
+    // Resolve company data from Supabase for IDs not in companyInfo
+    useEffect(() => {
+        const unresolvedIds = companyIds.filter(id =>
+            !companyInfo[id] && !resolvedCompanies[id] && !COMPANIES.find(c => c.id === id)
+        );
+
+        if (unresolvedIds.length === 0) return;
+
+        const fetchCompanies = async () => {
+            const { data } = await supabase
+                .from('companies')
+                .select('id, name, slug, whatsapp, logo')
+                .in('id', unresolvedIds);
+
+            if (data) {
+                const map = {};
+                data.forEach(c => { map[c.id] = c; });
+                setResolvedCompanies(prev => ({ ...prev, ...map }));
+            }
+        };
+        fetchCompanies();
+    }, [companyIds.join(',')]);
+
+    // Helper to resolve company from multiple sources
+    const getCompany = (companyId) => {
+        return companyInfo[companyId] || resolvedCompanies[companyId] || COMPANIES.find(c => c.id === companyId) || null;
+    };
 
     const openQuoteModal = (companyId) => {
         setSelectedCompanyId(companyId);
         setIsModalOpen(true);
     };
 
+    const formatDate = () => {
+        const now = new Date();
+        return now.toLocaleDateString('es-CL', {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    };
+
     const handleSendWhatsApp = async () => {
-        if (!selectedCompanyId || !customerInfo.name || !customerInfo.whatsapp) {
+        if (!selectedCompanyId || !customerInfo.name || !customerInfo.email) {
             showToast("Por favor completa todos los campos", "error");
             return;
         }
@@ -39,23 +95,27 @@ export default function CartPage() {
         setIsSubmitting(true);
         const companyId = selectedCompanyId;
         const cartItems = carts[companyId];
-        const company = COMPANIES.find(c => c.id === companyId);
+        const company = getCompany(companyId);
 
         if (!company || !cartItems || cartItems.length === 0) {
+            showToast("No se encontró la tienda o el carrito está vacío", "error");
             setIsSubmitting(false);
             return;
         }
 
-        const { totalPrice } = getCartTotal(companyId);
+        // Calculate total using wholesale pricing
+        let grandTotal = 0;
 
         try {
             // 1. Save to Supabase
+            const { totalPrice } = getCartTotal(companyId);
+
             const { data: quote, error: quoteError } = await supabase
                 .from('quotes')
                 .insert([{
                     company_id: companyId,
                     customer_name: customerInfo.name,
-                    customer_whatsapp: customerInfo.whatsapp,
+                    customer_whatsapp: customerInfo.email, // Store email in whatsapp field for now
                     total: totalPrice,
                     status: 'pending'
                 }])
@@ -65,12 +125,15 @@ export default function CartPage() {
             if (quoteError) throw quoteError;
 
             // 2. Save Quote Items
-            const quoteItemsToCheck = cartItems.map(item => ({
-                quote_id: quote.id,
-                product_id: item.id,
-                quantity: item.quantity,
-                price_at_time: item.price
-            }));
+            const quoteItemsToCheck = cartItems.map(item => {
+                const { unitPrice } = getEffectivePrice(item);
+                return {
+                    quote_id: quote.id,
+                    product_id: item.id,
+                    quantity: item.quantity,
+                    price_at_time: unitPrice
+                };
+            });
 
             const { error: itemsError } = await supabase
                 .from('quote_items')
@@ -78,26 +141,33 @@ export default function CartPage() {
 
             if (itemsError) throw itemsError;
 
-            // 3. Generate WhatsApp Link & Redirect
-            const baseUrl = window.location.origin;
-            let message = `*Hola ${company.name}, soy ${customerInfo.name} y me gustaría cotizar lo siguiente:*\n\n`;
-            message += `--------------------------------\n`;
+            // 3. Generate WhatsApp Message with new format
+            let message = `*Nueva Cotización - ${company.name} (Ktaloog)* 🛒\n`;
+            message += `-----------\n\n`;
+            message += `📅 Fecha: ${formatDate()}\n`;
+            message += `👤 Nombre: ${customerInfo.name}\n`;
+            message += `📧 Correo: ${customerInfo.email}\n`;
+            message += `-----------\n\n`;
+            message += `*Cotización:*\n\n`;
 
             cartItems.forEach((item, index) => {
-                const productUrl = `${baseUrl}/catalogo/${company.slug}/producto/${item.slug}`;
-                message += `${index + 1}. *${item.name}* (SKU: ${item.sku || 'N/A'})\n`;
-                message += `   Cant: ${item.quantity} x ${formatCurrency(item.price)}\n`;
-                message += `   Subtotal: ${formatCurrency(item.price * item.quantity)}\n`;
-                message += `   Ver: ${productUrl}\n\n`;
+                const { unitPrice, isWholesale, tierMinQty } = getEffectivePrice(item);
+                const subtotal = unitPrice * item.quantity;
+                grandTotal += subtotal;
+
+                message += `${index + 1}. *${item.name}*\n`;
+                message += `   SKU: ${item.sku || 'N/A'}\n`;
+                if (isWholesale) {
+                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (por mayor, ${tierMinQty}+ un.)\n`;
+                } else {
+                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (unitario)\n`;
+                }
+                message += `   Subtotal: ${formatCurrency(subtotal)}\n\n`;
             });
 
-            message += `--------------------------------\n`;
-            message += `*Total estimado: ${formatCurrency(totalPrice)}*\n\n`;
-            message += `_Mis datos de contacto:_\n`;
-            message += `Name: ${customerInfo.name}\n`;
-            message += `WhatsApp: ${customerInfo.whatsapp}\n\n`;
-            message += `_Enviado desde mi catálogo digital_`;
-
+            message += `-----------\n`;
+            message += `*💰 Total estimado: ${formatCurrency(grandTotal)}*\n\n`;
+            message += `_Enviado desde Ktaloog_`;
 
             const link = generateWhatsAppLink(company.whatsapp, message);
 
@@ -107,18 +177,13 @@ export default function CartPage() {
                     await supabase.rpc('increment_quotes', { company_id: companyId });
                 } catch (error) {
                     console.error('Error tracking quote:', error);
-                    // Fail silently - don't block user experience
                 }
             }
 
-            // Close modal and clear cart for this company? 
-            // Maybe not clear cart immediately in case they want to review, 
-            // but usually a sent quote means cart is done. Let's clear it.
             clearCart(companyId);
             setIsModalOpen(false);
-            setCustomerInfo({ name: '', whatsapp: '' });
+            setCustomerInfo({ name: '', email: '' });
 
-            // Redirect
             window.open(link, '_blank');
             showToast("Cotización enviada y registrada con éxito", "success");
 
@@ -154,7 +219,7 @@ export default function CartPage() {
                     const cartItems = carts[companyId];
                     if (cartItems.length === 0) return null;
 
-                    const company = COMPANIES.find(c => c.id === companyId);
+                    const company = getCompany(companyId);
                     const { totalPrice, totalItems } = getCartTotal(companyId);
 
                     return (
@@ -162,14 +227,14 @@ export default function CartPage() {
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="h-10 w-10 rounded-full bg-white border border-slate-200 flex items-center justify-center overflow-hidden">
-                                        {company ? (
+                                        {company?.logo ? (
                                             <img src={company.logo} alt={company.name} className="h-full w-full object-cover" />
                                         ) : (
                                             <Store className="text-slate-400" />
                                         )}
                                     </div>
                                     <div>
-                                        <h2 className="text-lg font-bold text-slate-900">{company?.name || 'Tienda Desconocida'}</h2>
+                                        <h2 className="text-lg font-bold text-slate-900">{company?.name || 'Cargando tienda...'}</h2>
                                         <p className="text-xs text-slate-500">{totalItems} productos</p>
                                     </div>
                                 </div>
@@ -186,65 +251,97 @@ export default function CartPage() {
                             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
                                 {/* Cart Items */}
                                 <div className="lg:col-span-2 space-y-4">
-                                    {cartItems.map((item) => (
-                                        <Card key={item.id} className="border-none shadow-sm overflow-hidden">
-                                            <CardContent className="p-0">
-                                                <div className="flex items-center p-4">
-                                                    <img
-                                                        src={item.images[0]}
-                                                        alt={item.name}
-                                                        className="h-20 w-20 rounded-xl object-cover"
-                                                    />
-                                                    <div className="ml-4 flex-1">
-                                                        <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{item.name}</h4>
-                                                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {item.sku || 'N/A'}</p>
-                                                        <p className="text-sm font-semibold text-primary-600 mt-1">{formatCurrency(item.price)}</p>
+                                    {cartItems.map((item) => {
+                                        const { unitPrice, isWholesale, tierMinQty } = getEffectivePrice(item);
+                                        const subtotal = unitPrice * item.quantity;
 
-                                                        <div className="flex items-center justify-between mt-3">
-                                                            <div className="flex h-8 items-center rounded-lg border border-slate-200">
-                                                                <button
-                                                                    className="px-2 text-slate-500 hover:text-primary-600"
-                                                                    onClick={() => updateQuantity(companyId, item.id, item.quantity - 1)}
-                                                                >
-                                                                    <Minus className="h-4 w-4" />
-                                                                </button>
-                                                                <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
-                                                                <button
-                                                                    className="px-2 text-slate-500 hover:text-primary-600"
-                                                                    onClick={() => updateQuantity(companyId, item.id, item.quantity + 1)}
-                                                                >
-                                                                    <Plus className="h-4 w-4" />
-                                                                </button>
+                                        return (
+                                            <Card key={item.id} className="border-none shadow-sm overflow-hidden">
+                                                <CardContent className="p-0">
+                                                    <div className="flex items-center p-4">
+                                                        <img
+                                                            src={item.images?.[0] || 'https://placehold.co/80x80?text=Sin+Imagen'}
+                                                            alt={item.name}
+                                                            className="h-20 w-20 rounded-xl object-cover"
+                                                        />
+                                                        <div className="ml-4 flex-1">
+                                                            <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{item.name}</h4>
+                                                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {item.sku || 'N/A'}</p>
+
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <p className="text-sm font-semibold text-primary-600">{formatCurrency(unitPrice)}</p>
+                                                                {isWholesale && (
+                                                                    <Badge variant="success" className="text-[9px] px-1.5 py-0">
+                                                                        <Tag size={10} className="mr-0.5" />
+                                                                        Mayorista ({tierMinQty}+ un.)
+                                                                    </Badge>
+                                                                )}
                                                             </div>
-                                                            <button
-                                                                className="p-2 text-red-400 hover:text-red-600"
-                                                                onClick={() => removeFromCart(companyId, item.id)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
+
+                                                            {!isWholesale && item.wholesale_prices?.length > 0 && (
+                                                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                                                    💡 Agrega {item.wholesale_prices.sort((a, b) => a.min_qty - b.min_qty)[0].min_qty}+ para precio mayorista
+                                                                </p>
+                                                            )}
+
+                                                            <div className="flex items-center justify-between mt-3">
+                                                                <div className="flex h-8 items-center rounded-lg border border-slate-200">
+                                                                    <button
+                                                                        className="px-2 text-slate-500 hover:text-primary-600"
+                                                                        onClick={() => updateQuantity(companyId, item.id, item.quantity - 1)}
+                                                                    >
+                                                                        <Minus className="h-4 w-4" />
+                                                                    </button>
+                                                                    <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
+                                                                    <button
+                                                                        className="px-2 text-slate-500 hover:text-primary-600"
+                                                                        onClick={() => updateQuantity(companyId, item.id, item.quantity + 1)}
+                                                                    >
+                                                                        <Plus className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-sm font-bold text-slate-700">{formatCurrency(subtotal)}</span>
+                                                                    <button
+                                                                        className="p-2 text-red-400 hover:text-red-600"
+                                                                        onClick={() => removeFromCart(companyId, item.id)}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Summary / Sidebar */}
                                 <div className="lg:col-span-1">
-                                    <Card className="border-none shadow-md bg-white">
+                                    <Card className="border-none shadow-md bg-white sticky top-24">
                                         <CardContent className="p-6">
-                                            <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4 mb-4">Resumen {company?.name}</h3>
+                                            <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4 mb-4">Resumen</h3>
 
-                                            <div className="space-y-3 mb-6">
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-slate-500">Productos ({totalItems})</span>
-                                                    <span className="font-semibold">{formatCurrency(totalPrice)}</span>
-                                                </div>
-                                                <div className="pt-4 border-t border-slate-100 flex justify-between">
-                                                    <span className="text-lg font-bold">Total estimado</span>
-                                                    <span className="text-lg font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
-                                                </div>
+                                            <div className="space-y-2 mb-4">
+                                                {cartItems.map(item => {
+                                                    const { unitPrice, isWholesale } = getEffectivePrice(item);
+                                                    return (
+                                                        <div key={item.id} className="flex justify-between text-xs">
+                                                            <span className="text-slate-500 truncate max-w-[60%]">
+                                                                {item.name} ×{item.quantity}
+                                                                {isWholesale && ' 🏷️'}
+                                                            </span>
+                                                            <span className="font-semibold">{formatCurrency(unitPrice * item.quantity)}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            <div className="pt-4 border-t border-slate-100 flex justify-between mb-6">
+                                                <span className="text-lg font-bold">Total estimado</span>
+                                                <span className="text-lg font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
                                             </div>
 
                                             <Button
@@ -252,7 +349,7 @@ export default function CartPage() {
                                                 onClick={() => openQuoteModal(companyId)}
                                             >
                                                 <Send className="mr-2 h-5 w-5" />
-                                                Cotizar con {company?.name}
+                                                Cotizar con {company?.name || 'tienda'}
                                             </Button>
 
                                             <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-100 italic">
@@ -295,11 +392,12 @@ export default function CartPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-slate-700 uppercase mb-1.5 block">Tu WhatsApp</label>
+                            <label className="text-xs font-bold text-slate-700 uppercase mb-1.5 block">Tu Correo Electrónico</label>
                             <Input
-                                placeholder="Ej: +569 1234 5678"
-                                value={customerInfo.whatsapp}
-                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
+                                type="email"
+                                placeholder="Ej: juan@email.com"
+                                value={customerInfo.email}
+                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
                                 className="bg-slate-50 border-slate-200"
                             />
                         </div>
@@ -309,7 +407,7 @@ export default function CartPage() {
                         <Button
                             className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-xl shadow-lg shadow-emerald-100"
                             onClick={handleSendWhatsApp}
-                            disabled={isSubmitting || !customerInfo.name || !customerInfo.whatsapp}
+                            disabled={isSubmitting || !customerInfo.name || !customerInfo.email}
                         >
                             {isSubmitting ? (
                                 <>
@@ -328,4 +426,3 @@ export default function CartPage() {
         </div>
     );
 }
-

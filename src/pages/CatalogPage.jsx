@@ -14,6 +14,7 @@ import { MailboxPreview } from '../components/chat/MailboxPreview';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../hooks/useSettings';
+import { useCart } from '../hooks/useCart';
 import { NotificationCenter } from '../components/notifications/NotificationCenter';
 import { cn, formatCurrency } from '../utils';
 import NotFoundPage from './NotFoundPage';
@@ -21,6 +22,7 @@ import NotFoundPage from './NotFoundPage';
 export default function CatalogPage() {
     const { showToast } = useToast();
     const { user, profile, refreshCompany } = useAuth();
+    const { setCompanyInfo } = useCart();
     const [searchParams] = useSearchParams();
     const isDemo = searchParams.get('mode') === 'demo';
     const { companySlug } = useParams();
@@ -116,10 +118,19 @@ export default function CatalogPage() {
                     ? parseFloat((reviewsData.reduce((acc, r) => acc + r.rating, 0) / reviewsData.length).toFixed(1))
                     : 0;
 
-                setCompany({
+                const fullCompany = {
                     ...companyData,
                     rating: realRating,
                     reviews: reviewsData || []
+                };
+                setCompany(fullCompany);
+
+                // Store company info in cart context for CartPage resolution
+                setCompanyInfo(companyData.id, {
+                    name: companyData.name,
+                    slug: companyData.slug,
+                    whatsapp: companyData.whatsapp,
+                    logo: companyData.logo
                 });
 
                 // 3. Fetch Products with new schema
@@ -667,32 +678,35 @@ export default function CatalogPage() {
                                     <Share2 size={16} className="sm:size-18" />
                                 </button>
 
-                                <button
-                                    onClick={() => setIsQROpen(true)}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                    title="Código QR"
-                                >
-                                    <QrCode size={16} className="sm:size-18" />
-                                </button>
+                                {company?.plan !== 'free' && (
+                                    <>
+                                        <button
+                                            onClick={() => setIsQROpen(true)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                            title="Código QR"
+                                        >
+                                            <QrCode size={16} className="sm:size-18" />
+                                        </button>
 
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 text-[10px] sm:text-xs font-bold gap-2 px-3 sm:px-4"
-                                    onClick={() => {
-                                        if (!user) {
-                                            showToast('Debes registrarte para chatear con la tienda', 'info');
-                                            return;
-                                        }
-                                        showToast('Función de chat activada', 'info');
-                                    }}
-                                >
-                                    <MessageCircle size={14} />
-                                    <span className="hidden sm:inline">Chatea con nosotros</span>
-                                    <span className="sm:hidden">Chat</span>
-                                </Button>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 text-[10px] sm:text-xs font-bold gap-2 px-3 sm:px-4"
+                                            onClick={() => {
+                                                if (!user) {
+                                                    showToast('Debes registrarte para chatear con la tienda', 'info');
+                                                    return;
+                                                }
+                                                showToast('Función de chat activada', 'info');
+                                            }}
+                                        >
+                                            <MessageCircle size={14} />
+                                            <span className="hidden sm:inline">Chatea con nosotros</span>
+                                            <span className="sm:hidden">Chat</span>
+                                        </Button>
+                                    </>
+                                )}
 
-                                <NotificationCenter />
                             </div>
                         </div>
                     </div>
@@ -808,42 +822,43 @@ export default function CatalogPage() {
                 </div>
             </div>
 
-            {/* Chat Widget triggers when isMailboxOpen is true or via its own internal floating button if we render it always */}
-            {/* We render ChatWidget always, but pass isDemo={false} for these Pro Demos to enable mock chat */}
-            {user && (
+            {/* Chat Widget - Premium only */}
+            {user && company?.plan !== 'free' && (
                 <ChatWidget
                     companyName={company.name}
                     companyLogo={company.logo}
-                    isDemo={false} // Force "Pro" behavior (mock chat) for these demos as requested
+                    isDemo={false}
                 />
             )}
 
-            {/* QR Code Modal */}
-            <Modal
-                isOpen={isQROpen}
-                onClose={() => setIsQROpen(false)}
-                title="Escanea para visitar"
-                maxWidth="sm"
-            >
-                <div className="flex flex-col items-center justify-center p-8 space-y-6">
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                        <div style={{ height: "auto", margin: "0 auto", maxWidth: 200, width: "100%" }}>
-                            <QRCode
-                                size={256}
-                                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                                value={window.location.href}
-                                viewBox={`0 0 256 256`}
-                            />
+            {/* QR Code Modal - Premium only */}
+            {company?.plan !== 'free' && (
+                <Modal
+                    isOpen={isQROpen}
+                    onClose={() => setIsQROpen(false)}
+                    title="Escanea para visitar"
+                    maxWidth="sm"
+                >
+                    <div className="flex flex-col items-center justify-center p-8 space-y-6">
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                            <div style={{ height: "auto", margin: "0 auto", maxWidth: 200, width: "100%" }}>
+                                <QRCode
+                                    size={256}
+                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                    value={window.location.href}
+                                    viewBox={`0 0 256 256`}
+                                />
+                            </div>
                         </div>
+                        <p className="text-center text-slate-500 text-sm">
+                            Escanea este código con tu cámara para abrir esta tienda en tu celular.
+                        </p>
+                        <Button onClick={() => setIsQROpen(false)} className="w-full">
+                            Cerrar
+                        </Button>
                     </div>
-                    <p className="text-center text-slate-500 text-sm">
-                        Escanea este código con tu cámara para abrir esta tienda en tu celular.
-                    </p>
-                    <Button onClick={() => setIsQROpen(false)} className="w-full">
-                        Cerrar
-                    </Button>
-                </div>
-            </Modal>
+                </Modal>
+            )}
 
             {/* Reviews Modal for Store */}
             <Modal

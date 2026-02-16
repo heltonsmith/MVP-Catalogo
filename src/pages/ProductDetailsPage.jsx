@@ -142,6 +142,7 @@ export default function ProductDetailsPage() {
             return;
         }
         addToCart(product, quantity);
+        showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
     };
 
     const handleShare = async () => {
