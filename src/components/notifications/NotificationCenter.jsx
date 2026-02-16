@@ -1,131 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Check, X, Quote, Package, MessageCircle, AlertCircle, Trash2 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bell, Check, X, Quote, Package, MessageCircle, AlertCircle, Trash2, Mail, MailOpen, Sparkles, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 import { cn } from '../../utils';
 
 export function NotificationCenter() {
-    const { user } = useAuth();
-    const [notifications, setNotifications] = useState([]);
+    const { unreadNotifications: globalUnreadCount } = useAuth();
+    const {
+        notifications,
+        loading,
+        markAsRead,
+        markAsUnread,
+        deleteNotification,
+        markAllAsRead,
+        clearAll
+    } = useNotifications();
+
     const [isOpen, setIsOpen] = useState(false);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const [selectedId, setSelectedId] = useState(null);
     const dropdownRef = useRef(null);
-
-    useEffect(() => {
-        if (!user) return;
-
-        fetchNotifications();
-
-        // Subscribe to real-time notifications
-        const channel = supabase
-            .channel(`notifications-${user.id}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                setNotifications(prev => [payload.new, ...prev]);
-            })
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new : n));
-            })
-            .on('postgres_changes', {
-                event: 'DELETE',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [user]);
-
-    useEffect(() => {
-        setUnreadCount(notifications.filter(n => !n.is_read).length);
-    }, [notifications]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsOpen(false);
+                setSelectedId(null);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const fetchNotifications = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('notifications')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(50);
+    const getIcon = (notification) => {
+        const type = notification.type;
+        const isRejected = notification.metadata?.status === 'rejected' || notification.title.toLowerCase().includes('rechazada');
+        const isApproved = notification.metadata?.status === 'approved' || notification.title.toLowerCase().includes('activado');
 
-            if (error) {
-                if (error.code === 'PGRST116' || error.status === 404) {
-                    // Table doesn't exist yet, handle gracefully
-                    setNotifications([]);
-                    return;
-                }
-                throw error;
-            }
-            if (data) {
-                setNotifications(data);
-            }
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
-            setNotifications([]);
-        }
-    };
+        if (isRejected) return <XCircle className="text-rose-500" size={16} />;
+        if (isApproved) return <CheckCircle2 className="text-emerald-500" size={16} />;
 
-    const markAsRead = async (id) => {
-        const { error } = await supabase
-            .from('notifications')
-            .update({ is_read: true })
-            .eq('id', id);
-
-        // Optimistic update handled by real-time subscription or local state
-        if (!error) {
-            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-        }
-    };
-
-    const markAllAsRead = async () => {
-        const { error } = await supabase
-            .from('notifications')
-            .update({ is_read: true })
-            .eq('user_id', user.id)
-            .eq('is_read', false);
-
-        if (!error) {
-            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        }
-    };
-
-    const clearAll = async () => {
-        const { error } = await supabase
-            .from('notifications')
-            .delete()
-            .eq('user_id', user.id);
-
-        if (!error) {
-            setNotifications([]);
-        }
-    };
-
-    const getIcon = (type) => {
         switch (type) {
             case 'quote': return <Quote className="text-blue-500" size={16} />;
             case 'stock': return <Package className="text-amber-500" size={16} />;
@@ -147,7 +60,26 @@ export function NotificationCenter() {
         return date.toLocaleDateString();
     };
 
-    if (!user) return null;
+    const handleToggleRead = (e, n) => {
+        e.stopPropagation();
+        if (n.is_read) markAsUnread(n.id);
+        else markAsRead(n.id);
+    };
+
+    const handleDelete = (e, id) => {
+        e.stopPropagation();
+        deleteNotification(id);
+        if (selectedId === id) setSelectedId(null);
+    };
+
+    const handleSelect = (id) => {
+        if (selectedId === id) setSelectedId(null);
+        else {
+            setSelectedId(id);
+            const n = notifications.find(notif => notif.id === id);
+            if (n && !n.is_read) markAsRead(id);
+        }
+    };
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -157,21 +89,21 @@ export function NotificationCenter() {
                 title="Notificaciones"
             >
                 <Bell size={20} />
-                {unreadCount > 0 && (
+                {globalUnreadCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-white">
-                        {unreadCount > 9 ? '9+' : unreadCount}
+                        {globalUnreadCount > 9 ? '9+' : globalUnreadCount}
                     </span>
                 )}
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 mt-3 w-85 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
                         <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                             Notificaciones
-                            {unreadCount > 0 && (
+                            {globalUnreadCount > 0 && (
                                 <span className="text-[10px] bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full font-bold">
-                                    {unreadCount} nuevas
+                                    {globalUnreadCount} nuevas
                                 </span>
                             )}
                         </h3>
@@ -179,13 +111,13 @@ export function NotificationCenter() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={markAllAsRead}
-                                    className="text-[10px] font-bold text-primary-600 hover:text-primary-700"
+                                    className="text-[10px] font-bold text-primary-600 hover:text-primary-700 active:scale-95 transition-transform"
                                 >
-                                    Todo leido
+                                    Marcar todo
                                 </button>
                                 <button
                                     onClick={clearAll}
-                                    className="text-[10px] font-bold text-slate-400 hover:text-rose-500"
+                                    className="text-[10px] font-bold text-slate-400 hover:text-rose-500 active:scale-95 transition-transform"
                                 >
                                     Limpiar
                                 </button>
@@ -193,8 +125,12 @@ export function NotificationCenter() {
                         )}
                     </div>
 
-                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                        {notifications.length === 0 ? (
+                    <div className="max-h-[420px] overflow-y-auto custom-scrollbar bg-slate-50/30">
+                        {loading ? (
+                            <div className="p-10 text-center">
+                                <div className="h-6 w-6 border-2 border-primary-500 border-t-transparent animate-spin rounded-full mx-auto" />
+                            </div>
+                        ) : notifications.length === 0 ? (
                             <div className="p-10 text-center">
                                 <div className="mx-auto w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
                                     <Bell size={24} className="text-slate-200" />
@@ -205,54 +141,96 @@ export function NotificationCenter() {
                                 </p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-slate-50">
-                                {notifications.map((notification) => (
-                                    <div
-                                        key={notification.id}
-                                        className={cn(
-                                            "p-4 hover:bg-slate-50 transition-colors flex gap-3 relative cursor-pointer group",
-                                            !notification.is_read && "bg-blue-50/30"
-                                        )}
-                                        onClick={() => markAsRead(notification.id)}
-                                    >
-                                        <div className={cn(
-                                            "flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center mt-0.5",
-                                            notification.type === 'quote' ? 'bg-blue-50' :
-                                                notification.type === 'stock' ? 'bg-amber-50' :
-                                                    notification.type === 'system' ? 'bg-primary-50' :
-                                                        notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50' : 'bg-slate-50'
-                                        )}>
-                                            {getIcon(notification.type)}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className={cn(
-                                                "text-xs font-bold text-slate-900 mb-0.5 leading-tight",
-                                                !notification.is_read && "text-blue-900"
-                                            )}>
-                                                {notification.title}
-                                            </p>
-                                            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                                                {notification.content}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                                                    {formatTime(notification.created_at)}
-                                                </span>
-                                                {!notification.is_read && (
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                            <div className="divide-y divide-slate-100">
+                                {notifications.map((notification) => {
+                                    const isRejected = notification.metadata?.status === 'rejected' || notification.title.toLowerCase().includes('rechazada');
+
+                                    return (
+                                        <div
+                                            key={notification.id}
+                                            className={cn(
+                                                "group relative transition-all duration-300",
+                                                !notification.is_read ? (isRejected ? "bg-rose-50/30" : "bg-white") : "bg-transparent opacity-80"
+                                            )}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    "p-4 flex gap-3 cursor-pointer hover:bg-slate-50 transition-colors",
+                                                    selectedId === notification.id && "bg-slate-50/80"
                                                 )}
+                                                onClick={() => handleSelect(notification.id)}
+                                            >
+                                                <div className={cn(
+                                                    "flex-shrink-0 h-9 w-9 rounded-2xl flex items-center justify-center mt-0.5 shadow-sm border border-white",
+                                                    isRejected && !notification.is_read ? "bg-rose-100 text-rose-600" :
+                                                        notification.type === 'quote' ? 'bg-blue-50 text-blue-600' :
+                                                            notification.type === 'stock' ? 'bg-amber-50 text-amber-600' :
+                                                                notification.type === 'system' ? 'bg-primary-50 text-primary-600' :
+                                                                    notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
+                                                )}>
+                                                    {getIcon(notification)}
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                                                        <p className={cn(
+                                                            "text-xs font-black text-slate-900 leading-tight truncate",
+                                                            !notification.is_read && (isRejected ? "text-rose-700" : "text-primary-800")
+                                                        )}>
+                                                            {notification.title}
+                                                        </p>
+                                                        <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap">
+                                                            {formatTime(notification.created_at)}
+                                                        </span>
+                                                    </div>
+                                                    <p className={cn(
+                                                        "text-[11px] text-slate-500 leading-relaxed",
+                                                        selectedId !== notification.id && "line-clamp-1"
+                                                    )}>
+                                                        {notification.content}
+                                                    </p>
+
+                                                    {selectedId === notification.id && (
+                                                        <div className="mt-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                                                            <button
+                                                                onClick={(e) => handleToggleRead(e, notification)}
+                                                                className={cn(
+                                                                    "flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border text-[10px] font-bold transition-all shadow-sm",
+                                                                    isRejected ? "text-rose-600 border-rose-100 hover:bg-rose-50" : "text-slate-600 border-slate-100 hover:text-primary-600 hover:border-primary-100"
+                                                                )}
+                                                            >
+                                                                {notification.is_read ? <Mail size={12} /> : <MailOpen size={12} />}
+                                                                {notification.is_read ? 'Marcar no leído' : 'Marcar leído'}
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDelete(e, notification.id)}
+                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border border-slate-100 text-[10px] font-bold text-slate-400 hover:text-rose-500 hover:border-rose-100 transition-all shadow-sm"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                                Eliminar
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex flex-col items-center justify-between py-1">
+                                                    {!notification.is_read && (
+                                                        <div className={cn("h-2 w-2 rounded-full shadow-sm", isRejected ? "bg-rose-500 shadow-rose-200" : "bg-primary-500 shadow-primary-200")} />
+                                                    )}
+                                                    <ChevronRight size={14} className={cn("text-slate-300 transition-transform", selectedId === notification.id && "rotate-90 text-primary-400")} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
 
                     {notifications.length > 0 && (
-                        <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
-                            <button className="text-[10px] font-bold text-slate-500 hover:text-slate-900 transition-colors">
-                                Ver todas las actividades
+                        <div className="p-3 bg-white border-t border-slate-100 text-center">
+                            <button className="text-[10px] font-black text-slate-400 hover:text-primary-600 uppercase tracking-widest transition-colors">
+                                Centro de Actividad
                             </button>
                         </div>
                     )}

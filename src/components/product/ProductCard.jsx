@@ -58,13 +58,25 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                         {product.name}
                     </h4>
                 </Link>
-                <div className="flex items-center justify-between mt-2">
-                    <span className="text-lg font-bold text-primary-600">
-                        {formatCurrency(product.price)}
-                    </span>
-                    {product.weight && (
-                        <span className="text-xs text-slate-400 font-medium">{product.weight}</span>
-                    )}
+                <div className="flex items-start justify-between mt-2">
+                    <div className="flex flex-col w-full">
+                        <span className="text-lg font-bold text-primary-600">
+                            {formatCurrency(product.price)}
+                        </span>
+                        {product.wholesale_prices && product.wholesale_prices.length > 0 && (
+                            <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1 w-full">
+                                {product.wholesale_prices.sort((a, b) => a.min_qty - b.min_qty).slice(0, 3).map((tier, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-[10px]">
+                                        <span className="text-slate-500 font-medium">{tier.min_qty}+ un.</span>
+                                        <span className="font-bold text-emerald-600">{formatCurrency(tier.price)}</span>
+                                    </div>
+                                ))}
+                                {product.wholesale_prices.length > 3 && (
+                                    <span className="text-[9px] text-slate-400 italic text-right">Ver más...</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </CardContent>
 

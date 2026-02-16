@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2 } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
@@ -9,10 +9,12 @@ import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../utils';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
+import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { COMPANIES } from '../data/mock';
 import { useSettings } from '../hooks/useSettings';
+import { useNotifications } from '../hooks/useNotifications';
 
 export default function DashboardProfile() {
     const { showToast } = useToast();
@@ -40,6 +42,25 @@ export default function DashboardProfile() {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [upgradeHistory, setUpgradeHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const { pendingRequest } = useUpgradeRequest();
+    const {
+        notifications,
+        loading: loadingNotifs,
+        markAsRead,
+        markAsUnread,
+        deleteNotification,
+        unreadCount
+    } = useNotifications();
+
+    const systemNotifications = useMemo(() =>
+        notifications.filter(n => n.type === 'system' || n.type === 'message'),
+        [notifications]
+    );
+
+    const unreadSystemCount = useMemo(() =>
+        systemNotifications.filter(n => !n.is_read).length,
+        [systemNotifications]
+    );
 
     const [formData, setFormData] = useState({
         name: '',
@@ -259,68 +280,93 @@ export default function DashboardProfile() {
                                 Mensajes del Sistema
                             </div>
                             <CardContent className="p-6">
-                                {loadingHistory ? (
+                                {loadingNotifs ? (
                                     <div className="flex justify-center py-12">
                                         <Loader2 className="animate-spin text-primary-500" size={32} />
                                     </div>
-                                ) : upgradeHistory.length > 0 ? (
+                                ) : systemNotifications.length > 0 ? (
                                     <div className="space-y-4">
-                                        {upgradeHistory.map((req) => (
-                                            <div key={req.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white transition-all">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={cn(
-                                                            "h-10 w-10 rounded-lg flex items-center justify-center border",
-                                                            req.status === 'pending' ? "bg-amber-50 border-amber-100 text-amber-600" :
-                                                                req.status === 'approved' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
-                                                                    "bg-red-50 border-red-100 text-red-600"
-                                                        )}>
-                                                            {req.status === 'pending' ? <Clock size={20} /> :
-                                                                req.status === 'approved' ? <CheckCircle2 size={20} /> :
-                                                                    <XCircle size={20} />}
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-bold text-slate-900 text-sm">
-                                                                Solicitud Plan {req.requested_plan.toUpperCase()}
-                                                            </h4>
-                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                <span className={cn(
-                                                                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                                                    req.status === 'pending' ? "bg-amber-100 text-amber-700 border-amber-200" :
-                                                                        req.status === 'approved' ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
-                                                                            "bg-red-100 text-red-700 border-red-200"
-                                                                )}>
-                                                                    {req.status === 'pending' ? 'Pendiente' : req.status === 'approved' ? 'Aprobado' : 'Rechazado'}
-                                                                </span>
-                                                                <span className="text-[10px] text-slate-400">
-                                                                    {new Date(req.created_at).toLocaleDateString()}
-                                                                </span>
+                                        {systemNotifications.map((notif) => {
+                                            const isRejected = notif.metadata?.status === 'rejected' || notif.title.toLowerCase().includes('rechazada');
+                                            const isApproved = notif.metadata?.status === 'approved' || notif.title.toLowerCase().includes('activado');
+
+                                            return (
+                                                <div
+                                                    key={notif.id}
+                                                    className={cn(
+                                                        "p-5 rounded-2xl border transition-all duration-300",
+                                                        !notif.is_read
+                                                            ? (isRejected ? "bg-rose-50/50 border-rose-100 shadow-md shadow-rose-50" : "bg-white border-primary-100 shadow-md shadow-primary-50")
+                                                            : "bg-slate-50 border-slate-100 opacity-80"
+                                                    )}
+                                                >
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn(
+                                                                "h-10 w-10 rounded-xl flex items-center justify-center border shadow-sm",
+                                                                !notif.is_read
+                                                                    ? (isRejected ? "bg-rose-100 border-rose-200 text-rose-600" : "bg-primary-50 border-primary-100 text-primary-600")
+                                                                    : "bg-white border-slate-100 text-slate-400"
+                                                            )}>
+                                                                {isRejected ? <XCircle size={20} /> : isApproved ? <CheckCircle2 size={20} /> : <Sparkles size={20} />}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className={cn(
+                                                                    "font-bold text-sm",
+                                                                    isRejected && !notif.is_read ? "text-rose-700" : "text-slate-900"
+                                                                )}>{notif.title}</h4>
+                                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                    {new Date(notif.created_at).toLocaleDateString()} • {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </p>
                                                             </div>
                                                         </div>
+                                                        <div className="flex items-center gap-1">
+                                                            {!notif.is_read && <div className={cn("h-2 w-2 rounded-full animate-pulse mr-2", isRejected ? "bg-rose-500" : "bg-primary-500")} />}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    notif.is_read ? markAsUnread(notif.id) : markAsRead(notif.id);
+                                                                }}
+                                                                className={cn(
+                                                                    "p-2 rounded-lg transition-colors",
+                                                                    isRejected ? "text-rose-400 hover:text-rose-600 hover:bg-rose-50" : "text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                                                                )}
+                                                                title={notif.is_read ? "Marcar como no leído" : "Marcar como leído"}
+                                                            >
+                                                                {notif.is_read ? <MailOpen size={16} /> : <Mail size={16} />}
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    deleteNotification(notif.id);
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                title="Eliminar"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                </div>
 
-                                                {req.admin_message ? (
-                                                    <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
-                                                        <p className="text-[11px] font-bold text-primary-600 mb-1">Respuesta del Administrador:</p>
-                                                        <p className="text-xs text-slate-600 italic">
-                                                            "{req.admin_message}"
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border",
+                                                        isRejected && !notif.is_read ? "bg-white/80 border-rose-100" : "bg-white/50 border-slate-100/50"
+                                                    )}>
+                                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                                            {notif.content}
                                                         </p>
                                                     </div>
-                                                ) : req.status === 'pending' ? (
-                                                    <p className="text-[11px] text-slate-500 italic">
-                                                        Estamos revisando tu solicitud. Te avisaremos pronto.
-                                                    </p>
-                                                ) : null}
-                                            </div>
-                                        ))}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div className="text-center py-12 px-6">
-                                        <div className="h-12 w-12 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                                            <MessageSquare size={24} />
+                                        <div className="h-16 w-16 bg-slate-50 text-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                            <MessageSquare size={32} />
                                         </div>
-                                        <p className="text-sm text-slate-500 font-medium">No hay mensajes del sistema.</p>
+                                        <p className="text-sm text-slate-500 font-bold">No hay mensajes del sistema</p>
+                                        <p className="text-xs text-slate-400 mt-1 max-w-[240px] mx-auto">Te avisaremos por este medio sobre actualizaciones de tu plan o alertas importantes.</p>
                                     </div>
                                 )}
                             </CardContent>
@@ -433,14 +479,34 @@ export default function DashboardProfile() {
 
                                 {!isPro && (
                                     <div className="absolute inset-0 flex items-center justify-center z-10">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setShowUpgradeModal(true)}
-                                            className="bg-white/80 backdrop-blur-sm border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-bold rounded-xl"
-                                        >
-                                            <Sparkles size={16} className="mr-2" />
-                                            Habilitar conexión WhatsApp
-                                        </Button>
+                                        <div className="flex flex-col items-center gap-3">
+                                            {pendingRequest && (
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
+                                                    <Clock size={12} />
+                                                    Solicitud en Revisión
+                                                </div>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowUpgradeModal(true)}
+                                                className={cn(
+                                                    "bg-white/80 backdrop-blur-sm border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-black rounded-xl",
+                                                    pendingRequest && "border-amber-200 shadow-none opacity-90"
+                                                )}
+                                            >
+                                                {pendingRequest ? (
+                                                    <>
+                                                        <Clock size={16} className="mr-2" />
+                                                        Ver Estado
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles size={16} className="mr-2" />
+                                                        Habilitar conexión WhatsApp
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                             </CardContent>
@@ -673,20 +739,42 @@ export default function DashboardProfile() {
                                 </div>
 
                                 {!isPro && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                        <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl border border-primary-100 shadow-xl max-w-sm">
-                                            <div className="h-12 w-12 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                                <Sparkles className="text-primary-600" size={24} />
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-20">
+                                        <div className={cn(
+                                            "bg-white/95 backdrop-blur-md rounded-3xl border border-primary-100 shadow-xl max-w-[280px] sm:max-w-sm transition-all animate-in zoom-in-95 duration-300",
+                                            pendingRequest ? "p-5" : "p-8"
+                                        )}>
+                                            <div className={cn(
+                                                "bg-primary-100 rounded-2xl flex items-center justify-center mx-auto transition-all",
+                                                pendingRequest ? "h-10 w-10 mb-3" : "h-12 w-12 mb-4"
+                                            )}>
+                                                <Sparkles className="text-primary-600" size={pendingRequest ? 20 : 24} />
                                             </div>
-                                            <h4 className="font-bold text-slate-900 mb-2">Función Exclusiva de Planes Pagados</h4>
-                                            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-                                                Genera códigos QR personalizados para que tus clientes accedan a tu catálogo al instante.
+                                            <h4 className="font-bold text-slate-900 mb-1 text-sm sm:text-base leading-tight">Función Premium</h4>
+                                            <p className="text-[10px] sm:text-xs text-slate-500 mb-4 leading-relaxed line-clamp-2">
+                                                Genera códigos QR personalizados para simplificar el acceso a tu tienda.
                                             </p>
+                                            {pendingRequest && (
+                                                <div className="flex items-center justify-center gap-1.5 mb-3 py-1 px-3 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider animate-pulse">
+                                                    <Clock size={10} />
+                                                    Petición en proceso
+                                                </div>
+                                            )}
                                             <Button
                                                 onClick={() => setShowUpgradeModal(true)}
-                                                className="w-full bg-primary-600 hover:bg-primary-700 font-bold shadow-lg shadow-primary-100"
+                                                className={cn(
+                                                    "w-full h-10 font-black shadow-lg shadow-primary-100 transition-all text-xs",
+                                                    pendingRequest ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 shadow-none" : "bg-primary-600 hover:bg-primary-700"
+                                                )}
                                             >
-                                                Mejorar Plan
+                                                {pendingRequest ? (
+                                                    <>
+                                                        <Clock size={14} className="mr-2" />
+                                                        Ver Estado
+                                                    </>
+                                                ) : (
+                                                    'Mejorar Plan'
+                                                )}
                                             </Button>
                                         </div>
                                     </div>
@@ -722,14 +810,34 @@ export default function DashboardProfile() {
 
                                 {!isPro && (
                                     <div className="absolute inset-0 flex items-center justify-center z-10">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setShowUpgradeModal(true)}
-                                            className="bg-white/80 backdrop-blur-sm border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 font-bold rounded-xl"
-                                        >
-                                            <Sparkles size={16} className="mr-2" />
-                                            Mejorar Plan
-                                        </Button>
+                                        <div className="flex flex-col items-center gap-3">
+                                            {pendingRequest && (
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
+                                                    <Clock size={12} />
+                                                    En Revisión
+                                                </div>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowUpgradeModal(true)}
+                                                className={cn(
+                                                    "bg-white/80 backdrop-blur-sm border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 font-black rounded-xl",
+                                                    pendingRequest && "border-amber-200 shadow-none opacity-90"
+                                                )}
+                                            >
+                                                {pendingRequest ? (
+                                                    <>
+                                                        <Clock size={16} className="mr-2" />
+                                                        Ver Estado
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles size={16} className="mr-2" />
+                                                        Mejorar Plan
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                             </CardContent>
@@ -764,8 +872,18 @@ export default function DashboardProfile() {
                     <div className="bg-white rounded-3xl border border-slate-100 p-2 shadow-sm">
                         {[
                             { id: 'profile', name: 'Perfil de Tienda', icon: <User size={18} /> },
-                            { id: 'messages', name: 'Mensajes Sistema', icon: <MessageSquare size={18} /> },
-                            { id: 'notifications', name: 'Notificaciones', icon: <Bell size={18} /> },
+                            {
+                                id: 'messages',
+                                name: 'Mensajes Sistema',
+                                icon: <MessageSquare size={18} />,
+                                badge: unreadSystemCount > 0 ? unreadSystemCount : null
+                            },
+                            {
+                                id: 'notifications',
+                                name: 'Notificaciones',
+                                icon: <Bell size={18} />,
+                                badge: (unreadCount - unreadSystemCount) > 0 ? (unreadCount - unreadSystemCount) : null
+                            },
                             { id: 'security', name: 'Seguridad', icon: <Shield size={18} /> },
                             { id: 'whatsapp', name: 'Integración WhatsApp', icon: <Smartphone size={18} /> },
                         ].map((item, i) => (
@@ -773,14 +891,21 @@ export default function DashboardProfile() {
                                 key={i}
                                 onClick={() => setActiveTab(item.id)}
                                 className={cn(
-                                    "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all",
+                                    "w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all",
                                     activeTab === item.id
                                         ? "bg-primary-50 text-primary-600 shadow-sm ring-1 ring-primary-100"
                                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                 )}
                             >
-                                {item.icon}
-                                {item.name}
+                                <div className="flex items-center gap-3">
+                                    {item.icon}
+                                    {item.name}
+                                </div>
+                                {item.badge && (
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                                        {item.badge}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -827,15 +952,26 @@ export default function DashboardProfile() {
 
                             <Button
                                 className={cn(
-                                    "w-full font-bold shadow-lg",
-                                    company.plan === 'free' ? "bg-primary-600 hover:bg-primary-700 shadow-primary-100" :
-                                        company.plan === 'plus' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" :
-                                            "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
+                                    "w-full font-bold shadow-lg transition-all",
+                                    pendingRequest ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 shadow-none" : (
+                                        company.plan === 'free' ? "bg-primary-600 hover:bg-primary-700 shadow-primary-100" :
+                                            company.plan === 'plus' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" :
+                                                "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
+                                    )
                                 )}
                                 onClick={() => setShowUpgradeModal(true)}
                             >
-                                <Sparkles size={16} className="mr-2 text-yellow-300" />
-                                {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar Plan'}
+                                {pendingRequest ? (
+                                    <>
+                                        <Clock size={16} className="mr-2" />
+                                        Solicitud en Revisión
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles size={16} className="mr-2 text-yellow-300" />
+                                        {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar Plan'}
+                                    </>
+                                )}
                             </Button>
                         </CardContent>
                     </Card>

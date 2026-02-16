@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Globe, Shield, Cloud, Save, Loader2, Package, Camera, Zap, Sparkles, Crown } from 'lucide-react';
+import { Globe, Shield, Cloud, Save, Loader2, Package, Camera, Zap, Sparkles, Crown, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -19,8 +19,14 @@ export default function AdminSettings() {
         free_plan_image_limit: '1',
         plus_plan_product_limit: '100',
         plus_plan_image_limit: '5',
+        plus_plan_price_monthly: '9990',
+        plus_plan_price_semester: '8500',
+        plus_plan_price_annual: '7000',
         pro_plan_product_limit: '500',
         pro_plan_image_limit: '5',
+        pro_plan_price_monthly: '19990',
+        pro_plan_price_semester: '18000',
+        pro_plan_price_annual: '16000',
         custom_plan_product_limit: '1000',
         custom_plan_image_limit: '10'
     });
@@ -35,8 +41,14 @@ export default function AdminSettings() {
                 free_plan_image_limit: settings.free_plan_image_limit || '1',
                 plus_plan_product_limit: settings.plus_plan_product_limit || '100',
                 plus_plan_image_limit: settings.plus_plan_image_limit || '5',
+                plus_plan_price_monthly: settings.plus_plan_price_monthly || '9990',
+                plus_plan_price_semester: settings.plus_plan_price_semester || '8500',
+                plus_plan_price_annual: settings.plus_plan_price_annual || '7000',
                 pro_plan_product_limit: settings.pro_plan_product_limit || '500',
                 pro_plan_image_limit: settings.pro_plan_image_limit || '5',
+                pro_plan_price_monthly: settings.pro_plan_price_monthly || '19990',
+                pro_plan_price_semester: settings.pro_plan_price_semester || '18000',
+                pro_plan_price_annual: settings.pro_plan_price_annual || '16000',
                 custom_plan_product_limit: settings.custom_plan_product_limit || '1000',
                 custom_plan_image_limit: settings.custom_plan_image_limit || '10'
             });
@@ -194,6 +206,52 @@ export default function AdminSettings() {
                 <Card className="border-none shadow-sm">
                     <CardHeader className="border-b border-slate-50">
                         <div className="flex items-center gap-2">
+                            <DollarSign size={20} className="text-primary-600" />
+                            <CardTitle>Precios Plan Plus</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="p-4 bg-primary-50/30 rounded-2xl border border-primary-100">
+                                <p className="font-bold text-slate-900 text-sm mb-4">Precio Mensual</p>
+                                <Input
+                                    type="number"
+                                    value={formData.plus_plan_price_monthly}
+                                    onChange={(e) => handleInputChange('plus_plan_price_monthly', e.target.value)}
+                                    className="bg-white"
+                                    placeholder="9990"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">Precio base mensual en CLP</p>
+                            </div>
+                            <div className="p-4 bg-primary-50/30 rounded-2xl border border-primary-100">
+                                <p className="font-bold text-slate-900 text-sm mb-4">Precio Semestral</p>
+                                <Input
+                                    type="number"
+                                    value={formData.plus_plan_price_semester}
+                                    onChange={(e) => handleInputChange('plus_plan_price_semester', e.target.value)}
+                                    className="bg-white"
+                                    placeholder="8500"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">Precio mensual equivalente (6 meses)</p>
+                            </div>
+                            <div className="p-4 bg-primary-50/30 rounded-2xl border border-primary-100">
+                                <p className="font-bold text-slate-900 text-sm mb-4">Precio Anual</p>
+                                <Input
+                                    type="number"
+                                    value={formData.plus_plan_price_annual}
+                                    onChange={(e) => handleInputChange('plus_plan_price_annual', e.target.value)}
+                                    className="bg-white"
+                                    placeholder="7000"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">Precio mensual equivalente (12 meses)</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm">
+                    <CardHeader className="border-b border-slate-50">
+                        <div className="flex items-center gap-2">
                             <Sparkles size={20} className="text-amber-500" />
                             <CardTitle>Límites Plan Pro</CardTitle>
                         </div>
@@ -217,6 +275,52 @@ export default function AdminSettings() {
                                     onChange={(e) => handleInputChange('pro_plan_image_limit', e.target.value)}
                                     className="bg-white"
                                 />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm">
+                    <CardHeader className="border-b border-slate-50">
+                        <div className="flex items-center gap-2">
+                            <DollarSign size={20} className="text-amber-600" />
+                            <CardTitle>Precios Plan Pro</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="p-4 bg-amber-50/30 rounded-2xl border border-amber-100">
+                                <p className="font-bold text-slate-900 text-sm mb-4">Precio Mensual</p>
+                                <Input
+                                    type="number"
+                                    value={formData.pro_plan_price_monthly}
+                                    onChange={(e) => handleInputChange('pro_plan_price_monthly', e.target.value)}
+                                    className="bg-white"
+                                    placeholder="19990"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">Precio base mensual en CLP</p>
+                            </div>
+                            <div className="p-4 bg-amber-50/30 rounded-2xl border border-amber-100">
+                                <p className="font-bold text-slate-900 text-sm mb-4">Precio Semestral</p>
+                                <Input
+                                    type="number"
+                                    value={formData.pro_plan_price_semester}
+                                    onChange={(e) => handleInputChange('pro_plan_price_semester', e.target.value)}
+                                    className="bg-white"
+                                    placeholder="18000"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">Precio mensual equivalente (6 meses)</p>
+                            </div>
+                            <div className="p-4 bg-amber-50/30 rounded-2xl border border-amber-100">
+                                <p className="font-bold text-slate-900 text-sm mb-4">Precio Anual</p>
+                                <Input
+                                    type="number"
+                                    value={formData.pro_plan_price_annual}
+                                    onChange={(e) => handleInputChange('pro_plan_price_annual', e.target.value)}
+                                    className="bg-white"
+                                    placeholder="16000"
+                                />
+                                <p className="text-xs text-slate-400 mt-2">Precio mensual equivalente (12 meses)</p>
                             </div>
                         </div>
                     </CardContent>

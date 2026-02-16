@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Plus, Edit2, Trash2, Search, MoreVertical, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Layers, Plus, Edit2, Trash2, Search, MoreVertical, Loader2, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -14,6 +14,7 @@ import { CATEGORIES as MOCK_CATEGORIES, COMPANIES } from '../data/mock';
 export default function DashboardCategories() {
     const { company: authCompany, loading: authLoading } = useAuth();
     const { showToast } = useToast();
+    const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
 
@@ -63,16 +64,17 @@ export default function DashboardCategories() {
 
             if (catError) throw catError;
 
-            // Fetch product counts per category
+            // Fetch product counts per category using the junction table
+            // We join categories with product_categories to get the count for this specific company's categories
             const { data: countData, error: countError } = await supabase
-                .from('products')
+                .from('product_categories')
                 .select('category_id')
-                .eq('company_id', company.id);
+                .in('category_id', catData.map(c => c.id));
 
             if (countError) throw countError;
 
-            const categoryCounts = (countData || []).reduce((acc, p) => {
-                acc[p.category_id] = (acc[p.category_id] || 0) + 1;
+            const categoryCounts = (countData || []).reduce((acc, pc) => {
+                acc[pc.category_id] = (acc[pc.category_id] || 0) + 1;
                 return acc;
             }, {});
 
@@ -256,6 +258,15 @@ export default function DashboardCategories() {
                                     <Button
                                         variant="ghost"
                                         size="icon"
+                                        className="h-9 w-9 text-primary-400 hover:text-primary-600 hover:bg-primary-50"
+                                        title="Ver productos"
+                                        onClick={() => navigate(`/dashboard/productos?categoryId=${category.id}`)}
+                                    >
+                                        <ExternalLink size={16} />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         className="h-9 w-9 text-slate-300 hover:text-primary-600"
                                         onClick={() => {
                                             setEditingCategory(category);
@@ -271,9 +282,6 @@ export default function DashboardCategories() {
                                         onClick={() => handleDeleteCategory(category.id)}
                                     >
                                         <Trash2 size={16} />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300">
-                                        <MoreVertical size={16} />
                                     </Button>
                                 </div>
                             </div>

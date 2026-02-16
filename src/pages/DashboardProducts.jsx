@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, ExternalLink, Copy } from 'lucide-react';
+import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, ExternalLink, Copy, Clock, Zap, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -13,13 +13,15 @@ import { useSettings } from '../hooks/useSettings';
 
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { ProductFormModal } from '../components/dashboard/ProductFormModal';
+import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 
 import { PRODUCTS as MOCK_PRODUCTS, CATEGORIES as MOCK_CATEGORIES, COMPANIES } from '../data/mock';
 
 export default function DashboardProducts() {
     const { company: authCompany, loading: authLoading } = useAuth();
     const location = useLocation();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const categoryFilterId = searchParams.get('categoryId');
 
     // Check for demo mode via URL path or query param
     const isDemo = location.pathname.includes('/demo') || searchParams.get('demo') === 'true';
@@ -42,6 +44,8 @@ export default function DashboardProducts() {
     const [categories, setCategories] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const { pendingRequest } = useUpgradeRequest();
 
     const { getSetting } = useSettings();
     const currentPlan = company?.plan || 'free';
@@ -249,18 +253,33 @@ export default function DashboardProducts() {
                         </div>
                     </div>
                     {(currentPlan === 'free' || currentPlan === 'plus') && (
-                        <Link to="/precios">
+                        <div className="flex flex-col sm:flex-row items-center gap-3">
+                            {pendingRequest && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 text-white border border-white/30 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
+                                    <Clock size={12} />
+                                    Solicitud en Revisión
+                                </div>
+                            )}
                             <Button
+                                onClick={() => setShowUpgradeModal(true)}
                                 variant="secondary"
                                 size="sm"
                                 className={cn(
-                                    "bg-white border-none font-bold",
-                                    currentPlan === 'free' ? "text-amber-600 hover:bg-amber-50" : "text-blue-600 hover:bg-blue-50"
+                                    "bg-white border-none font-black shadow-sm h-9",
+                                    currentPlan === 'free' ? "text-amber-600 hover:bg-amber-50" : "text-blue-600 hover:bg-blue-50",
+                                    pendingRequest && "opacity-90"
                                 )}
                             >
-                                {currentPlan === 'free' ? 'Mejorar ahora' : 'Pasar a PRO'}
+                                {pendingRequest ? (
+                                    <>
+                                        <Clock size={16} className="mr-2" />
+                                        Ver Estado
+                                    </>
+                                ) : (
+                                    currentPlan === 'free' ? 'Mejorar ahora' : 'Pasar a PRO'
+                                )}
                             </Button>
-                        </Link>
+                        </div>
                     )}
                 </div>
             )}
@@ -314,20 +333,62 @@ export default function DashboardProducts() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+            <div className="flex flex-col md:flex-row items-center gap-3">
+                <div className="relative flex-1 w-full">
                     <Input
                         placeholder="Buscar por nombre o SKU..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 h-10 bg-white"
                     />
                     <Search className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                 </div>
-                <Button variant="secondary" className="px-3">
-                    <Filter className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-none">
+                        <select
+                            value={categoryFilterId || ''}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                const newParams = new URLSearchParams(searchParams);
+                                if (val) newParams.set('categoryId', val);
+                                else newParams.delete('categoryId');
+                                setSearchParams(newParams);
+                            }}
+                            className="h-10 pl-10 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-primary-100 appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:1.25em_1.25em] w-full md:min-w-[200px] cursor-pointer hover:border-primary-200 transition-colors"
+                            style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%2394a3b8\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")' }}
+                        >
+                            <option value="">Todas las categorías</option>
+                            {categories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                        </select>
+                        <Filter className="absolute left-3 top-2.5 h-5 w-5 text-slate-400 pointer-events-none" />
+                    </div>
+                    <Button variant="secondary" className="px-3 h-10 hidden md:flex">
+                        <Filter className="h-5 w-5" />
+                    </Button>
+                </div>
             </div>
+
+            {/* Active Category Filter Indicator */}
+            {categoryFilterId && (
+                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-100 rounded-full text-xs font-bold shadow-sm">
+                        <Filter size={12} />
+                        Categoría: {categories.find(c => c.id === categoryFilterId)?.name || 'Cargando...'}
+                        <button
+                            onClick={() => {
+                                const newParams = new URLSearchParams(searchParams);
+                                newParams.delete('categoryId');
+                                setSearchParams(newParams);
+                            }}
+                            className="ml-1 p-0.5 hover:bg-primary-100 rounded-full transition-colors"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Hidden Products Warning */}
             {productCount > productLimit && (
@@ -363,10 +424,21 @@ export default function DashboardProducts() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {products.filter(p =>
-                                p.name.toLowerCase().includes(search.toLowerCase()) ||
-                                (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()))
-                            ).slice(0, productLimit).map((product) => (
+                            {products.filter(p => {
+                                const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+                                    (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()));
+
+                                if (!categoryFilterId) return matchesSearch;
+
+                                // Check if the product has the filtered category
+                                // In demo mode, p.categories is an array of IDs
+                                // In real mode, p.categories is an array of objects
+                                if (isDemo) {
+                                    return matchesSearch && (p.categories || []).includes(categoryFilterId);
+                                } else {
+                                    return matchesSearch && (p.categories || []).some(cat => cat.id === categoryFilterId);
+                                }
+                            }).slice(0, productLimit).map((product) => (
                                 <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">
@@ -397,8 +469,19 @@ export default function DashboardProducts() {
                                             {getCategoryNames(product)}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 font-bold text-slate-700">
-                                        {formatCurrency(product.price)}
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-bold text-slate-700">{formatCurrency(product.price)}</span>
+                                            {product.wholesale_prices && product.wholesale_prices.length > 0 && (
+                                                <div className="flex flex-col gap-0.5">
+                                                    {product.wholesale_prices.sort((a, b) => a.min_qty - b.min_qty).map((tier, idx) => (
+                                                        <span key={idx} className="text-[10px] text-emerald-600 font-medium bg-emerald-50 px-1.5 py-0.5 rounded w-fit whitespace-nowrap">
+                                                            {tier.min_qty}+ un: {formatCurrency(tier.price)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         {isDemoRestaurant ? (
@@ -461,6 +544,12 @@ export default function DashboardProducts() {
                 onSuccess={handleSuccess}
                 companyId={company?.id}
                 categories={categories}
+            />
+
+            <PlanUpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                companyId={company?.id}
             />
         </div>
     );

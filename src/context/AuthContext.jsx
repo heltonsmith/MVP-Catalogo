@@ -22,6 +22,8 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [company, setCompany] = useState(null);
     const [profile, setProfile] = useState(null);
+    const [pendingUpgrade, setPendingUpgrade] = useState(null);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
 
     // Ref to prevent multiple simultaneous loads for the same user
     const loadingForUserId = useRef(null);
@@ -54,7 +56,38 @@ export const AuthProvider = ({ children }) => {
                 }
             };
 
-            await Promise.allSettled([fetchProfile(), fetchCompany()]);
+            const fetchPendingUpgrade = async (companyId) => {
+                if (!companyId) return;
+                const { data } = await supabase
+                    .from('upgrade_requests')
+                    .select('*')
+                    .eq('company_id', companyId)
+                    .eq('status', 'pending')
+                    .maybeSingle();
+                setPendingUpgrade(data);
+            };
+
+            const fetchUnreadNotifications = async () => {
+                const { count, error } = await supabase
+                    .from('notifications')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', userId)
+                    .eq('is_read', false);
+
+                if (!error) {
+                    setUnreadNotifications(count || 0);
+                }
+            };
+
+            await Promise.allSettled([fetchProfile(), fetchCompany(), fetchUnreadNotifications()]);
+
+            // Fetch pending upgrade after company is loaded
+            if (loadingForUserId.current === userId) {
+                const { data: companyData } = await supabase.from('companies').select('id').eq('user_id', userId).maybeSingle();
+                if (companyData) {
+                    await fetchPendingUpgrade(companyData.id);
+                }
+            }
         } catch (error) {
             console.error('Auth: Load error:', error);
         } finally {
@@ -108,10 +141,33 @@ export const AuthProvider = ({ children }) => {
 
             if (currentUser) {
                 loadUserData(currentUser.id);
+
+                // Set up real-time unread count
+                const channel = supabase
+                    .channel(`unread-notifications-${currentUser.id}`)
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'notifications',
+                        filter: `user_id=eq.${currentUser.id}`
+                    }, async () => {
+                        const { count } = await supabase
+                            .from('notifications')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('user_id', currentUser.id)
+                            .eq('is_read', false);
+                        setUnreadNotifications(count || 0);
+                    })
+                    .subscribe();
+
+                return () => {
+                    supabase.removeChannel(channel);
+                };
             } else {
                 loadingForUserId.current = null;
                 setProfile(null);
                 setCompany(null);
+                setUnreadNotifications(0);
                 setLoading(false);
             }
         });
@@ -135,11 +191,38 @@ export const AuthProvider = ({ children }) => {
         await supabase.auth.signOut();
         setProfile(null);
         setCompany(null);
+        setPendingUpgrade(null);
+        setUnreadNotifications(0);
     };
 
     const refreshCompany = async () => {
         if (user) {
             await loadUserData(user.id, true);
+        }
+    };
+
+    const refreshUpgradeStatus = async () => {
+        if (company?.id) {
+            const { data } = await supabase
+                .from('upgrade_requests')
+                .select('*')
+                .eq('company_id', company.id)
+                .eq('status', 'pending')
+                .maybeSingle();
+            setPendingUpgrade(data);
+        }
+    };
+
+    const refreshUnreadNotifications = async () => {
+        if (!user) return;
+        const { count, error } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+
+        if (!error) {
+            setUnreadNotifications(count || 0);
         }
     };
 
@@ -152,8 +235,12 @@ export const AuthProvider = ({ children }) => {
         session,
         company,
         profile,
+        pendingUpgrade,
+        unreadNotifications,
+        refreshUnreadNotifications,
+        refreshUpgradeStatus,
         loading
-    }), [user, session, company, profile, loading]);
+    }), [user, session, company, profile, pendingUpgrade, unreadNotifications, loading]);
 
     return (
         <AuthContext.Provider value={value}>

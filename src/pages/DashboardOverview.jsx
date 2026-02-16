@@ -1,4 +1,4 @@
-import { Package, Eye, DollarSign, TrendingUp, Plus, AlertTriangle, MessageCircle, ArrowUpRight, ArrowDownRight, CheckCircle2, Sparkles, Store, Loader2, Zap, Link2, Copy, ExternalLink } from 'lucide-react';
+import { Package, Eye, DollarSign, TrendingUp, Plus, AlertTriangle, MessageCircle, ArrowUpRight, ArrowDownRight, CheckCircle2, Sparkles, Store, Loader2, Zap, Link2, Copy, ExternalLink, Clock } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { PRODUCTS as MOCK_PRODUCTS, COMPANIES } from '../data/mock';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
+import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 
 export default function DashboardOverview() {
     const { company: authCompany, user, loading: authLoading } = useAuth();
@@ -38,6 +39,7 @@ export default function DashboardOverview() {
     ]);
     const [loading, setLoading] = useState(!isDemo);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const { pendingRequest, loading: loadingUpgrade } = useUpgradeRequest();
 
     useEffect(() => {
         if (isDemo) {
@@ -161,15 +163,33 @@ export default function DashboardOverview() {
                         <p className="text-slate-500 text-sm">Gestionando <span className="font-bold text-primary-600">{displayCompany.name}</span></p>
                     </div>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                    {pendingRequest && (
+                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
+                            <Clock size={12} />
+                            En revisión
+                        </div>
+                    )}
                     {displayCompany.plan === 'free' && (
                         <Button
                             onClick={() => setShowUpgradeModal(true)}
                             variant="secondary"
-                            className="flex-1 sm:flex-none font-bold bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200"
+                            className={cn(
+                                "flex-1 sm:flex-none font-black transition-all",
+                                pendingRequest ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-primary-50 text-primary-600 hover:bg-primary-100 border border-primary-200"
+                            )}
                         >
-                            <Zap size={18} className="mr-2 fill-current" />
-                            Mejorar tu plan
+                            {pendingRequest ? (
+                                <>
+                                    <Clock size={18} className="mr-2" />
+                                    Solicitud Pendiente
+                                </>
+                            ) : (
+                                <>
+                                    <Zap size={18} className="mr-2 fill-current" />
+                                    Mejorar tu plan
+                                </>
+                            )}
                         </Button>
                     )}
                 </div>
@@ -198,7 +218,19 @@ export default function DashboardOverview() {
                             </div>
 
                             {stat.name === 'Cotizaciones' && company.plan === 'free' && (
-                                <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-center">
+                                <div className="mt-4 pt-4 border-t border-slate-50">
+                                    <div className="mb-3 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
+                                        <h5 className="text-[10px] font-black text-purple-900 uppercase tracking-wider mb-1.5">Gestión de Cotizaciones</h5>
+                                        <p className="text-[9px] text-purple-700 leading-relaxed">
+                                            Visualiza las cotizaciones por Whatsapp de clientes con filtros avanzados, marca como respondidas o completadas, y visualiza detalles por fecha y cliente.
+                                        </p>
+                                    </div>
+                                    {pendingRequest && (
+                                        <div className="flex items-center justify-center gap-1.5 mb-2 py-1 px-3 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                                            <Clock size={10} />
+                                            Solicitud en revisión por admin
+                                        </div>
+                                    )}
                                     <Button
                                         onClick={(e) => {
                                             e.preventDefault();
@@ -207,10 +239,13 @@ export default function DashboardOverview() {
                                         }}
                                         variant="outline"
                                         size="default"
-                                        className="w-full text-xs font-bold h-9 gap-2 border-amber-200 text-amber-600 hover:bg-amber-50 shadow-sm"
+                                        className={cn(
+                                            "w-full text-[10px] font-black h-9 gap-2 transition-all",
+                                            pendingRequest ? "border-amber-200 bg-amber-50 text-amber-700 shadow-none" : "border-primary-200 text-primary-600 hover:bg-primary-50"
+                                        )}
                                     >
-                                        <Zap size={14} className="fill-current" />
-                                        Mejorar Plan
+                                        {pendingRequest ? <Clock size={14} /> : <Zap size={14} className="fill-current" />}
+                                        {pendingRequest ? 'Ver Estado' : 'Mejorar Plan'}
                                     </Button>
                                 </div>
                             )}
@@ -364,11 +399,16 @@ export default function DashboardOverview() {
 
                                 {company.plan === 'free' && (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-white/10 backdrop-blur-[1px] z-10">
+                                        <div className="h-10 w-10 bg-purple-50 rounded-xl flex items-center justify-center mb-3">
+                                            <DollarSign className="text-purple-500 fill-purple-500/20" size={20} />
+                                        </div>
+                                        <h4 className="font-bold text-slate-900 text-xs mb-1">Análisis de Productos</h4>
+                                        <p className="text-[10px] text-slate-500 mb-4 px-2 text-center leading-relaxed">Descubre qué productos cotizan más tus clientes y optimiza tu inventario.</p>
                                         <Button
                                             onClick={() => setShowUpgradeModal(true)}
                                             variant="secondary"
                                             size="sm"
-                                            className="font-bold bg-white/90 border-amber-100 text-amber-600 hover:bg-white shadow-sm text-[10px]"
+                                            className="font-bold bg-white/90 border-purple-100 text-purple-600 hover:bg-white shadow-sm text-[10px]"
                                         >
                                             <Zap size={14} className="mr-2 fill-current" />
                                             Ver Analíticas
@@ -459,14 +499,14 @@ export default function DashboardOverview() {
 
                             {company.plan === 'free' && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-white/10 backdrop-blur-[1px]">
-                                    <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center mb-3">
-                                        <Zap className="text-amber-500 fill-amber-500/20" size={20} />
+                                    <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
+                                        <MessageCircle className="text-emerald-500 fill-emerald-500/20" size={20} />
                                     </div>
-                                    <h4 className="font-bold text-slate-900 text-xs mb-1">Función Premium</h4>
-                                    <p className="text-[10px] text-slate-500 mb-4 px-4 overflow-hidden line-clamp-2">Visualiza la actividad y pedidos de tus clientes en tiempo real.</p>
+                                    <h4 className="font-bold text-slate-900 text-xs mb-1">Actividad en Tiempo Real</h4>
+                                    <p className="text-[10px] text-slate-500 mb-4 px-4 leading-relaxed">Visualiza todas las cotizaciones y mensajes de tus clientes vía WhatsApp, ordenados por fecha con filtros avanzados.</p>
                                     <Button
                                         onClick={() => setShowUpgradeModal(true)}
-                                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold h-8 text-[10px] shadow-lg shadow-amber-200 px-6 rounded-lg"
+                                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-8 text-[10px] shadow-lg shadow-emerald-200 px-6 rounded-lg"
                                     >
                                         Mejorar Plan
                                     </Button>

@@ -1,35 +1,74 @@
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 
-const supabaseUrl = 'https://dkrosrrlkerbkjggrvuy.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrcm9zcnJsa2VyYmtqZ2dydnV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MDUwMTAsImV4cCI6MjA4NjE4MTAxMH0.HNQFArdiVcsVI08SBbPLKTZY5uoBHBJkS3oLz6ng9Lc';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-async function probeSchema() {
-    console.log('--- Probing Quotes Schema via Omission ---');
-
-    // Try to insert WITHOUT company_id
-    const payload = {
-        customer_name: 'Test Omission',
-        customer_whatsapp: '123456789',
-        total: 100
-        // No company_id
-    };
-
-    console.log('Attempting INSERT without any company ID column...');
-    const { data, error } = await supabase
-        .from('quotes')
-        .insert([payload])
-        .select();
-
-    if (error) {
-        console.log('INSERT Error Message:', error.message);
-        console.log('INSERT Error Details:', error.details);
-        console.log('INSERT Error Hint:', error.hint);
-        console.log('INSERT Error Code:', error.code);
-    } else {
-        console.log('INSERT Success (Unexpected):', data);
+// Manual parser for .env
+function loadEnv() {
+    try {
+        const envPath = path.resolve(process.cwd(), '.env');
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const env = {};
+        envContent.split('\n').forEach(line => {
+            const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+            if (match) {
+                let value = match[2];
+                // Remove quotes if present
+                if (value && value.length > 0 && value.charAt(0) === '"') {
+                    value = value.replace(/^"|"$/g, '');
+                }
+                env[match[1]] = value;
+            }
+        });
+        return env;
+    } catch (err) {
+        console.error('Error loading .env:', err);
+        return {};
     }
 }
 
-probeSchema();
+const env = loadEnv();
+const supabaseUrl = env.VITE_SUPABASE_URL;
+const supabaseKey = env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase credentials in .env');
+    process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function checkSchema() {
+    console.log('Checking products table schema...');
+
+    // Try to select a single product to see the returned columns
+    const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .limit(1);
+
+    if (error) {
+        console.error('Error fetching products:', error);
+        return;
+    }
+
+    if (data && data.length > 0) {
+        console.log('Columns found in products table:', Object.keys(data[0]));
+        const hasWholesale = Object.keys(data[0]).includes('wholesale_prices');
+        console.log('Has wholesale_prices column:', hasWholesale);
+    } else {
+        console.log('No products found, checking empty set keys might not work. Trying to insert dry run...');
+        // We can try to select specific column 'wholesale_prices' from empty set?
+        const { error: colError } = await supabase
+            .from('products')
+            .select('wholesale_prices')
+            .limit(1);
+
+        if (colError) {
+            console.log('Select wholesale_prices failed:', colError.message);
+        } else {
+            console.log('Select wholesale_prices succeeded, column likely exists.');
+        }
+    }
+}
+
+checkSchema();

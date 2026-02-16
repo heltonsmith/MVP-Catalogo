@@ -14,6 +14,9 @@ export default function LandingPage() {
     const proProductLimit = getSetting('pro_plan_product_limit', '500');
     const proImageLimit = getSetting('pro_plan_image_limit', '5');
 
+    const plusPriceAnnual = parseInt(getSetting('plus_plan_price_annual', '7000'));
+    const proPriceAnnual = parseInt(getSetting('pro_plan_price_annual', '16000'));
+
     const benefits = [
         {
             title: 'Plan Gratis de por vida',
@@ -42,9 +45,9 @@ export default function LandingPage() {
         },
         {
             name: 'Plus',
-            price: '$7.000',
+            price: `$${plusPriceAnnual.toLocaleString('es-CL')}`,
             period: '/mes',
-            yearlyTotal: '$84.000/año',
+            yearlyTotal: `$${(plusPriceAnnual * 12).toLocaleString('es-CL')}/año`,
             note: 'Facturación anual',
             description: `Hasta ${plusProductLimit} productos, chat interno y WhatsApp.`,
             icon: <Zap className="text-primary-400 fill-primary-400" size={24} />,
@@ -53,9 +56,9 @@ export default function LandingPage() {
         },
         {
             name: 'Pro',
-            price: '$16.000',
+            price: `$${proPriceAnnual.toLocaleString('es-CL')}`,
             period: '/mes',
-            yearlyTotal: '$192.000/año',
+            yearlyTotal: `$${(proPriceAnnual * 12).toLocaleString('es-CL')}/año`,
             note: 'Facturación anual',
             description: `Hasta ${proProductLimit} productos, fotos HD y sin marca ktaloog.`,
             icon: <Sparkles className="text-amber-400 fill-amber-400" size={24} />,

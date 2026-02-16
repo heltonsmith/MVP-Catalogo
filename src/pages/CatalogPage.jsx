@@ -130,7 +130,8 @@ export default function CatalogPage() {
                         product_images(image_url, display_order),
                         product_categories(
                             categories(id, name)
-                        )
+                        ),
+                        wholesale_prices
                     `)
                     .eq('company_id', companyData.id)
                     .eq('available', true);

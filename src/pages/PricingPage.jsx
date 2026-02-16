@@ -24,6 +24,13 @@ export default function PricingPage() {
     const customProductLimit = getSetting('custom_plan_product_limit', '1000');
     const customImageLimit = getSetting('custom_plan_image_limit', '10');
 
+    const plusPriceMonthly = parseInt(getSetting('plus_plan_price_monthly', '9990'));
+    const plusPriceSemester = parseInt(getSetting('plus_plan_price_semester', '8500'));
+    const plusPriceAnnual = parseInt(getSetting('plus_plan_price_annual', '7000'));
+    const proPriceMonthly = parseInt(getSetting('pro_plan_price_monthly', '19990'));
+    const proPriceSemester = parseInt(getSetting('pro_plan_price_semester', '18000'));
+    const proPriceAnnual = parseInt(getSetting('pro_plan_price_annual', '16000'));
+
     const plans = [
         {
             name: 'Gratis',
@@ -46,7 +53,7 @@ export default function PricingPage() {
         },
         {
             name: 'Plus',
-            price: '$9.990',
+            price: `$${plusPriceMonthly.toLocaleString('es-CL')}`,
             period: '/mes',
             icon: <Zap className="text-primary-600 fill-primary-600" size={24} />,
             badge: 'Más popular',
@@ -67,7 +74,7 @@ export default function PricingPage() {
         },
         {
             name: 'Pro',
-            price: '$19.990',
+            price: `$${proPriceMonthly.toLocaleString('es-CL')}`,
             period: '/mes',
             icon: <Sparkles className="text-amber-500 fill-amber-500" size={24} />,
             description: 'Máxima potencia para grandes inventarios y presencia profesional.',
@@ -107,15 +114,15 @@ export default function PricingPage() {
     ];
 
     const plusOffers = [
-        { period: 'Mensual', price: '$9.990/mes', total: '$119.880/año', savings: null },
-        { period: 'Cada 6 meses', price: '$8.500/mes', total: '$102.000/año', savings: 'Ahorras 15%' },
-        { period: 'Por 1 año', price: '$7.000/mes', total: '$84.000/año', savings: 'Ahorras 30%' },
+        { period: 'Mensual', price: `$${plusPriceMonthly.toLocaleString('es-CL')}/mes`, total: `$${(plusPriceMonthly * 12).toLocaleString('es-CL')}/año`, savings: null },
+        { period: 'Cada 6 meses', price: `$${plusPriceSemester.toLocaleString('es-CL')}/mes`, total: `$${(plusPriceSemester * 6).toLocaleString('es-CL')}/6 meses`, savings: `Ahorras $${((plusPriceMonthly - plusPriceSemester) * 6).toLocaleString('es-CL')}` },
+        { period: 'Por 1 año', price: `$${plusPriceAnnual.toLocaleString('es-CL')}/mes`, total: `$${(plusPriceAnnual * 12).toLocaleString('es-CL')}/año`, savings: `Ahorras $${((plusPriceMonthly - plusPriceAnnual) * 12).toLocaleString('es-CL')}` },
     ];
 
     const proOffers = [
-        { period: 'Mensual', price: '$19.990/mes', total: '$239.880/año', savings: null },
-        { period: 'Cada 6 meses', price: '$18.000/mes', total: '$216.000/año', savings: 'Ahorras 10%' },
-        { period: 'Por 1 año', price: '$16.000/mes', total: '$192.000/año', savings: 'Ahorras 20%' },
+        { period: 'Mensual', price: `$${proPriceMonthly.toLocaleString('es-CL')}/mes`, total: `$${(proPriceMonthly * 12).toLocaleString('es-CL')}/año`, savings: null },
+        { period: 'Cada 6 meses', price: `$${proPriceSemester.toLocaleString('es-CL')}/mes`, total: `$${(proPriceSemester * 6).toLocaleString('es-CL')}/6 meses`, savings: `Ahorras $${((proPriceMonthly - proPriceSemester) * 6).toLocaleString('es-CL')}` },
+        { period: 'Por 1 año', price: `$${proPriceAnnual.toLocaleString('es-CL')}/mes`, total: `$${(proPriceAnnual * 12).toLocaleString('es-CL')}/año`, savings: `Ahorras $${((proPriceMonthly - proPriceAnnual) * 12).toLocaleString('es-CL')}` },
     ];
 
     return (

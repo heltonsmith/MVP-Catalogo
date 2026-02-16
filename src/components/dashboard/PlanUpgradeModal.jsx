@@ -11,13 +11,12 @@ import { useAuth } from '../../context/AuthContext';
 export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
     const { getSetting, loading: settingsLoading } = useSettings();
     const { showToast } = useToast();
-    const { profile, company } = useAuth();
+    const { profile, company, pendingUpgrade, refreshUpgradeStatus } = useAuth();
     const [selectedPlan, setSelectedPlan] = useState('plus');
     const [billingPeriod, setBillingPeriod] = useState('monthly');
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState('selection'); // selection, details
-    const [pendingRequest, setPendingRequest] = useState(null);
-    const [checkingPending, setCheckingPending] = useState(true);
+    const [checkingPending, setCheckingPending] = useState(false);
 
     const [details, setDetails] = useState({
         rut: '',
@@ -36,30 +35,10 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
     }, [profile]);
 
     useEffect(() => {
-        const checkPending = async () => {
-            if (!companyId) return;
-            try {
-                const { data, error } = await supabase
-                    .from('upgrade_requests')
-                    .select('*')
-                    .eq('company_id', companyId)
-                    .eq('status', 'pending')
-                    .maybeSingle();
-
-                if (error) throw error;
-                setPendingRequest(data);
-            } catch (error) {
-                console.error('Error checking pending upgrade:', error);
-            } finally {
-                setCheckingPending(false);
-            }
-        };
-
         if (isOpen) {
-            checkPending();
             setStep('selection');
         }
-    }, [isOpen, companyId]);
+    }, [isOpen]);
 
     const plusProductLimit = getSetting('plus_plan_product_limit', '100');
     const plusImageLimit = getSetting('plus_plan_image_limit', '5');
@@ -68,17 +47,23 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
     const customProductLimit = getSetting('custom_plan_product_limit', '1000');
     const customImageLimit = getSetting('custom_plan_image_limit', '10');
 
+    const plusPriceMonthly = parseInt(getSetting('plus_plan_price_monthly', '9990'));
+    const plusPriceSemester = parseInt(getSetting('plus_plan_price_semester', '8500'));
+    const plusPriceAnnual = parseInt(getSetting('plus_plan_price_annual', '7000'));
+    const proPriceMonthly = parseInt(getSetting('pro_plan_price_monthly', '19990'));
+    const proPriceSemester = parseInt(getSetting('pro_plan_price_semester', '18000'));
+    const proPriceAnnual = parseInt(getSetting('pro_plan_price_annual', '16000'));
+
     const BILLING_PERIODS = [
-        { id: 'monthly', label: 'Mensual', discount: 0 },
-        { id: 'semester', label: 'Semestral', discount: 0.10 },
-        { id: 'annual', label: 'Anual', discount: 0.20 }
+        { id: 'monthly', label: 'Mensual', plusPrice: plusPriceMonthly, proPrice: proPriceMonthly },
+        { id: 'semester', label: 'Semestral', plusPrice: plusPriceSemester, proPrice: proPriceSemester },
+        { id: 'annual', label: 'Anual', plusPrice: plusPriceAnnual, proPrice: proPriceAnnual }
     ];
 
     const PLANS = [
         {
             id: 'plus',
             name: 'Plan Plus',
-            monthlyPrice: 9990,
             description: `Hasta ${plusProductLimit} productos y ${plusImageLimit} fotos por cada uno.`,
             features: [
                 `Hasta ${plusProductLimit} Productos`,
@@ -94,7 +79,6 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
         {
             id: 'pro',
             name: 'Plan Pro',
-            monthlyPrice: 19990,
             description: `Hasta ${proProductLimit} productos y ${proImageLimit} fotos por cada uno.`,
             features: [
                 `Hasta ${proProductLimit} Productos`,
@@ -110,7 +94,6 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
         {
             id: 'custom',
             name: 'Personalizado',
-            monthlyPrice: null,
             description: 'Para grandes inventarios y soluciones a medida.',
             features: [`Más de ${customProductLimit} Productos`, `Hasta ${customImageLimit} Fotos por Producto`, 'Soporte 24/7 Dedicado', 'Multisucursal'],
             color: 'border-slate-500 bg-slate-50/30',
@@ -119,22 +102,30 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
         }
     ];
 
+    const formatRut = (value) => {
+        let clean = value.replace(/[^0-9kK]/g, '').toUpperCase();
+        if (clean.length <= 1) return clean;
+        let dv = clean.slice(-1);
+        let body = clean.slice(0, -1);
+        body = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        return `${body}-${dv}`;
+    };
+
     const calculatePrice = (plan) => {
-        if (!plan.monthlyPrice) return { display: 'Consultar', period: '', monthlyEquivalent: null, totalCost: null };
+        if (plan.isExternal) return { display: 'Consultar', period: '', monthlyEquivalent: null, totalCost: null };
 
         const period = BILLING_PERIODS.find(p => p.id === billingPeriod);
-        const discount = period.discount;
         const months = billingPeriod === 'monthly' ? 1 : billingPeriod === 'semester' ? 6 : 12;
 
-        const monthlyWithDiscount = Math.round(plan.monthlyPrice * (1 - discount));
-        const totalCost = monthlyWithDiscount * months;
+        const monthlyPrice = plan.id === 'plus' ? period.plusPrice : period.proPrice;
+        const totalCost = monthlyPrice * months;
 
         return {
-            display: `$${monthlyWithDiscount.toLocaleString('es-CL')}`,
+            display: `$${monthlyPrice.toLocaleString('es-CL')}`,
             period: billingPeriod === 'monthly' ? '/mes' : `/${months} meses`,
-            monthlyEquivalent: monthlyWithDiscount,
+            monthlyEquivalent: monthlyPrice,
             totalCost: totalCost,
-            savings: billingPeriod !== 'monthly' ? Math.round((plan.monthlyPrice - monthlyWithDiscount) * months) : 0
+            savings: 0
         };
     };
 
@@ -174,8 +165,13 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
 
             if (error) throw error;
 
+            await refreshUpgradeStatus();
+
             showToast("Solicitud enviada. Nos contactaremos contigo para activar tu plan.", "success");
-            onClose();
+            // Don't close immediately to let them see the "pending" state or a success message
+            setTimeout(() => {
+                onClose();
+            }, 2000);
         } catch (error) {
             console.error('Error requesting upgrade:', error);
             showToast("No se pudo enviar la solicitud", "error");
@@ -191,14 +187,14 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
                     <div className="flex h-64 items-center justify-center">
                         <Loader2 className="animate-spin text-primary-500" />
                     </div>
-                ) : pendingRequest ? (
+                ) : pendingUpgrade ? (
                     <div className="py-12 px-6 text-center animate-in fade-in zoom-in duration-300">
                         <div className="h-16 w-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
                             <AlertCircle size={32} />
                         </div>
                         <h3 className="text-lg font-bold text-slate-900 mb-2">Solicitud en Proceso</h3>
                         <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
-                            Ya tienes una solicitud pendiente para el plan <span className="font-bold text-amber-600 border-b border-amber-200">{pendingRequest.requested_plan.toUpperCase()}</span>.
+                            Ya tienes una solicitud pendiente para el plan <span className="font-bold text-amber-600 border-b border-amber-200">{pendingUpgrade.requested_plan.toUpperCase()}</span>.
                         </p>
                         <p className="text-xs text-slate-400 mt-4 italic">
                             Nuestro equipo está revisando tus datos. Te avisaremos pronto.
@@ -335,7 +331,7 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
                                 icon={<Building2 size={18} />}
                                 placeholder="12.345.678-9"
                                 value={details.rut}
-                                onChange={(e) => setDetails({ ...details, rut: e.target.value })}
+                                onChange={(e) => setDetails({ ...details, rut: formatRut(e.target.value) })}
                                 className="font-bold border-slate-200"
                             />
                             <Input

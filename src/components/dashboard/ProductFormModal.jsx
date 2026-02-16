@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Upload, Loader2, Package, Tag, DollarSign, Archive, Camera, Trash2, Weight, Ruler } from 'lucide-react';
+import { X, Upload, Loader2, Package, Tag, DollarSign, Archive, Camera, Trash2, Weight, Ruler, Plus, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
@@ -29,6 +29,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
     const [images, setImages] = useState([]);
     const [imageFiles, setImageFiles] = useState([]);
     const [removedImageUrls, setRemovedImageUrls] = useState([]);
+    const [wholesalePrices, setWholesalePrices] = useState([]);
 
     const { getSetting } = useSettings();
     const { company } = useAuth();
@@ -63,6 +64,8 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 setSelectedCategories(productToEdit.categories?.map(c => c.id) || []);
                 const existingImages = productToEdit.images || [];
                 setImages(existingImages.slice(0, maxImages));
+                // Load wholesale prices if they exist
+                setWholesalePrices(productToEdit.wholesale_prices || []);
             } else {
                 setFormData({
                     name: '',
@@ -77,7 +80,9 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 });
                 setSelectedCategories([]);
                 setImages([]);
+                setImages([]);
                 setImageFiles([]);
+                setWholesalePrices([]);
             }
             // Reset removed images list whenever modal opens/changes product
             setRemovedImageUrls([]);
@@ -157,6 +162,20 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
         setImages(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleAddTier = () => {
+        setWholesalePrices(prev => [...prev, { min_qty: '', price: '', label: '' }]);
+    };
+
+    const handleRemoveTier = (index) => {
+        setWholesalePrices(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleTierChange = (index, field, value) => {
+        setWholesalePrices(prev => prev.map((item, i) =>
+            i === index ? { ...item, [field]: value } : item
+        ));
+    };
+
     const uploadImages = async (productId) => {
         if (imageFiles.length === 0) return [];
 
@@ -210,7 +229,8 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 ...formData,
                 company_id: companyId,
                 price: parseFloat(formData.price) || 0,
-                stock: parseInt(formData.stock) || 0
+                stock: parseInt(formData.stock) || 0,
+                wholesale_prices: wholesalePrices.filter(p => p.min_qty && p.price) // Only save valid tiers
             };
 
             let productId;
@@ -552,6 +572,89 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                     </div>
                                 </div>
 
+                                {/* Wholesale Tiers - Only for wholesale or mixed business types */}
+                                {(company?.business_type === 'wholesale' || company?.business_type === 'mixed') && (
+                                    <div className="space-y-3 pt-2 border-t border-dashed border-slate-200">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1 flex items-center gap-1.5">
+                                                <Users size={12} /> Precios por Mayor (Opcional)
+                                            </label>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={handleAddTier}
+                                                className="h-7 text-xs font-bold text-primary-600 hover:text-primary-700 hover:bg-primary-50 px-2"
+                                            >
+                                                <Plus size={14} className="mr-1" /> Agregar Escala
+                                            </Button>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {wholesalePrices.map((tier, index) => (
+                                                <div key={index} className="flex gap-2 items-start animate-in fade-in slide-in-from-top-1">
+                                                    <div className="flex-1 space-y-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 pl-1">Etiqueta (Opcional)</span>
+                                                        <Input
+                                                            placeholder="Ej. Mayor de 6"
+                                                            value={tier.label || ''}
+                                                            onChange={(e) => handleTierChange(index, 'label', e.target.value)}
+                                                            className="text-xs h-9"
+                                                        />
+                                                    </div>
+                                                    <div className="w-24 space-y-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 pl-1">Cant. Mín.</span>
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="Ej. 6"
+                                                            value={tier.min_qty}
+                                                            onChange={(e) => handleTierChange(index, 'min_qty', parseInt(e.target.value) || '')}
+                                                            className="text-xs h-9 text-center font-bold"
+                                                        />
+                                                    </div>
+                                                    <div className="w-32 space-y-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 pl-1">Precio Unit.</span>
+                                                        <div className="relative">
+                                                            <DollarSign className="absolute left-2 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                                                            <Input
+                                                                type="number"
+                                                                placeholder="0"
+                                                                value={tier.price}
+                                                                onChange={(e) => handleTierChange(index, 'price', parseFloat(e.target.value) || '')}
+                                                                className="text-xs h-9 pl-7 font-bold text-slate-700"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="pt-6">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveTier(index)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Eliminar escala"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {wholesalePrices.length === 0 && (
+                                                <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                                    <p className="text-xs text-slate-400 font-medium">No has agregado precios mayoristas</p>
+                                                    <Button
+                                                        type="button"
+                                                        variant="link"
+                                                        onClick={handleAddTier}
+                                                        className="text-primary-600 font-bold text-xs h-auto p-0 hover:no-underline mt-1"
+                                                    >
+                                                        + Agregar primer precio
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Available Checkbox */}
                                 <div className="flex items-center gap-2">
                                     <input
@@ -580,8 +683,9 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                             </Button>
                         </div>
                     </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
+                </div >
+            )
+            }
+        </AnimatePresence >
     );
 }

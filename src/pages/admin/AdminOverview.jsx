@@ -55,7 +55,7 @@ export default function AdminOverview() {
                         name,
                         logo,
                         plan,
-                        owner_id
+                        user_id
                     )
                 `)
                 .eq('status', 'pending')
@@ -97,9 +97,10 @@ export default function AdminOverview() {
 
             if (compError) throw compError;
 
-            // 3. Create notification for the user
+            // 3. Create notification for the user (Handled by DB Trigger, but adding safeguard if trigger fails/not run)
+            /* 
             await supabase.from('notifications').insert([{
-                user_id: request.companies.owner_id,
+                user_id: request.companies.user_id,
                 type: 'system',
                 title: 'Plan Actualizado',
                 content: message,
@@ -108,6 +109,7 @@ export default function AdminOverview() {
                     plan: request.requested_plan
                 }
             }]);
+            */
 
             showToast(`¡Plan ${request.requested_plan.toUpperCase()} activado para ${request.companies.name}!`, "success");
             setRequests(requests.filter(r => r.id !== request.id));
@@ -142,9 +144,10 @@ export default function AdminOverview() {
 
             if (error) throw error;
 
-            // 2. Create notification for the user
+            // 2. Create notification for the user (Handled by DB Trigger)
+            /*
             await supabase.from('notifications').insert([{
-                user_id: request.companies.owner_id,
+                user_id: request.companies.user_id,
                 type: 'system',
                 title: 'Solicitud de Plan Rechazada',
                 content: message,
@@ -153,6 +156,7 @@ export default function AdminOverview() {
                     plan: request.requested_plan
                 }
             }]);
+            */
 
             showToast("Solicitud rechazada", "info");
             setRequests(requests.filter(r => r.id !== request.id));

@@ -16,12 +16,13 @@ import {
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
+import { TooltipCard } from '../ui/Tooltip';
 
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 
 export function DashboardLayout() {
     const navigate = useNavigate();
-    const { user, profile, company, loading, signOut } = useAuth();
+    const { user, profile, company, loading, signOut, unreadNotifications } = useAuth();
 
     // Fetch unread messages count
     const { unreadCount } = useUnreadMessages(company?.id);
@@ -52,7 +53,12 @@ export function DashboardLayout() {
             badge: unreadCount > 0 ? unreadCount.toString() : null
         },
         { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/dashboard/cotizaciones' },
-        { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/dashboard/perfil' },
+        {
+            name: 'Ajustes Perfil',
+            icon: <Settings size={20} />,
+            path: '/dashboard/perfil',
+            badge: unreadNotifications > 0 ? unreadNotifications.toString() : null
+        },
     ];
 
     return (
@@ -86,7 +92,24 @@ export function DashboardLayout() {
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     {menuItems.map((item) => {
                         const isLocked = company?.plan === 'free' && ['Mensajes', 'Cotizaciones'].includes(item.name);
-                        return (
+
+                        const getTooltipContent = (name) => {
+                            if (name === 'Mensajes') {
+                                return {
+                                    title: '💬 Mensajes',
+                                    description: 'Almacena todos los mensajes que envíen clientes u otras tiendas. Gestiona conversaciones, responde y mantiene un historial completo.'
+                                };
+                            }
+                            if (name === 'Cotizaciones') {
+                                return {
+                                    title: '📋 Cotizaciones',
+                                    description: 'Registra todas las cotizaciones de clientes ordenadas por fecha. Filtra, marca como respondidas o completadas, y visualiza detalles completos de cada solicitud.'
+                                };
+                            }
+                            return null;
+                        };
+
+                        const navLink = (
                             <NavLink
                                 key={item.path}
                                 to={isLocked ? '#' : item.path}
@@ -94,7 +117,6 @@ export function DashboardLayout() {
                                 onClick={(e) => {
                                     if (isLocked) {
                                         e.preventDefault();
-                                        // Maybe show a toast or nothing since it's visually locked
                                     }
                                 }}
                                 className={({ isActive }) =>
@@ -128,6 +150,22 @@ export function DashboardLayout() {
                                 )}
                             </NavLink>
                         );
+
+                        if (isLocked) {
+                            const tooltipContent = getTooltipContent(item.name);
+                            return (
+                                <TooltipCard
+                                    key={item.path}
+                                    title={tooltipContent.title}
+                                    description={tooltipContent.description}
+                                    side="right"
+                                >
+                                    {navLink}
+                                </TooltipCard>
+                            );
+                        }
+
+                        return navLink;
                     })}
                 </nav>
 

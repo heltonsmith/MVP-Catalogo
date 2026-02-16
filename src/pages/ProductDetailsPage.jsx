@@ -240,9 +240,33 @@ export default function ProductDetailsPage() {
                         <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">{product.name}</h1>
                         <p className="text-sm font-mono text-slate-400 mt-2">SKU: {product.sku}</p>
 
-                        <p className="mt-6 text-3xl font-bold text-primary-600">
-                            {formatCurrency(product.price)}
-                        </p>
+                        <div className="mt-6">
+                            <p className="text-3xl font-bold text-emerald-600">
+                                {formatCurrency(product.price)}
+                                <span className="text-sm text-slate-400 font-medium ml-2 font-normal">x unidad</span>
+                            </p>
+
+                            {product.wholesale_prices && product.wholesale_prices.length > 0 && (
+                                <div className="mt-4 bg-slate-50 rounded-xl p-4 border border-slate-100 inline-block min-w-[300px]">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Escala de Precios</p>
+                                    <div className="space-y-2">
+                                        {product.wholesale_prices.sort((a, b) => a.min_qty - b.min_qty).map((tier, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
+                                                <div className="flex flex-col">
+                                                    <span className="text-slate-700 font-bold">
+                                                        {tier.min_qty} o más unidades
+                                                    </span>
+                                                    {tier.label && (
+                                                        <span className="text-xs text-slate-400 font-normal capitalize">{tier.label}</span>
+                                                    )}
+                                                </div>
+                                                <span className="font-bold text-emerald-600 text-base">{formatCurrency(tier.price)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="mt-8 space-y-6">
                             <div className="prose prose-slate max-w-none">
