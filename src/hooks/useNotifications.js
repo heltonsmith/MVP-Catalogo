@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 export function useNotifications() {
-    const { user, refreshUnreadNotifications } = useAuth();
+    const { user, refreshUnreadNotifications, setUnreadNotifications } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -44,20 +44,19 @@ export function useNotifications() {
                 filter: `user_id=eq.${user.id}`
             }, () => {
                 fetchNotifications();
-                refreshUnreadNotifications?.();
             })
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user, fetchNotifications, refreshUnreadNotifications]);
+    }, [user, fetchNotifications]);
 
     const markAsRead = async (id) => {
         // Optimistic update
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
         setUnreadCount(prev => Math.max(0, prev - 1));
-        refreshUnreadNotifications?.();
+        if (setUnreadNotifications) setUnreadNotifications(prev => Math.max(0, prev - 1));
 
         try {
             const { error } = await supabase
@@ -79,7 +78,7 @@ export function useNotifications() {
         // Optimistic update
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
         setUnreadCount(prev => prev + 1);
-        refreshUnreadNotifications?.();
+        if (setUnreadNotifications) setUnreadNotifications(prev => prev + 1);
 
         try {
             const { error } = await supabase
@@ -104,8 +103,8 @@ export function useNotifications() {
         setNotifications(prev => prev.filter(n => n.id !== id));
         if (notification && !notification.is_read) {
             setUnreadCount(prev => Math.max(0, prev - 1));
+            if (setUnreadNotifications) setUnreadNotifications(prev => Math.max(0, prev - 1));
         }
-        refreshUnreadNotifications?.();
 
         try {
             const { error } = await supabase
@@ -129,7 +128,7 @@ export function useNotifications() {
         // Optimistic update
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
-        refreshUnreadNotifications?.();
+        if (setUnreadNotifications) setUnreadNotifications(0);
 
         try {
             const { error } = await supabase
@@ -154,7 +153,7 @@ export function useNotifications() {
         // Optimistic update
         setNotifications([]);
         setUnreadCount(0);
-        refreshUnreadNotifications?.();
+        if (setUnreadNotifications) setUnreadNotifications(0);
 
         try {
             const { error } = await supabase

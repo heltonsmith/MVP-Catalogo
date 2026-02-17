@@ -24,6 +24,7 @@ import CustomerOrders from '../pages/customer/CustomerOrders';
 import CustomerReviews from '../pages/customer/CustomerReviews';
 import CustomerMessages from '../pages/customer/CustomerMessages';
 import CustomerProfile from '../pages/customer/CustomerProfile';
+import CustomerQuotes from '../pages/customer/CustomerQuotes';
 import PricingPage from '../pages/PricingPage';
 import TermsPage from '../pages/TermsPage';
 import AboutUsPage from '../pages/AboutUsPage';
@@ -73,6 +74,7 @@ export function AppRouter() {
                 <Route path="favoritos" element={<CustomerFavorites />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
                 <Route path="resenas" element={<CustomerReviews />} />
+                <Route path="cotizaciones" element={<CustomerQuotes />} />
                 <Route path="mensajes" element={<CustomerMessages />} />
                 <Route path="perfil" element={<CustomerProfile />} />
                 <Route path="*" element={<NotFoundPage />} />

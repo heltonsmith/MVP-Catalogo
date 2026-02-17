@@ -39,7 +39,7 @@ export function CustomerDashboardLayout() {
     const menuItems = [
         { name: 'Mi Panel', icon: <LayoutDashboard size={20} />, path: '/dashboard/cliente' },
         { name: 'Favoritos', icon: <Heart size={20} />, path: '/dashboard/cliente/favoritos' },
-        { name: 'Mis Pedidos', icon: <ShoppingBag size={20} />, path: '/dashboard/cliente/pedidos' },
+        { name: 'Cotizaciones', icon: <ShoppingBag size={20} />, path: '/dashboard/cliente/cotizaciones' },
         { name: 'Mis Reseñas', icon: <Star size={20} />, path: '/dashboard/cliente/resenas' },
         { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/dashboard/cliente/mensajes' },
         { name: 'Mi Perfil', icon: <Settings size={20} />, path: '/dashboard/cliente/perfil' },
@@ -62,7 +62,7 @@ export function CustomerDashboardLayout() {
                         </div>
                         <div className="min-w-0">
                             <h2 className="text-sm font-bold text-slate-900 truncate">
-                                Mi Cuenta
+                                {profile?.full_name || user?.user_metadata?.full_name || 'Mi Cuenta'}
                             </h2>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                 Cliente ktaloog

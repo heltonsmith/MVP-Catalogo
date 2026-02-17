@@ -42,7 +42,7 @@ export default function CustomerFavorites() {
         try {
             const { data, error } = await supabase
                 .from('favorites')
-                .select('*, target:companies(*)')
+                .select('*, company:companies(*)')
                 .eq('user_id', user.id);
 
             if (error) throw error;
@@ -85,8 +85,8 @@ export default function CustomerFavorites() {
     };
 
     const filteredFavorites = favorites.filter(f => {
-        const matchesTab = activeTab === 'all' || f.type === activeTab;
-        const matchesSearch = f.target?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const matchesTab = activeTab === 'all' || f.company?.business_type === activeTab;
+        const matchesSearch = f.company?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             f.user_category?.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTab && matchesSearch;
     });
@@ -122,7 +122,7 @@ export default function CustomerFavorites() {
             </div>
 
             <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 self-start w-fit">
-                {['all', 'retail', 'wholesale', 'restaurant'].map(t => (
+                {['all', 'retail', 'wholesale', 'mixed', 'restaurant'].map(t => (
                     <button
                         key={t}
                         onClick={() => setActiveTab(t)}
@@ -131,7 +131,11 @@ export default function CustomerFavorites() {
                             activeTab === t ? "bg-slate-900 text-white shadow-lg" : "text-slate-400 hover:text-slate-600"
                         )}
                     >
-                        {t === 'all' ? 'Todas' : t === 'retail' ? 'Minorista' : t === 'wholesale' ? 'Por Mayor' : 'Resto'}
+                        {t === 'all' ? 'Todas' :
+                            t === 'retail' ? 'Minorista' :
+                                t === 'wholesale' ? 'Mayorista' :
+                                    t === 'mixed' ? 'Mayorista y Detalle' :
+                                        'Restaurante'}
                     </button>
                 ))}
             </div>
@@ -142,28 +146,31 @@ export default function CustomerFavorites() {
                         <Card key={fav.id} className="group hover:shadow-xl transition-all duration-300 border-none bg-white rounded-[2rem] overflow-hidden shadow-sm">
                             <CardContent className="p-6">
                                 <div className="flex gap-4">
-                                    <Link to={`/catalogo/${fav.target?.slug}`} className="shrink-0">
+                                    <Link to={`/catalogo/${fav.company?.slug}`} className="shrink-0">
                                         <div className="h-20 w-20 rounded-2xl bg-slate-50 overflow-hidden ring-4 ring-slate-50 shrink-0 shadow-inner group-hover:scale-105 transition-transform">
-                                            {fav.target?.logo ? (
-                                                <img src={fav.target.logo} alt="" className="h-full w-full object-cover" />
+                                            {fav.company?.logo ? (
+                                                <img src={fav.company.logo} alt="" className="h-full w-full object-cover" />
                                             ) : (
                                                 <div className="h-full w-full flex items-center justify-center font-black text-slate-300 text-3xl">
-                                                    {fav.target?.name?.substring(0, 2).toUpperCase()}
+                                                    {fav.company?.name?.substring(0, 2).toUpperCase()}
                                                 </div>
                                             )}
                                         </div>
                                     </Link>
                                     <div className="flex-1 min-w-0">
-                                        <Link to={`/catalogo/${fav.target?.slug}`}>
+                                        <Link to={`/catalogo/${fav.company?.slug}`}>
                                             <div className="flex items-center gap-1.5 mb-1">
-                                                <h4 className="font-bold text-slate-900 truncate group-hover:text-primary-600 transition-colors uppercase tracking-tight">{fav.target?.name}</h4>
-                                                {fav.target?.plan === 'pro' && <BadgeCheck size={14} className="text-blue-500 shrink-0" />}
+                                                <h4 className="font-bold text-slate-900 truncate group-hover:text-primary-600 transition-colors uppercase tracking-tight">{fav.company?.name}</h4>
+                                                {fav.company?.plan === 'pro' && <BadgeCheck size={14} className="text-blue-500 shrink-0" />}
                                             </div>
                                         </Link>
 
                                         <div className="flex items-center flex-wrap gap-2 mb-4">
                                             <span className="text-[9px] bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded-md uppercase tracking-widest">
-                                                {fav.type === 'retail' ? 'Minorista' : fav.type === 'wholesale' ? 'Mayorista' : 'Restaurante'}
+                                                {fav.company?.business_type === 'retail' ? 'Minorista' :
+                                                    fav.company?.business_type === 'wholesale' ? 'Mayorista' :
+                                                        fav.company?.business_type === 'mixed' ? 'Mayorista y Detalle' :
+                                                            'Restaurante'}
                                             </span>
                                             {fav.user_category ? (
                                                 <button
@@ -191,7 +198,7 @@ export default function CustomerFavorites() {
                                         <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                                             <div className="flex items-center gap-2">
                                                 <Star size={12} className="fill-amber-400 text-amber-400" />
-                                                <span className="text-xs font-black text-slate-700">{fav.target?.rating || '4.9'}</span>
+                                                <span className="text-xs font-black text-slate-700">{fav.company?.rating || '4.9'}</span>
                                             </div>
                                             <button
                                                 onClick={() => removeFavorite(fav.id)}

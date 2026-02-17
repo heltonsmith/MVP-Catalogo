@@ -31,8 +31,13 @@ export function DashboardLayout() {
         if (!loading) {
             if (!user) {
                 navigate('/login');
-            } else if (profile?.role === 'admin') {
-                navigate('/admin');
+            } else {
+                const role = profile?.role || user?.user_metadata?.role;
+                if (role === 'admin') {
+                    navigate('/admin');
+                } else if (role === 'client' || role === 'user') {
+                    navigate('/dashboard/cliente');
+                }
             }
         }
     }, [user, profile, loading, navigate]);

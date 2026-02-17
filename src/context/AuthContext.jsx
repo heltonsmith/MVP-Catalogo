@@ -231,12 +231,14 @@ export const AuthProvider = ({ children }) => {
         signIn,
         signOut,
         refreshCompany,
+        refreshProfile: refreshCompany,
         user,
         session,
         company,
         profile,
         pendingUpgrade,
         unreadNotifications,
+        setUnreadNotifications, // Exposed for optimistic updates
         refreshUnreadNotifications,
         refreshUpgradeStatus,
         loading

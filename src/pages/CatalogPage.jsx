@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Search, MessageCircle, User, Globe, Instagram, Music2, Share2, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X, Heart, Pencil } from 'lucide-react';
+import { useParams, useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Search, MessageCircle, User, Users, Globe, Instagram, Music2, Share2, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X, Heart, Pencil } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { COMPANIES, PRODUCTS, CATEGORIES } from '../data/mock';
@@ -27,6 +27,7 @@ export default function CatalogPage() {
     const isDemo = searchParams.get('mode') === 'demo';
     const { companySlug } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [company, setCompany] = useState(null);
     const [products, setProducts] = useState([]);
@@ -39,6 +40,11 @@ export default function CatalogPage() {
     const [isMailboxOpen, setIsMailboxOpen] = useState(false);
     const [isQROpen, setIsQROpen] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followerCount, setFollowerCount] = useState(0);
+    const [favoriteCount, setFavoriteCount] = useState(0);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [followCategory, setFollowCategory] = useState('retail');
     const [hasReviewed, setHasReviewed] = useState(false);
     const [tempReview, setTempReview] = useState({ rating: 0, comment: '' });
     const { getSetting } = useSettings();
@@ -52,6 +58,12 @@ export default function CatalogPage() {
     };
 
     const productLimit = getLimit();
+
+    useEffect(() => {
+        if (location.hash === '#reviews') {
+            setIsReviewsOpen(true);
+        }
+    }, [location]);
 
     useEffect(() => {
         const fetchCatalogData = async () => {
@@ -208,9 +220,24 @@ export default function CatalogPage() {
     useEffect(() => {
         if (user && company) {
             checkIfFavorite();
+            checkIfFollowing();
             checkIfReviewed();
+            loadStoreMetrics();
         }
     }, [user, company]);
+
+    const loadStoreMetrics = async () => {
+        try {
+            const [follows, favs] = await Promise.all([
+                supabase.from('store_follows').select('id', { count: 'exact' }).eq('company_id', company.id),
+                supabase.from('favorites').select('id', { count: 'exact' }).eq('company_id', company.id)
+            ]);
+            setFollowerCount(follows.count || 0);
+            setFavoriteCount(favs.count || 0);
+        } catch (error) {
+            console.error('Error loading store metrics:', error);
+        }
+    };
 
     const checkIfFavorite = async () => {
         try {
@@ -218,12 +245,64 @@ export default function CatalogPage() {
                 .from('favorites')
                 .select('id')
                 .eq('user_id', user.id)
-                .eq('target_id', company.id)
+                .eq('company_id', company.id)
                 .maybeSingle();
 
             setIsFavorite(!!data);
         } catch (error) {
             console.error('Error checking favorite:', error);
+        }
+    };
+
+    const checkIfFollowing = async () => {
+        try {
+            const { data } = await supabase
+                .from('store_follows')
+                .select('id, category')
+                .eq('user_id', user.id)
+                .eq('company_id', company.id)
+                .maybeSingle();
+
+            setIsFollowing(!!data);
+            if (data) setFollowCategory(data.category);
+        } catch (error) {
+            console.error('Error checking follow:', error);
+        }
+    };
+
+
+    const toggleFollow = async () => {
+        const category = company?.business_type || 'retail';
+        if (!user) {
+            showToast("Debes iniciar sesión para usar esta función", "info");
+            return;
+        }
+
+        try {
+            if (isFollowing) {
+                await supabase
+                    .from('store_follows')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('company_id', company.id);
+                setIsFollowing(false);
+                showToast("Ya no sigues esta tienda", "success");
+            } else {
+                await supabase
+                    .from('store_follows')
+                    .insert([{
+                        user_id: user.id,
+                        company_id: company.id,
+                        category: category
+                    }]);
+                setIsFollowing(true);
+                setFollowCategory(category);
+                showToast("¡Ahora sigues a esta tienda!", "success");
+            }
+            loadStoreMetrics();
+        } catch (error) {
+            console.error('Error toggling follow:', error);
+            showToast("Error al procesar solicitud", "error");
         }
     };
 
@@ -244,7 +323,7 @@ export default function CatalogPage() {
 
     const toggleFavorite = async () => {
         if (!user) {
-            showToast("Debes iniciar sesión para guardar favoritos", "info");
+            showToast("Debes iniciar sesión para usar esta función", "info");
             return;
         }
 
@@ -254,7 +333,7 @@ export default function CatalogPage() {
                     .from('favorites')
                     .delete()
                     .eq('user_id', user.id)
-                    .eq('target_id', company.id);
+                    .eq('company_id', company.id);
                 setIsFavorite(false);
                 showToast("Eliminado de favoritos", "success");
             } else {
@@ -262,12 +341,13 @@ export default function CatalogPage() {
                     .from('favorites')
                     .insert([{
                         user_id: user.id,
-                        target_id: company.id,
+                        company_id: company.id,
                         type: company.business_type || 'retail'
                     }]);
                 setIsFavorite(true);
                 showToast("¡Guardado en favoritos!", "success");
             }
+            loadStoreMetrics();
         } catch (error) {
             console.error('Error toggling favorite:', error);
             showToast("Error al procesar solicitud", "error");
@@ -282,15 +362,20 @@ export default function CatalogPage() {
         }
 
         try {
-            const { error } = await supabase
+            const newReview = {
+                user_id: user.id,
+                company_id: company.id,
+                rating: tempReview.rating,
+                comment: tempReview.comment,
+                customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
+                created_at: new Date().toISOString()
+            };
+
+            const { data, error } = await supabase
                 .from('reviews')
-                .insert([{
-                    user_id: user.id,
-                    company_id: company.id,
-                    rating: tempReview.rating,
-                    comment: tempReview.comment,
-                    customer_name: profile?.full_name || 'Anónimo'
-                }]);
+                .insert([newReview])
+                .select()
+                .single();
 
             if (error) throw error;
 
@@ -298,7 +383,27 @@ export default function CatalogPage() {
             setHasReviewed(true);
             setTempReview({ rating: 0, comment: '' });
 
-            // Optionally refresh reviews here if they are fetched live
+            // Real-time update
+            setCompany(prev => {
+                const updatedReviews = [
+                    {
+                        id: data.id,
+                        user: newReview.customer_name,
+                        date: new Date().toLocaleDateString(),
+                        rating: newReview.rating,
+                        comment: newReview.comment
+                    },
+                    ...(prev.reviews || [])
+                ];
+
+                const newRating = parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1));
+
+                return {
+                    ...prev,
+                    reviews: updatedReviews,
+                    rating: newRating
+                };
+            });
         } catch (error) {
             console.error('Error submitting review:', error);
             showToast("No se pudo enviar la reseña", "error");
@@ -582,6 +687,21 @@ export default function CatalogPage() {
                                         </span>
                                     )}
                                 </div>
+                                {/* Popularity Metrics */}
+                                <div className="flex flex-wrap items-center gap-2 mt-2">
+                                    <div className="flex items-center gap-1.5 bg-white/5 py-1 px-2.5 rounded-lg border border-white/5 backdrop-blur-sm">
+                                        <Users size={12} className="text-primary-400" />
+                                        <span className="text-[10px] font-black text-white/90 uppercase tracking-widest">
+                                            {followerCount.toLocaleString()} Seguidores
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 bg-white/5 py-1 px-2.5 rounded-lg border border-white/5 backdrop-blur-sm">
+                                        <Heart size={12} className="text-rose-400 fill-rose-400/20" />
+                                        <span className="text-[10px] font-black text-white/90 uppercase tracking-widest">
+                                            {favoriteCount.toLocaleString()} Favoritos
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -609,6 +729,18 @@ export default function CatalogPage() {
                                     title={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
                                 >
                                     <Heart size={16} className={cn("sm:size-18", isFavorite && "fill-current")} />
+                                </button>
+
+                                <button
+                                    onClick={toggleFollow}
+                                    className={cn(
+                                        "flex h-8 px-3 items-center justify-center rounded-full transition-all active:scale-95 shadow-sm text-[10px] font-black uppercase tracking-widest",
+                                        isFollowing
+                                            ? "bg-primary-600 text-white shadow-primary-200"
+                                            : "bg-white/10 text-white hover:bg-white/20 border border-white/20"
+                                    )}
+                                >
+                                    {isFollowing ? 'Siguiendo' : 'Seguir'}
                                 </button>
 
                                 {(company.website || company.socials?.website) && (
@@ -692,13 +824,7 @@ export default function CatalogPage() {
                                             variant="secondary"
                                             size="sm"
                                             className="h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 text-[10px] sm:text-xs font-bold gap-2 px-3 sm:px-4"
-                                            onClick={() => {
-                                                if (!user) {
-                                                    showToast('Debes registrarte para chatear con la tienda', 'info');
-                                                    return;
-                                                }
-                                                showToast('Función de chat activada', 'info');
-                                            }}
+                                            onClick={() => setIsChatOpen(true)}
                                         >
                                             <MessageCircle size={14} />
                                             <span className="hidden sm:inline">Chatea con nosotros</span>
@@ -823,42 +949,50 @@ export default function CatalogPage() {
             </div>
 
             {/* Chat Widget - Premium only */}
-            {user && company?.plan !== 'free' && (
-                <ChatWidget
-                    companyName={company.name}
-                    companyLogo={company.logo}
-                    isDemo={false}
-                />
-            )}
+            {
+                company?.plan !== 'free' && (
+                    <ChatWidget
+                        companyName={company.name}
+                        companyLogo={company.logo}
+                        companyId={company.id}
+                        isDemo={isDemo}
+                        isOpen={isChatOpen}
+                        onOpen={() => setIsChatOpen(true)}
+                        onClose={() => setIsChatOpen(false)}
+                    />
+                )
+            }
 
             {/* QR Code Modal - Premium only */}
-            {company?.plan !== 'free' && (
-                <Modal
-                    isOpen={isQROpen}
-                    onClose={() => setIsQROpen(false)}
-                    title="Escanea para visitar"
-                    maxWidth="sm"
-                >
-                    <div className="flex flex-col items-center justify-center p-8 space-y-6">
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                            <div style={{ height: "auto", margin: "0 auto", maxWidth: 200, width: "100%" }}>
-                                <QRCode
-                                    size={256}
-                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                                    value={window.location.href}
-                                    viewBox={`0 0 256 256`}
-                                />
+            {
+                company?.plan !== 'free' && (
+                    <Modal
+                        isOpen={isQROpen}
+                        onClose={() => setIsQROpen(false)}
+                        title="Escanea para visitar"
+                        maxWidth="sm"
+                    >
+                        <div className="flex flex-col items-center justify-center p-8 space-y-6">
+                            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                                <div style={{ height: "auto", margin: "0 auto", maxWidth: 200, width: "100%" }}>
+                                    <QRCode
+                                        size={256}
+                                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                        value={window.location.href}
+                                        viewBox={`0 0 256 256`}
+                                    />
+                                </div>
                             </div>
+                            <p className="text-center text-slate-500 text-sm">
+                                Escanea este código con tu cámara para abrir esta tienda en tu celular.
+                            </p>
+                            <Button onClick={() => setIsQROpen(false)} className="w-full">
+                                Cerrar
+                            </Button>
                         </div>
-                        <p className="text-center text-slate-500 text-sm">
-                            Escanea este código con tu cámara para abrir esta tienda en tu celular.
-                        </p>
-                        <Button onClick={() => setIsQROpen(false)} className="w-full">
-                            Cerrar
-                        </Button>
-                    </div>
-                </Modal>
-            )}
+                    </Modal>
+                )
+            }
 
             {/* Reviews Modal for Store */}
             <Modal
@@ -968,6 +1102,7 @@ export default function CatalogPage() {
                     </div>
                 </div>
             </Modal>
-        </div>
+            {/* Follow categorization modal removed per user request */}
+        </div >
     );
 }

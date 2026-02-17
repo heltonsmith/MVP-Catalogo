@@ -77,7 +77,43 @@ export function NotificationCenter() {
         else {
             setSelectedId(id);
             const n = notifications.find(notif => notif.id === id);
-            if (n && !n.is_read) markAsRead(id);
+            if (n) {
+                if (!n.is_read) markAsRead(id);
+
+                // Navigation logic
+                if (n.type === 'message' || n.type === 'chat') {
+                    const companyId = n.metadata?.company_id;
+                    const customerId = n.metadata?.customer_id;
+                    const role = profile?.role;
+
+                    if (role === 'owner' && customerId) {
+                        navigate(`/dashboard/mensajes?id=${customerId}`);
+                    } else if (role === 'client' && companyId) {
+                        navigate(`/dashboard/cliente/mensajes?id=${companyId}`);
+                    }
+                } else if (n.type === 'stock') {
+                    // Navigate to the store or product
+                    const companySlug = n.metadata?.company_slug;
+                    const productSlug = n.metadata?.product_slug;
+
+                    if (companySlug) {
+                        const url = productSlug
+                            ? `/catalogo/${companySlug}/producto/${productSlug}`
+                            : `/catalogo/${companySlug}`;
+                        window.open(url, '_blank');
+                    }
+                } else if (n.type === 'review') {
+                    const companySlug = n.metadata?.company_slug;
+                    const productSlug = n.metadata?.product_slug;
+
+                    if (companySlug) {
+                        const url = productSlug
+                            ? `/catalogo/${companySlug}/producto/${productSlug}#reviews`
+                            : `/catalogo/${companySlug}#reviews`;
+                        window.open(url, '_blank');
+                    }
+                }
+            }
         }
     };
 
@@ -174,43 +210,95 @@ export function NotificationCenter() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between gap-2 mb-0.5">
                                                         <p className={cn(
-                                                            "text-xs font-black text-slate-900 leading-tight truncate",
+                                                            "text-xs font-black text-slate-900 leading-tight",
                                                             !notification.is_read && (isRejected ? "text-rose-700" : "text-primary-800")
                                                         )}>
-                                                            {notification.title}
+                                                            {notification.type === 'review' && notification.metadata?.customer_name ? (
+                                                                <>
+                                                                    <span className="font-extrabold">{notification.metadata.customer_name}</span>
+                                                                    <span className="font-normal opacity-80"> calificó tu {notification.metadata.product_slug ? 'producto' : 'tienda'}</span>
+                                                                </>
+                                                            ) : notification.title}
                                                         </p>
                                                         <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap">
                                                             {formatTime(notification.created_at)}
                                                         </span>
                                                     </div>
-                                                    <p className={cn(
-                                                        "text-[11px] text-slate-500 leading-relaxed",
-                                                        selectedId !== notification.id && "line-clamp-1"
-                                                    )}>
-                                                        {notification.content}
+                                                    <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">
+                                                        {notification.metadata?.comment || notification.content}
                                                     </p>
 
-                                                    {selectedId === notification.id && (
-                                                        <div className="mt-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                                                    {notification.type === 'stock' && notification.metadata?.company_slug && (
+                                                        <div className="mt-2 flex">
                                                             <button
-                                                                onClick={(e) => handleToggleRead(e, notification)}
-                                                                className={cn(
-                                                                    "flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border text-[10px] font-bold transition-all shadow-sm",
-                                                                    isRejected ? "text-rose-600 border-rose-100 hover:bg-rose-50" : "text-slate-600 border-slate-100 hover:text-primary-600 hover:border-primary-100"
-                                                                )}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const companySlug = notification.metadata.company_slug;
+                                                                    const productSlug = notification.metadata.product_slug;
+                                                                    const url = productSlug
+                                                                        ? `/catalogo/${companySlug}/producto/${productSlug}`
+                                                                        : `/catalogo/${companySlug}`;
+                                                                    window.open(url, '_blank');
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
                                                             >
-                                                                {notification.is_read ? <Mail size={12} /> : <MailOpen size={12} />}
-                                                                {notification.is_read ? 'Marcar no leído' : 'Marcar leído'}
+                                                                <Package size={12} />
+                                                                Ver Producto
                                                             </button>
+                                                        </div>
+                                                    )}
+
+                                                    {notification.type === 'review' && (
+                                                        <div className="mt-2 flex">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleSelect(notification.id);
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-50 border border-yellow-100 text-[10px] font-bold text-yellow-700 hover:bg-yellow-100 transition-all shadow-sm"
+                                                            >
+                                                                <MessageCircle size={12} />
+                                                                Ver Reseña
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {(notification.type === 'message' || notification.type === 'chat') && (
+                                                        <div className="mt-2 flex">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleSelect(notification.id);
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
+                                                            >
+                                                                <MessageCircle size={12} />
+                                                                Responder Mensaje
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                        <button
+                                                            onClick={(e) => handleToggleRead(e, notification)}
+                                                            className={cn(
+                                                                "flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border text-[10px] font-bold transition-all shadow-sm",
+                                                                isRejected ? "text-rose-600 border-rose-100 hover:bg-rose-50" : "text-slate-600 border-slate-100 hover:text-primary-600 hover:border-primary-100"
+                                                            )}
+                                                        >
+                                                            {notification.is_read ? <Mail size={12} /> : <MailOpen size={12} />}
+                                                            {notification.is_read ? 'Marcar no leído' : 'Marcar leído'}
+                                                        </button>
+                                                        {selectedId === notification.id && (
                                                             <button
                                                                 onClick={(e) => handleDelete(e, notification.id)}
-                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border border-slate-100 text-[10px] font-bold text-slate-400 hover:text-rose-500 hover:border-rose-100 transition-all shadow-sm"
+                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border border-slate-100 text-[10px] font-bold text-slate-400 hover:text-rose-500 hover:border-rose-100 transition-all shadow-sm fade-in animate-in slide-in-from-top-1"
                                                             >
                                                                 <Trash2 size={12} />
                                                                 Eliminar
                                                             </button>
-                                                        </div>
-                                                    )}
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 <div className="flex flex-col items-center justify-between py-1">

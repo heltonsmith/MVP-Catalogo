@@ -1,23 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, User, Store } from 'lucide-react';
+import { MessageCircle, X, Send, User, Store, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { cn } from '../../utils';
 import { useToast } from '../ui/Toast';
+import { useAuth } from '../../context/AuthContext';
+import { useChat } from '../../hooks/useChat';
 
-export function ChatWidget({ companyName, companyLogo, isDemo }) {
+export function ChatWidget({ companyName, companyLogo, isDemo, isOpen: externalOpen, onOpen, onClose, companyId }) {
     const { showToast } = useToast();
-    const [isOpen, setIsOpen] = useState(false);
+    const { user } = useAuth();
+    const [internalOpen, setInternalOpen] = useState(false);
+    const isOpen = externalOpen !== undefined ? externalOpen : internalOpen;
     const [message, setMessage] = useState('');
-    const [messages, setMessages] = useState([
-        {
-            id: 1,
-            text: `¡Hola! 👋 Soy del equipo de ${companyName}. ¿En qué podemos ayudarte hoy?`,
-            sender: 'store',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-    ]);
+
+    const { messages, loading, sendMessage } = useChat({
+        companyId: companyId,
+        customerId: user?.id,
+        enabled: isOpen && !!companyId && !!user && !isDemo
+    });
+
     const scrollRef = useRef(null);
 
     useEffect(() => {
@@ -26,7 +29,21 @@ export function ChatWidget({ companyName, companyLogo, isDemo }) {
         }
     }, [messages, isOpen]);
 
-    const handleSend = (e) => {
+    const handleToggle = () => {
+        if (!user) {
+            showToast("Debes iniciar sesión para chatear", "info");
+            return;
+        }
+        if (isOpen && onClose) {
+            onClose();
+        } else if (!isOpen && onOpen) {
+            onOpen();
+        } else {
+            setInternalOpen(!internalOpen);
+        }
+    };
+
+    const handleSend = async (e) => {
         e.preventDefault();
         if (!message.trim()) return;
 
@@ -36,25 +53,12 @@ export function ChatWidget({ companyName, companyLogo, isDemo }) {
             return;
         }
 
-        const newMessage = {
-            id: Date.now(),
-            text: message,
-            sender: 'user',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setMessages([...messages, newMessage]);
-        setMessage('');
-
-        // Mock auto-reply
-        setTimeout(() => {
-            setMessages(prev => [...prev, {
-                id: Date.now() + 1,
-                text: 'Gracias por escribirnos. Te responderemos lo antes posible.',
-                sender: 'store',
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }]);
-        }, 1500);
+        try {
+            await sendMessage(message, 'customer');
+            setMessage('');
+        } catch (error) {
+            showToast("Error al enviar mensaje", "error");
+        }
     };
 
     return (
@@ -84,7 +88,7 @@ export function ChatWidget({ companyName, companyLogo, isDemo }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setIsOpen(false)}
+                                onClick={onClose || (() => setInternalOpen(false))}
                                 className="h-8 w-8 text-white hover:bg-white/10"
                             >
                                 <X size={20} />
@@ -96,29 +100,43 @@ export function ChatWidget({ companyName, companyLogo, isDemo }) {
                             ref={scrollRef}
                             className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4 scrollbar-hide"
                         >
-                            {messages.map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    className={cn(
-                                        "flex flex-col max-w-[80%]",
-                                        msg.sender === 'user' ? "ml-auto items-end" : "mr-auto items-start"
-                                    )}
-                                >
+                            {loading && messages.length === 0 ? (
+                                <div className="flex justify-center py-10">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary-200" />
+                                </div>
+                            ) : (
+                                messages.map((msg) => (
                                     <div
+                                        key={msg.id}
                                         className={cn(
-                                            "rounded-2xl px-4 py-2 text-sm shadow-sm",
-                                            msg.sender === 'user'
-                                                ? "bg-primary-600 text-white rounded-tr-none"
-                                                : "bg-white text-slate-800 rounded-tl-none border border-slate-100"
+                                            "flex flex-col max-w-[80%]",
+                                            msg.sender_type === 'customer' ? "ml-auto items-end" : "mr-auto items-start"
                                         )}
                                     >
-                                        {msg.text}
+                                        <div
+                                            className={cn(
+                                                "rounded-2xl px-4 py-2 text-sm shadow-sm",
+                                                msg.sender_type === 'customer'
+                                                    ? "bg-primary-600 text-white rounded-tr-none"
+                                                    : "bg-white text-slate-800 rounded-tl-none border border-slate-100"
+                                            )}
+                                        >
+                                            {msg.content}
+                                        </div>
+                                        <span className="mt-1 text-[10px] text-slate-400 font-medium">
+                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
                                     </div>
-                                    <span className="mt-1 text-[10px] text-slate-400 font-medium">
-                                        {msg.time}
-                                    </span>
+                                ))
+                            )}
+                            {messages.length === 0 && !loading && (
+                                <div className="text-center py-10 px-6">
+                                    <MessageCircle className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+                                    <p className="text-xs text-slate-400 font-medium">
+                                        ¿Tienes alguna duda sobre nuestros productos? ¡Escríbenos!
+                                    </p>
                                 </div>
-                            ))}
+                            )}
                         </div>
 
                         {/* Input Area */}
@@ -144,26 +162,27 @@ export function ChatWidget({ companyName, companyLogo, isDemo }) {
                 )}
             </AnimatePresence>
 
-            <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsOpen(!isOpen)}
-                className={cn(
-                    "flex h-14 w-14 items-center justify-center rounded-full shadow-2xl transition-all duration-300",
-                    isOpen ? "bg-slate-800 rotate-90" : "bg-emerald-500"
-                )}
-            >
-                {isOpen ? (
-                    <X className="h-7 w-7 text-white" />
-                ) : (
+            {!isOpen && (
+                <motion.button
+                    initial={{ scale: 0, rotate: -90 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    exit={{ scale: 0, rotate: 90 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleToggle}
+                    className={cn(
+                        "flex h-14 w-14 items-center justify-center rounded-full shadow-2xl transition-all duration-300",
+                        "bg-emerald-500"
+                    )}
+                >
                     <MessageCircle className="h-7 w-7 text-white" />
-                )}
-                {!isOpen && (
-                    <span className="absolute -top-1 -right-1 flex h-5 w-5 animate-bounce items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
-                        1
-                    </span>
-                )}
-            </motion.button>
+                    {user && (
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 animate-bounce items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
+                            1
+                        </span>
+                    )}
+                </motion.button>
+            )}
         </div>
     );
 }

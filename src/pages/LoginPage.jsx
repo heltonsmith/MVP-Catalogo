@@ -21,12 +21,14 @@ export default function LoginPage() {
     // Handle redirection once we have the user and their profile
     useEffect(() => {
         if (!authLoading && user && profile) {
-            console.log('LoginPage: Auth ready, redirecting based on role:', profile.role);
-            if (profile.role === 'admin') {
+            const role = profile.role || user?.user_metadata?.role;
+            console.log('LoginPage: Auth ready, redirecting based on role:', role);
+            if (role === 'admin') {
                 navigate('/admin');
-            } else if (profile.role === 'owner') {
+            } else if (role === 'owner') {
                 navigate('/dashboard');
-            } else if (profile.role === 'client') {
+            } else if (role === 'client' || role === 'user') {
+                // 'user' is the default in profiles table, usually redirect to client dashboard
                 navigate('/dashboard/cliente');
             } else {
                 navigate('/');
@@ -59,7 +61,9 @@ export default function LoginPage() {
             if (data?.user) {
                 console.log('LoginPage: Sign-in successful, waiting for profile...');
                 showToast("Sesión iniciada correctamente", "success");
-                // We DON'T navigate here. useEffect will handle it once profile is loaded.
+
+                // If the user is logging in, we check if we should override redirection 
+                // but the useEffect already handles this based on profile.role
             }
         } catch (error) {
             showToast(translateAuthError(error), "error");

@@ -97,9 +97,9 @@ export default function PublicExplorer() {
         try {
             const { data } = await supabase
                 .from('favorites')
-                .select('target_id')
+                .select('company_id')
                 .eq('user_id', user.id);
-            setUserFavorites(new Set(data?.map(f => f.target_id) || []));
+            setUserFavorites(new Set(data?.map(f => f.company_id) || []));
         } catch (error) {
             console.error('Error fetching favorites:', error);
         }
@@ -121,7 +121,7 @@ export default function PublicExplorer() {
                     .from('favorites')
                     .delete()
                     .eq('user_id', user.id)
-                    .eq('target_id', store.id);
+                    .eq('company_id', store.id);
 
                 const newFavs = new Set(userFavorites);
                 newFavs.delete(store.id);
@@ -132,7 +132,7 @@ export default function PublicExplorer() {
                     .from('favorites')
                     .insert([{
                         user_id: user.id,
-                        target_id: store.id,
+                        company_id: store.id,
                         type: store.business_type || 'retail'
                     }]);
 

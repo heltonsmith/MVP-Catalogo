@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     MessageSquare,
     Search,
@@ -24,6 +25,12 @@ export default function CustomerMessages() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [replyText, setReplyText] = useState('');
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const id = searchParams.get('id');
+        if (id) setSelectedCompanyId(id);
+    }, [searchParams]);
 
     useEffect(() => {
         if (!user?.id) return;

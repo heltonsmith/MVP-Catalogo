@@ -28,12 +28,14 @@ export default function RegisterPage() {
     // Handle redirection once we have the user and their profile
     useEffect(() => {
         if (!authLoading && user && profile) {
-            console.log('RegisterPage: Auth ready, redirecting based on role:', profile.role);
-            if (profile.role === 'admin') {
+            const role = profile.role || user?.user_metadata?.role;
+            console.log('RegisterPage: Auth ready, redirecting based on role:', role);
+            if (role === 'admin') {
                 navigate('/admin');
-            } else if (profile.role === 'owner') {
+            } else if (role === 'owner') {
                 navigate('/dashboard');
-            } else if (profile.role === 'client') {
+            } else if (role === 'client' || role === 'user') {
+                // 'user' is the default in profiles table, usually redirect to client dashboard
                 navigate('/dashboard/cliente');
             } else {
                 navigate('/');

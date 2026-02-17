@@ -156,8 +156,13 @@ export default function DashboardOverview() {
                     <div>
                         <div className="flex items-center gap-2">
                             <h1 className="text-2xl font-bold text-slate-900">Bienvenido, {displayName}</h1>
-                            <Badge variant="outline" className={displayCompany.plan === 'pro' ? "border-amber-200 text-amber-700 bg-amber-50" : "border-slate-200 text-slate-700 bg-slate-50"}>
-                                {displayCompany.plan === 'pro' ? 'Plan Pro' : 'Plan Gratis'}
+                            <Badge variant="outline" className={cn(
+                                "border-2 shadow-sm",
+                                displayCompany.plan === 'pro' && "border-amber-200 text-amber-700 bg-amber-50 ring-4 ring-amber-500/10",
+                                displayCompany.plan === 'plus' && "border-blue-200 text-blue-700 bg-blue-50 ring-4 ring-blue-500/10",
+                                displayCompany.plan === 'free' && "border-slate-200 text-slate-700 bg-slate-50"
+                            )}>
+                                {displayCompany.plan === 'pro' ? 'Plan Pro' : displayCompany.plan === 'plus' ? 'Plan Plus' : 'Plan Gratis'}
                             </Badge>
                         </div>
                         <p className="text-slate-500 text-sm">Gestionando <span className="font-bold text-primary-600">{displayCompany.name}</span></p>

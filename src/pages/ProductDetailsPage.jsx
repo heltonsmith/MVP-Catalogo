@@ -13,8 +13,11 @@ import { useToast } from '../components/ui/Toast';
 import { motion } from 'framer-motion';
 import NotFoundPage from './NotFoundPage';
 
+import { useAuth } from '../context/AuthContext';
+
 export default function ProductDetailsPage() {
     const { showToast } = useToast();
+    const { user, profile } = useAuth();
     const [searchParams] = useSearchParams();
     const isDemo = searchParams.get('mode') === 'demo';
 
@@ -28,6 +31,8 @@ export default function ProductDetailsPage() {
     const [error, setError] = useState(null);
     const [product, setProduct] = useState(null);
     const [company, setCompany] = useState(null);
+    const [hasReviewed, setHasReviewed] = useState(false);
+    const [tempReview, setTempReview] = useState({ rating: 0, comment: '' });
 
     useEffect(() => {
         const fetchProductData = async () => {
@@ -122,6 +127,82 @@ export default function ProductDetailsPage() {
 
         fetchProductData();
     }, [productSlug, companySlug, isDemo]);
+
+    useEffect(() => {
+        if (user && product) {
+            checkIfReviewed();
+        }
+    }, [user, product]);
+
+    const checkIfReviewed = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('reviews')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('product_id', product.id)
+                .maybeSingle();
+
+            setHasReviewed(!!data);
+        } catch (error) {
+            console.error('Error checking review:', error);
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (!user) {
+            showToast("Debes iniciar sesión para comentar", "info");
+            return;
+        }
+        if (tempReview.rating === 0) {
+            showToast("Por favor selecciona una calificación", "error");
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .insert([{
+                    user_id: user.id,
+                    company_id: company.id, // Store review also linked to company
+                    product_id: product.id,
+                    rating: tempReview.rating,
+                    comment: tempReview.comment,
+                    customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo'
+                }]);
+
+            if (error) throw error;
+
+            showToast("¡Gracias por tu opinión!", "success");
+            setHasReviewed(true);
+            setTempReview({ rating: 0, comment: '' });
+
+            // Real-time update
+            setProduct(prev => {
+                const updatedReviews = [
+                    {
+                        id: Date.now(), // Temporary ID until refresh
+                        user: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
+                        date: new Date().toLocaleDateString(),
+                        rating: tempReview.rating,
+                        comment: tempReview.comment
+                    },
+                    ...(prev.reviews || [])
+                ];
+
+                const newRating = parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1));
+
+                return {
+                    ...prev,
+                    reviews: updatedReviews,
+                    rating: newRating
+                };
+            });
+        } catch (error) {
+            console.error('Error submitting review:', error);
+            showToast("No se pudo enviar la reseña", "error");
+        }
+    };
 
     if (loading) {
         return (
@@ -370,9 +451,100 @@ export default function ProductDetailsPage() {
                     </div>
                 </div>
 
+                {/* Reviews Section at the bottom */}
+                <div id="reviews" className="mt-16 pt-12 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+                                <User className="text-primary-600" size={24} /> Opiniones de Clientes
+                            </h3>
+                            <div className="flex items-center gap-2 mt-2">
+                                <StarRating rating={product.rating} count={product.reviews?.length} size={16} />
+                                <span className="text-sm font-bold text-slate-400">({product.reviews?.length || 0} valoraciones)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {product.reviews && product.reviews.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {product.reviews.map(review => (
+                                <div key={review.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-300">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm">
+                                                <User size={20} className="text-slate-300" />
+                                            </div>
+                                            <div>
+                                                <span className="font-black text-slate-900 text-sm block uppercase tracking-tight">{review.user}</span>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{review.date}</span>
+                                            </div>
+                                        </div>
+                                        <StarRating rating={review.rating} size={12} />
+                                    </div>
+                                    <p className="text-slate-600 text-sm italic leading-relaxed">"{review.comment}"</p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center text-slate-400">
+                            <p className="font-bold uppercase tracking-widest text-sm">Este producto aún no tiene reseñas</p>
+                            <p className="text-xs mt-1">¡Sé el primero en compartir tu experiencia!</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Write Review Section */}
+                <div id="write-review" className="mt-12 bg-slate-50 rounded-3xl p-6 md:p-8 border border-slate-100">
+                    <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <Utensils className="text-primary-600" size={20} />
+                        Deja tu opinión sobre este producto
+                    </h3>
+
+                    {!user ? (
+                        <div className="text-center py-8">
+                            <Button onClick={() => navigate('/login')} variant="secondary">
+                                Inicia sesión para opinar
+                            </Button>
+                        </div>
+                    ) : hasReviewed ? (
+                        <div className="text-center py-8 bg-emerald-50 rounded-2xl border border-emerald-100">
+                            <p className="text-emerald-700 font-medium">¡Ya has opinado sobre este producto! Gracias.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 max-w-2xl mx-auto">
+                            <div className="flex flex-col items-center gap-3">
+                                <span className="text-sm font-medium text-slate-500">Tu calificación</span>
+                                <StarRating
+                                    interactive
+                                    rating={tempReview.rating}
+                                    size={32}
+                                    onRate={(val) => setTempReview(prev => ({ ...prev, rating: val }))}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-700">Tu comentario</label>
+                                <textarea
+                                    value={tempReview.comment}
+                                    onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value }))}
+                                    className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 min-h-[120px]"
+                                    placeholder="¿Qué te pareció el producto?"
+                                />
+                            </div>
+
+                            <Button
+                                onClick={handleSubmitReview}
+                                disabled={tempReview.rating === 0}
+                                className="w-full"
+                            >
+                                Publicar Opinión
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Reviews Modal */}
+            {/* Reviews Modal - Kept for consistency but now users can also scroll to the section */}
             <Modal
                 isOpen={isReviewsOpen}
                 onClose={() => setIsReviewsOpen(false)}

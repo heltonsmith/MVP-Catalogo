@@ -121,28 +121,21 @@ export function Navbar() {
 
                         {user ? (
                             <div className="hidden md:flex items-center gap-4">
-                                <div className="flex flex-col items-end mr-2">
-                                    <span className="text-sm font-bold text-slate-700">
+                                <Link
+                                    to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'}
+                                    className="flex flex-col items-end mr-2 text-slate-700 hover:text-primary-600 transition-colors group"
+                                >
+                                    <span className="text-sm font-bold truncate max-w-[150px]">
                                         {profile?.role === 'admin' || profile?.role === 'super_admin'
                                             ? 'Admin Ktaloog'
-                                            : profile?.role === 'client'
-                                                ? profile?.full_name || 'Mi Perfil'
-                                                : company?.slug ? (
-                                                    <Link
-                                                        to={`/catalogo/${company.slug}`}
-                                                        className="hover:text-primary-600 transition-colors cursor-pointer"
-                                                        title="Ver mi catálogo público"
-                                                    >
-                                                        {company?.name || 'Mi Tienda'}
-                                                    </Link>
-                                                ) : (company?.name || 'Mi Tienda')
+                                            : (profile?.full_name || user?.user_metadata?.full_name || company?.name || 'Mi Perfil')
                                         }
                                     </span>
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
-                                        {profile?.role === 'client' ? 'Cliente Ktaloog' : 'Sesión Activa'}
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold group-hover:text-primary-500 transition-colors">
+                                        {profile?.role === 'client' || profile?.role === 'user' ? 'Cliente' : 'Sesión Activa'}
                                     </span>
-                                </div>
-                                <div className="h-8 w-px bg-slate-200 mx-2" />
+                                </Link>
+                                <div className="h-8 w-px bg-slate-200 mx-1" />
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -152,7 +145,7 @@ export function Navbar() {
                                     <LogOut size={16} className="mr-2" />
                                     Salir
                                 </Button>
-                                <Link to={profile?.role === 'client' ? '/dashboard/cliente' : '/dashboard'}>
+                                <Link to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'}>
                                     <Button size="sm" className="shadow-lg shadow-primary-200">
                                         Ir al Panel
                                     </Button>
@@ -251,7 +244,7 @@ export function Navbar() {
                                             <p className="text-xs text-slate-500">{user.email}</p>
                                         </div>
                                     </div>
-                                    <Link to={profile?.role === 'client' ? '/dashboard/cliente' : '/dashboard'} onClick={() => setIsOpen(false)}>
+                                    <Link to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'} onClick={() => setIsOpen(false)}>
                                         <Button className="w-full">Ir al Panel</Button>
                                     </Link>
                                     <Button

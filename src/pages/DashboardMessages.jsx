@@ -5,9 +5,9 @@ import { Input } from '../components/ui/Input';
 import { cn } from '../utils';
 import { useAuth } from '../context/AuthContext';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
-import { useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase'; // Import supabase
-import { useChat } from '../hooks/useChat'; // Import useChat
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useChat } from '../hooks/useChat';
 
 export default function DashboardMessages() {
     const { company: authCompany } = useAuth();
@@ -19,6 +19,15 @@ export default function DashboardMessages() {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [showChatOnMobile, setShowChatOnMobile] = useState(false);
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const id = searchParams.get('id');
+        if (id) {
+            setSelectedCustomerId(id);
+            setShowChatOnMobile(true);
+        }
+    }, [searchParams]);
 
     // Fetch conversations (unique customers who have messaged this company)
     useEffect(() => {
@@ -67,7 +76,7 @@ export default function DashboardMessages() {
                     const customerIds = uniqueConversations.map(c => c.customer_id);
                     const { data: profiles } = await supabase
                         .from('profiles') // Assuming 'profiles' table exists and matches auth.users
-                        .select('id, full_name, email') // Adjust column names based on your schema
+                        .select('id, full_name, email, avatar_url') // Adjust column names based on your schema
                         .in('id', customerIds);
 
                     // Merge profile data
@@ -76,7 +85,8 @@ export default function DashboardMessages() {
                         return {
                             ...conv,
                             customerName: profile?.full_name || profile?.email || 'Cliente',
-                            customerEmail: profile?.email
+                            customerEmail: profile?.email,
+                            avatarUrl: profile?.avatar_url
                         };
                     });
                     setConversations(conversationsWithProfiles);
@@ -93,7 +103,67 @@ export default function DashboardMessages() {
 
         fetchConversations();
 
-        // Subscription for new conversations could go here to update the list live
+        // Real-time subscription for new messages
+        const channel = supabase
+            .channel('public:messages')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `company_id=eq.${authCompany.id}`
+                },
+                async (payload) => {
+                    // Check if sender is 'customer' (we only care about incoming messages for the list)
+                    // Actually we care about 'store' too to update the snippet
+                    const newMessage = payload.new;
+
+                    // Fetch profile if it's a new customer we haven't identified yet
+                    let customerName = 'Cliente';
+                    let customerEmail = null;
+                    let customerAvatar = null;
+
+                    if (newMessage.sender_type === 'customer') {
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('full_name, email, avatar_url')
+                            .eq('id', newMessage.customer_id)
+                            .single();
+
+                        if (profile) {
+                            customerName = profile.full_name || profile.email;
+                            customerEmail = profile.email;
+                            customerAvatar = profile.avatar_url;
+                        }
+                    }
+
+                    setConversations(prev => {
+                        const otherConvs = prev.filter(c => c.customer_id !== newMessage.customer_id);
+                        // Construct updated conversation object
+                        const existingConv = prev.find(c => c.customer_id === newMessage.customer_id);
+
+                        const updatedConv = {
+                            customer_id: newMessage.customer_id,
+                            created_at: newMessage.created_at,
+                            content: newMessage.content,
+                            is_read: newMessage.is_read,
+                            sender_type: newMessage.sender_type,
+                            customerName: existingConv?.customerName || customerName,
+                            customerEmail: existingConv?.customerEmail || customerEmail,
+                            avatarUrl: existingConv?.avatarUrl || customerAvatar,
+                            count: (existingConv?.count || 0) + 1
+                        };
+
+                        return [updatedConv, ...otherConvs];
+                    });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
 
     }, [authCompany?.id]);
 
@@ -212,9 +282,18 @@ export default function DashboardMessages() {
                                 )}
 
                                 <div className="flex justify-between mb-1">
-                                    <h3 className={cn("font-bold text-sm truncate", selectedCustomerId === conv.customer_id ? "text-primary-700" : "text-slate-700")}>
-                                        {conv.customerName}
-                                    </h3>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        {conv.avatarUrl ? (
+                                            <img src={conv.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
+                                        ) : (
+                                            <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                                <User size={12} className="text-slate-400" />
+                                            </div>
+                                        )}
+                                        <h3 className={cn("font-bold text-sm truncate", selectedCustomerId === conv.customer_id ? "text-primary-700" : "text-slate-700")}>
+                                            {conv.customerName}
+                                        </h3>
+                                    </div>
                                     <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap ml-2">
                                         {new Date(conv.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
@@ -242,9 +321,17 @@ export default function DashboardMessages() {
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
                                 </button>
 
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 border border-indigo-50 shadow-inner">
-                                    <User size={20} />
-                                </div>
+                                {conversations.find(c => c.customer_id === selectedCustomerId)?.avatarUrl ? (
+                                    <img
+                                        src={conversations.find(c => c.customer_id === selectedCustomerId)?.avatarUrl}
+                                        alt="Avatar"
+                                        className="h-10 w-10 rounded-full object-cover border border-indigo-50 shadow-inner"
+                                    />
+                                ) : (
+                                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 border border-indigo-50 shadow-inner">
+                                        <User size={20} />
+                                    </div>
+                                )}
                                 <div>
                                     <h2 className="font-bold text-slate-800 leading-tight">
                                         {conversations.find(c => c.customer_id === selectedCustomerId)?.customerName || 'Cliente'}

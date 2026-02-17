@@ -141,7 +141,35 @@ export default function CartPage() {
 
             if (itemsError) throw itemsError;
 
-            // 3. Generate WhatsApp Message with new format
+            // 3. Save copy for WhatsApp History (Panel de Cliente)
+            if (user) {
+                // Generate the descriptive message for history
+                let historyContent = `Cotización para ${company.name}\n`;
+                const detailedItems = cartItems.map(item => {
+                    const { unitPrice } = getEffectivePrice(item);
+                    historyContent += `${item.name} x${item.quantity} - ${formatCurrency(unitPrice)}\n`;
+                    return {
+                        id: item.id,
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: unitPrice,
+                        sku: item.sku,
+                        image: item.images?.[0]
+                    };
+                });
+
+                await supabase.from('whatsapp_quotes').insert([{
+                    user_id: user.id,
+                    company_id: companyId,
+                    customer_name: customerInfo.name,
+                    customer_email: customerInfo.email,
+                    content: historyContent,
+                    items: detailedItems,
+                    total: totalPrice
+                }]);
+            }
+
+            // 4. Generate WhatsApp Message for actual sending
             let message = `*Nueva Cotización - ${company.name} (Ktaloog)* 🛒\n`;
             message += `-----------\n\n`;
             message += `📅 Fecha: ${formatDate()}\n`;

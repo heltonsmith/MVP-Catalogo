@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     User,
     Camera,
@@ -28,10 +28,42 @@ export default function CustomerProfile() {
     const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
-        fullName: profile?.full_name || '',
+        fullName: profile?.full_name || user?.user_metadata?.full_name || '',
         email: user?.email || '',
+        rut: profile?.rut || '',
+        phone: profile?.phone || '',
+        address: profile?.shipping_address || '',
         newPassword: ''
     });
+
+    const formatRUT = (value) => {
+        const clean = value.replace(/[^0-9kK]/g, '').substring(0, 9);
+        if (!clean) return '';
+        if (clean.length < 2) return clean.toUpperCase();
+
+        let rut = clean.substring(0, clean.length - 1);
+        let dv = clean.substring(clean.length - 1).toUpperCase();
+
+        let formatted = '';
+        while (rut.length > 3) {
+            formatted = '.' + rut.substring(rut.length - 3) + formatted;
+            rut = rut.substring(0, rut.length - 3);
+        }
+        return rut + formatted + '-' + dv;
+    };
+
+    // Auto-populate when profile loads
+    useEffect(() => {
+        if (profile) {
+            setFormData(prev => ({
+                ...prev,
+                fullName: prev.fullName || profile.full_name || user?.user_metadata?.full_name || '',
+                rut: prev.rut || profile.rut || '',
+                phone: prev.phone || profile.phone || '',
+                address: prev.address || profile.shipping_address || ''
+            }));
+        }
+    }, [profile, user]);
 
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
@@ -54,8 +86,12 @@ export default function CustomerProfile() {
 
             const { error: updateError } = await supabase
                 .from('profiles')
-                .update({ avatar_url: publicUrl })
-                .eq('id', user.id);
+                .upsert({
+                    id: user.id,
+                    avatar_url: publicUrl,
+                    email: user.email,
+                    full_name: profile?.full_name || user?.user_metadata?.full_name || ''
+                });
 
             if (updateError) throw updateError;
 
@@ -77,10 +113,14 @@ export default function CustomerProfile() {
             // 1. Update Profile Metadata
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({
-                    full_name: formData.fullName
-                })
-                .eq('id', user.id);
+                .upsert({
+                    id: user.id,
+                    email: user.email,
+                    full_name: formData.fullName,
+                    rut: formData.rut,
+                    phone: formData.phone,
+                    shipping_address: formData.address
+                });
 
             if (profileError) throw profileError;
 
@@ -116,7 +156,11 @@ export default function CustomerProfile() {
                         <div className="relative inline-block group">
                             <div className="h-32 w-32 rounded-[2.5rem] bg-slate-50 flex items-center justify-center overflow-hidden ring-4 ring-slate-100 shadow-xl group-hover:scale-105 transition-transform duration-500">
                                 {profile?.avatar_url ? (
-                                    <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                                    <img
+                                        src={`${profile.avatar_url}?t=${profile.updated_at ? new Date(profile.updated_at).getTime() : Date.now()}`}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                    />
                                 ) : (
                                     <User className="h-16 w-16 text-slate-200" />
                                 )}
@@ -142,7 +186,9 @@ export default function CustomerProfile() {
                             />
                         </div>
                         <div className="mt-6">
-                            <h3 className="font-black text-slate-900 truncate uppercase tracking-tight">{profile?.full_name || 'Sin Nombre'}</h3>
+                            <h3 className="font-black text-slate-900 truncate uppercase tracking-tight">
+                                {profile?.full_name || user?.user_metadata?.full_name || 'Sin Nombre'}
+                            </h3>
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Cliente Miembro</p>
                         </div>
                     </CardContent>
@@ -157,7 +203,7 @@ export default function CustomerProfile() {
                                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">1</span>
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Información Personal</h3>
                                 </div>
-                                <div className="grid grid-cols-1 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Input
                                         label="Nombre Completo"
                                         placeholder="Tu nombre"
@@ -165,6 +211,26 @@ export default function CustomerProfile() {
                                         onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                                         required
                                         className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                    />
+                                    <Input
+                                        label="RUT"
+                                        placeholder="12.345.678-9"
+                                        value={formData.rut}
+                                        maxLength={12}
+                                        onChange={(e) => {
+                                            const formatted = formatRUT(e.target.value);
+                                            setFormData(prev => ({ ...prev, rut: formatted }));
+                                        }}
+                                        className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                    />
+                                    <Input
+                                        label="Teléfono"
+                                        placeholder="+569..."
+                                        type="tel"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                        className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                        icon={<Smartphone size={16} />}
                                     />
                                     <Input
                                         label="Correo Electrónico"
@@ -175,6 +241,13 @@ export default function CustomerProfile() {
                                         icon={<Mail size={16} />}
                                     />
                                 </div>
+                                <Input
+                                    label="Dirección de Envío"
+                                    placeholder="Calle Ejemplo 123, Comuna, Región"
+                                    value={formData.address}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                                    className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                />
                             </div>
 
                             <div className="space-y-6">
