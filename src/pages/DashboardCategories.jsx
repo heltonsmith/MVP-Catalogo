@@ -88,6 +88,10 @@ export default function DashboardCategories() {
         }
     };
 
+    const handleDemoAction = (action) => {
+        showToast(`Esta es una acción demo: ${action}. En la versión real, esta acción se realizaría correctamente.`, "demo");
+    };
+
     useEffect(() => {
         fetchCategories();
     }, [company?.id, isDemo, demoCompany.id]);
@@ -97,7 +101,7 @@ export default function DashboardCategories() {
         if (!newCategoryName.trim()) return;
 
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás agregar categorías.", "info");
+            handleDemoAction("Añadir Categoría");
             setNewCategoryName('');
             return;
         }
@@ -135,7 +139,7 @@ export default function DashboardCategories() {
 
     const handleDeleteCategory = async (id) => {
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás eliminar categorías.", "info");
+            handleDemoAction("Eliminar Categoría");
             return;
         }
 
@@ -166,7 +170,7 @@ export default function DashboardCategories() {
         if (!editName.trim() || !editingCategory) return;
 
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás editar categorías.", "info");
+            handleDemoAction("Editar Categoría");
             setEditingCategory(null);
             return;
         }
@@ -260,7 +264,12 @@ export default function DashboardCategories() {
                                         size="icon"
                                         className="h-9 w-9 text-primary-400 hover:text-primary-600 hover:bg-primary-50"
                                         title="Ver productos"
-                                        onClick={() => navigate(`/dashboard/productos?categoryId=${category.id}`)}
+                                        onClick={() => {
+                                            const basePath = isDemo
+                                                ? (isDemoRestaurant ? '/demo/restaurante/dashboard' : '/demo/tienda/dashboard')
+                                                : '/dashboard';
+                                            navigate(`${basePath}/productos?categoryId=${category.id}${isDemo ? '&demo=true' : ''}`);
+                                        }}
                                     >
                                         <ExternalLink size={16} />
                                     </Button>

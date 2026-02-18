@@ -5,6 +5,7 @@ RETURNS TRIGGER AS $$
 DECLARE
     company_owner_id UUID;
     customer_name TEXT;
+    customer_avatar TEXT;
     notification_title TEXT;
     notification_content TEXT;
 BEGIN
@@ -15,8 +16,8 @@ BEGIN
         FROM companies
         WHERE id = NEW.company_id;
 
-        -- Get customer name from profiles
-        SELECT full_name INTO customer_name
+        -- Get customer info from profiles
+        SELECT full_name, avatar_url INTO customer_name, customer_avatar
         FROM profiles
         WHERE id = NEW.customer_id;
 
@@ -46,7 +47,8 @@ BEGIN
                 'customer_id', NEW.customer_id,
                 'company_id', NEW.company_id,
                 'customer_name', customer_name,
-                'comment', NEW.content -- Using 'comment' key to match NotificationCenter logic or 'content'
+                'actor_avatar', customer_avatar,
+                'comment', NEW.content
             )
         );
     END IF;

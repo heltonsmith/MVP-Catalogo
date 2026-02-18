@@ -21,14 +21,30 @@ export function useNotifications() {
             if (error) throw error;
             const fetchedNotifications = data || [];
             setNotifications(fetchedNotifications);
-            const count = fetchedNotifications.filter(n => !n.is_read).length;
+
+            // Debug: Log the first notification to see types
+            if (fetchedNotifications.length > 0) {
+                console.log('useNotifications: Sample notification:', {
+                    id: fetchedNotifications[0].id,
+                    is_read: fetchedNotifications[0].is_read,
+                    type: typeof fetchedNotifications[0].is_read
+                });
+            }
+
+            const count = fetchedNotifications.filter(n => n.is_read === false || n.is_read === 'f').length;
             setUnreadCount(count);
+
+            // Synchronize with global state in AuthContext
+            if (setUnreadNotifications) {
+                console.log('useNotifications: Syncing global unread count:', count);
+                setUnreadNotifications(count);
+            }
         } catch (error) {
             console.error('Error fetching notifications:', error);
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, setUnreadNotifications]);
 
     useEffect(() => {
         if (!user) return;
@@ -36,16 +52,19 @@ export function useNotifications() {
         fetchNotifications();
 
         const channel = supabase
-            .channel(`public:notifications:user:${user.id}`)
+            .channel(`global:notifications:${user.id}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'notifications',
                 filter: `user_id=eq.${user.id}`
-            }, () => {
+            }, (payload) => {
+                console.log('useNotifications: Real-time update detected!', payload.eventType);
                 fetchNotifications();
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log('useNotifications: Subscription status:', status);
+            });
 
         return () => {
             supabase.removeChannel(channel);

@@ -2,28 +2,28 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, MessageCircle, User, Users, Globe, Instagram, Music2, Share2, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X, Heart, Pencil, Trash2 } from 'lucide-react';
 import QRCode from "react-qr-code";
-import { supabase } from '../lib/supabase';
-import { COMPANIES, PRODUCTS, CATEGORIES } from '../data/mock';
-import { ProductCard } from '../components/product/ProductCard';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { StarRating } from '../components/ui/StarRating';
-import { Modal } from '../components/ui/Modal';
-import { MailboxPreview } from '../components/chat/MailboxPreview';
-import { useToast } from '../components/ui/Toast';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../hooks/useSettings';
-import { useCart } from '../hooks/useCart';
-import { NotificationCenter } from '../components/notifications/NotificationCenter';
-import { cn, formatCurrency } from '../utils';
-import NotFoundPage from './NotFoundPage';
+import { COMPANIES, PRODUCTS, CATEGORIES } from '../../data/mock';
+import { DemoProductCard as ProductCard } from '../../components/demo/DemoProductCard';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { StarRating } from '../../components/ui/StarRating';
+import { Modal } from '../../components/ui/Modal';
+import { useToast } from '../../components/ui/Toast';
+import { useAuth } from '../../context/AuthContext';
 
-export default function CatalogPage() {
+import { useSettings } from '../../hooks/useSettings';
+import { useCart } from '../../hooks/useCart';
+import { NotificationCenter } from '../../components/notifications/NotificationCenter';
+import { cn, formatCurrency } from '../../utils';
+import NotFoundPage from '../NotFoundPage';
+
+export default function DemoCatalogPage({ overrideSlug }) {
     const { showToast } = useToast();
-    const { user, profile, refreshCompany } = useAuth();
+    const { user, profile } = useAuth();
     const { setCompanyInfo } = useCart();
-    const [searchParams] = useSearchParams();
-    const { companySlug } = useParams();
+    const isDemo = true;
+    const { companySlug: paramSlug } = useParams();
+    const companySlug = overrideSlug || paramSlug;
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -39,8 +39,8 @@ export default function CatalogPage() {
     const [isQROpen, setIsQROpen] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
-    const [followerCount, setFollowerCount] = useState(0);
-    const [favoriteCount, setFavoriteCount] = useState(0);
+    const [followerCount, setFollowerCount] = useState(1800);
+    const [favoriteCount, setFavoriteCount] = useState(500);
     const [followCategory, setFollowCategory] = useState('retail');
     const [hasReviewed, setHasReviewed] = useState(false);
     const [tempReview, setTempReview] = useState({ rating: 0, comment: '' });
@@ -51,14 +51,28 @@ export default function CatalogPage() {
     const { getSetting } = useSettings();
 
     const getLimit = () => {
-        if (!company) return 10;
-        if (company.plan === 'custom') return Infinity;
-        const limitKey = `${company.plan}_plan_product_limit`;
-        const defaultValue = company.plan === 'free' ? '5' : company.plan === 'plus' ? '100' : '500';
-        return parseInt(getSetting(limitKey, defaultValue));
+        return 100; // No limits for demo
     };
 
     const productLimit = getLimit();
+
+    const [isViewOnly, setIsViewOnly] = useState(() => {
+        // Initialize from localStorage if present
+        const savedMode = localStorage.getItem('demo_view_only');
+        return savedMode === 'true'; // Default to false
+    });
+
+    useEffect(() => {
+        // Persist to localStorage
+        localStorage.setItem('demo_view_only', isViewOnly);
+        // Dispatch custom event so other components (like navbar) can react if needed
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('demo-view-mode-change', { detail: { isViewOnly } }));
+    }, [isViewOnly]);
+
+    const toggleViewOnly = () => {
+        setIsViewOnly(!isViewOnly);
+    };
 
     useEffect(() => {
         if (location.hash === '#reviews') {
@@ -70,157 +84,56 @@ export default function CatalogPage() {
         const fetchCatalogData = async () => {
             setLoading(true);
             try {
-                // 1. Fetch Company
-                const { data: companyData, error: companyError } = await supabase
+                // Check if it's a demo slug
+                const demoCompany = COMPANIES.find(c => c.slug === companySlug);
 
-                    .from('companies')
-                    .select('*')
-                    .eq('slug', companySlug)
-                    .single();
+                if (demoCompany) {
+                    setCompany(demoCompany);
+                    const demoProducts = PRODUCTS.filter(p => p.companyId === demoCompany.id);
 
-                if (companyError || !companyData) {
-                    throw new Error('Company not found');
-                }
-
-                // 2. Fetch Products with new schema
-                const { data: productsData, error: productsError } = await supabase
-                    .from('products')
-                    .select(`
-                        *,
-                        product_images(image_url, display_order),
-                        product_categories(
-                            categories(id, name)
-                        ),
-                        wholesale_prices
-                    `)
-                    .eq('company_id', companyData.id)
-                    .eq('available', true);
-
-                if (productsError) throw productsError;
-
-                const productIds = (productsData || []).map(p => p.id);
-
-                // 3. Fetch Reviews for real rating (Store reviews + Product reviews linked to company)
-                const { data: reviewsData } = await supabase
-                    .from('reviews')
-                    .select('id, rating, comment, customer_name, user_id, product_id, created_at')
-                    .or(`company_id.eq.${companyData.id}${productIds.length > 0 ? `,product_id.in.(${productIds.join(',')})` : ''}`)
-                    .order('created_at', { ascending: false });
-
-                // 3. Fetch avatars manually to avoid FK issues
-                let avatarsMap = {};
-                if (reviewsData && reviewsData.length > 0) {
-                    const userIds = [...new Set(reviewsData.map(r => r.user_id).filter(Boolean))];
-                    if (userIds.length > 0) {
-                        const { data: profilesData } = await supabase
-                            .from('profiles')
-                            .select('id, avatar_url')
-                            .in('id', userIds);
-
-                        if (profilesData) {
-                            profilesData.forEach(p => {
-                                avatarsMap[p.id] = p.avatar_url;
-                            });
+                    const enrichedProducts = demoProducts.map(p => ({
+                        ...p,
+                        categories: {
+                            id: p.categories[0],
+                            name: p.categories.map(catId => {
+                                const foundCat = CATEGORIES.find(c => c.id === catId);
+                                return foundCat ? foundCat.name : catId;
+                            }).join(', ')
                         }
-                    }
-                }
-
-                const storeReviews = (reviewsData || []).filter(r => !r.product_id);
-
-                const realRating = storeReviews.length > 0
-                    ? parseFloat((storeReviews.reduce((acc, r) => acc + r.rating, 0) / storeReviews.length).toFixed(1))
-                    : 0;
-
-                const mappedReviews = storeReviews.map(r => ({
-                    id: r.id,
-                    user: r.customer_name || 'Anónimo',
-                    user_id: r.user_id,
-                    avatar: avatarsMap[r.user_id],
-                    date: new Date(r.created_at).toLocaleDateString(),
-                    rating: r.rating,
-                    comment: r.comment || ''
-                }));
-
-                const fullCompany = {
-                    ...companyData,
-                    rating: realRating,
-                    reviews: mappedReviews
-                };
-                setCompany(fullCompany);
-
-                // Store company info in cart context for CartPage resolution
-                setCompanyInfo(companyData.id, {
-                    name: companyData.name,
-                    slug: companyData.slug,
-                    whatsapp: companyData.whatsapp,
-                    logo: companyData.logo
-                });
-
-                // Transform products to include categories array, images, and ratings
-                const transformedProducts = await Promise.all((productsData || []).map(async product => {
-                    // Filter reviews for this specific product from the already fetched reviewsData
-                    const productReviewData = (reviewsData || []).filter(r => r.product_id === product.id);
-                    // Fetch avatars for product reviews if not already in avatarsMap
-                    const productUserIds = [...new Set(productReviewData.map(r => r.user_id).filter(Boolean))];
-                    const newUserIds = productUserIds.filter(id => !avatarsMap[id]);
-
-                    if (newUserIds.length > 0) {
-                        const { data: profilesData } = await supabase
-                            .from('profiles')
-                            .select('id, avatar_url')
-                            .in('id', newUserIds);
-
-                        if (profilesData) {
-                            profilesData.forEach(p => {
-                                avatarsMap[p.id] = p.avatar_url;
-                            });
-                        }
-                    }
-
-                    const productReviews = productReviewData.map(r => ({
-                        id: r.id,
-                        user: r.customer_name || 'Anónimo',
-                        user_id: r.user_id,
-                        avatar: avatarsMap[r.user_id],
-                        date: new Date(r.created_at).toLocaleDateString(),
-                        rating: r.rating,
-                        comment: r.comment || ''
                     }));
 
-                    const avgRating = productReviews.length > 0
-                        ? parseFloat((productReviews.reduce((acc, r) => acc + r.rating, 0) / productReviews.length).toFixed(1))
-                        : 0;
+                    setProducts(enrichedProducts);
 
-                    return {
-                        ...product,
-                        categories: product.product_categories?.map(pc => pc.categories) || [],
-                        images: product.product_images?.sort((a, b) => a.display_order - b.display_order).map(img => img.image_url) || [],
-                        reviews: productReviews,
-                        rating: avgRating
-                    };
-                }));
-
-                setProducts(transformedProducts);
-
-                // Extract unique categories from products
-                const uniqueCategories = [];
-                const categoryIds = new Set();
-
-                transformedProducts.forEach(p => {
-                    if (p.categories && Array.isArray(p.categories)) {
-                        p.categories.forEach(cat => {
-                            if (cat && !categoryIds.has(cat.id)) {
-                                categoryIds.add(cat.id);
-                                uniqueCategories.push(cat);
+                    const uniqueCategories = [];
+                    const categoryIds = new Set();
+                    enrichedProducts.forEach(p => {
+                        const firstCatId = p.categories.id.split(',')[0].trim();
+                        // This logic is a bit simplified for the demo but ensures categories list is built
+                        p.categories.id.split(',').forEach((cId, idx) => {
+                            const trimmedId = cId.trim();
+                            const catName = p.categories.name.split(',')[idx].trim();
+                            if (!categoryIds.has(trimmedId)) {
+                                categoryIds.add(trimmedId);
+                                uniqueCategories.push({ id: trimmedId, name: catName });
                             }
                         });
-                    }
-                });
-                setCategories(uniqueCategories);
+                    });
+                    setCategories(uniqueCategories);
 
+                    setCompanyInfo(demoCompany.id, {
+                        name: demoCompany.name,
+                        slug: demoCompany.slug,
+                        whatsapp: demoCompany.whatsapp,
+                        logo: demoCompany.logo
+                    });
+
+                    setLoading(false);
+                    return;
+                }
+
+                setCompany(null);
             } catch (error) {
                 console.error('Error fetching catalog:', error);
-                setCompany(null);
             } finally {
                 setLoading(false);
             }
@@ -231,224 +144,25 @@ export default function CatalogPage() {
         }
     }, [companySlug]);
 
-    // Track store view
-    useEffect(() => {
-        const trackView = async () => {
-            // Only track views for real stores (not demo stores)
-            if (company && company.id && !company.slug?.includes('demo')) {
-                try {
-                    await supabase.rpc('increment_views', { company_id: company.id });
-                } catch (error) {
-                    console.error('Error tracking view:', error);
-                    // Fail silently - don't block user experience
-                }
-            }
-        };
-
-        trackView();
-    }, [company?.id]);
-
-
-    // Load general metrics for everyone
-    useEffect(() => {
-        if (company) {
-            loadStoreMetrics();
-        }
-    }, [company?.id]);
-
-    // Load user-specific state
-    useEffect(() => {
-        if (user && company) {
-            checkIfFavorite();
-            checkIfFollowing();
-            checkIfReviewed();
-        }
-    }, [user, company?.id]);
+    const handleDemoAction = (actionName) => {
+        showToast(`Esta es una acción demo: ${actionName}`, "demo");
+    };
 
     const loadStoreMetrics = async () => {
-        try {
-            const [follows, favs] = await Promise.all([
-                supabase.from('store_follows').select('id', { count: 'exact' }).eq('company_id', company.id),
-                supabase.from('favorites').select('id', { count: 'exact' }).eq('company_id', company.id)
-            ]);
-            setFollowerCount(follows.count || 0);
-            setFavoriteCount(favs.count || 0);
-        } catch (error) {
-            console.error('Error loading store metrics:', error);
-        }
+        // No-op for demo
     };
 
-    const checkIfFavorite = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('favorites')
-                .select('id')
-                .eq('user_id', user.id)
-                .eq('company_id', company.id)
-                .maybeSingle();
-
-            setIsFavorite(!!data);
-        } catch (error) {
-            console.error('Error checking favorite:', error);
-        }
+    const toggleFollow = () => {
+        handleDemoAction("Seguir Tienda");
     };
 
-    const checkIfFollowing = async () => {
-        try {
-            const { data } = await supabase
-                .from('store_follows')
-                .select('id, category')
-                .eq('user_id', user.id)
-                .eq('company_id', company.id)
-                .maybeSingle();
-
-            setIsFollowing(!!data);
-            if (data) setFollowCategory(data.category);
-        } catch (error) {
-            console.error('Error checking follow:', error);
-        }
-    };
-
-
-    const toggleFollow = async () => {
-        const category = company?.business_type || 'retail';
-        if (!user) {
-            showToast("Debes iniciar sesión para usar esta función", "info");
-            return;
-        }
-
-        try {
-            if (isFollowing) {
-                await supabase
-                    .from('store_follows')
-                    .delete()
-                    .eq('user_id', user.id)
-                    .eq('company_id', company.id);
-                setIsFollowing(false);
-                showToast("Ya no sigues esta tienda", "success");
-            } else {
-                await supabase
-                    .from('store_follows')
-                    .insert([{
-                        user_id: user.id,
-                        company_id: company.id,
-                        category: category
-                    }]);
-                setIsFollowing(true);
-                setFollowCategory(category);
-                showToast("¡Ahora sigues a esta tienda!", "success");
-            }
-            loadStoreMetrics();
-        } catch (error) {
-            console.error('Error toggling follow:', error);
-            showToast("Error al procesar solicitud", "error");
-        }
-    };
-
-    const checkIfReviewed = async () => {
-        try {
-            const { data } = await supabase
-                .from('reviews')
-                .select('id')
-                .eq('user_id', user.id)
-                .eq('company_id', company.id)
-                .is('product_id', null)
-                .maybeSingle();
-
-            setHasReviewed(!!data);
-        } catch (error) {
-            console.error('Error checking review:', error);
-        }
-    };
-
-    const toggleFavorite = async () => {
-        if (!user) {
-            showToast("Debes iniciar sesión para usar esta función", "info");
-            return;
-        }
-
-        try {
-            if (isFavorite) {
-                await supabase
-                    .from('favorites')
-                    .delete()
-                    .eq('user_id', user.id)
-                    .eq('company_id', company.id);
-                setIsFavorite(false);
-                showToast("Eliminado de favoritos", "success");
-            } else {
-                await supabase
-                    .from('favorites')
-                    .insert([{
-                        user_id: user.id,
-                        company_id: company.id,
-                        type: company.business_type || 'retail'
-                    }]);
-                setIsFavorite(true);
-                showToast("¡Guardado en favoritos!", "success");
-            }
-            loadStoreMetrics();
-        } catch (error) {
-            console.error('Error toggling favorite:', error);
-            showToast("Error al procesar solicitud", "error");
-        }
+    const toggleFavorite = () => {
+        handleDemoAction("Guardar en Favoritos");
     };
 
     const handleSubmitReview = async () => {
-        if (!user) return;
-        if (tempReview.rating === 0) {
-            showToast("Por favor selecciona una calificación", "error");
-            return;
-        }
-
-        try {
-            const newReview = {
-                user_id: user.id,
-                company_id: company.id,
-                rating: tempReview.rating,
-                comment: tempReview.comment,
-                customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
-                created_at: new Date().toISOString()
-            };
-
-            const { data, error } = await supabase
-                .from('reviews')
-                .insert([newReview])
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            showToast("¡Gracias por tu opinión!", "success");
-            setHasReviewed(true);
-            setTempReview({ rating: 0, comment: '' });
-
-            // Real-time update
-            setCompany(prev => {
-                const updatedReviews = [
-                    {
-                        id: data.id,
-                        user: newReview.customer_name,
-                        user_id: user.id,
-                        date: new Date().toLocaleDateString(),
-                        rating: newReview.rating,
-                        comment: newReview.comment
-                    },
-                    ...(prev.reviews || [])
-                ];
-
-                const newRating = parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1));
-
-                return {
-                    ...prev,
-                    reviews: updatedReviews,
-                    rating: newRating
-                };
-            });
-        } catch (error) {
-            console.error('Error submitting review:', error);
-            showToast("Error al enviar calificación", "error");
-        }
+        showToast("Esta es una función de demostración. Tu opinión no se guardará en la base de datos.", "info");
+        setTempReview({ rating: 0, comment: '' });
     };
 
     const handleOpenProductReviews = (product) => {
@@ -458,153 +172,18 @@ export default function CatalogPage() {
     };
 
     const handleSubmitProductReview = async () => {
-        if (!user) {
-            showToast("Debes iniciar sesión para opinar", "error");
-            return;
-        }
-
-        if (tempProductReview.rating === 0) {
-            showToast("Por favor selecciona una calificación", "warning");
-            return;
-        }
-
-        try {
-            const { error } = await supabase
-                .from('reviews')
-                .insert({
-                    company_id: company.id,
-                    product_id: selectedProductForReviews.id,
-                    user_id: user.id,
-                    customer_name: profile?.full_name || user.email.split('@')[0],
-                    rating: tempProductReview.rating,
-                    comment: tempProductReview.comment
-                });
-
-            if (error) throw error;
-
-            showToast("¡Gracias por tu opinión!", "success");
-            setTempProductReview({ rating: 0, comment: '' });
-            setHasReviewedProduct(true);
-
-            // Optimistically update local products state
-            const newReview = {
-                id: Math.random().toString(), // Temp ID
-                user: profile?.full_name || user.email.split('@')[0],
-                user_id: user.id,
-                avatar: profile?.avatar_url,
-                date: new Date().toLocaleDateString(),
-                rating: tempProductReview.rating,
-                comment: tempProductReview.comment
-            };
-
-            setProducts(prevProducts => prevProducts.map(p => {
-                if (p.id === selectedProductForReviews.id) {
-                    const newReviews = [newReview, ...(p.reviews || [])];
-                    const newRating = parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1));
-                    return { ...p, reviews: newReviews, rating: newRating };
-                }
-                return p;
-            }));
-
-            // Also update the selected product for the modal display
-            setSelectedProductForReviews(prev => {
-                if (!prev) return null;
-                const newReviews = [newReview, ...(prev.reviews || [])];
-                const newRating = parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1));
-                return { ...prev, reviews: newReviews, rating: newRating };
-            });
-
-        } catch (error) {
-            console.error('Error submitting product review:', error);
-            showToast("No se pudo enviar la reseña", "error");
-        }
+        showToast("Esta es una función de demostración. Tu opinión no se guardará.", "info");
+        setTempProductReview({ rating: 0, comment: '' });
     };
 
     const handleUpdateReview = async () => {
-        if (!user || !editingReview) return;
-
-        try {
-            const { error } = await supabase
-                .from('reviews')
-                .update({
-                    rating: tempReview.rating,
-                    comment: tempReview.comment,
-                    created_at: new Date().toISOString() // Optional: update timestamp
-                })
-                .eq('id', editingReview.id)
-                .eq('user_id', user.id);
-
-            if (error) throw error;
-
-            showToast("¡Reseña actualizada!", "success");
-
-            // Update local state
-            setCompany(prev => {
-                const updatedReviews = prev.reviews.map(r =>
-                    r.id === editingReview.id
-                        ? { ...r, rating: tempReview.rating, comment: tempReview.comment }
-                        : r
-                );
-
-                const newRating = parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1));
-
-                return {
-                    ...prev,
-                    reviews: updatedReviews,
-                    rating: newRating
-                };
-            });
-
-            setEditingReview(null);
-            setTempReview({ rating: 0, comment: '' });
-            // Keep hasReviewed as true
-        } catch (error) {
-            console.error('Error updating review:', error);
-            showToast("Error al actualizar", "error");
-        }
+        showToast("Esta es una función de demostración. Los cambios no se guardarán.", "info");
+        setEditingReview(null);
+        setTempReview({ rating: 0, comment: '' });
     };
 
     const handleDeleteReview = async (reviewId) => {
-        if (!confirm('¿Estás seguro de que quieres eliminar tu reseña?')) return;
-
-        try {
-            const { error } = await supabase
-                .from('reviews')
-                .delete()
-                .eq('id', reviewId)
-                .eq('user_id', user.id);
-
-            if (error) throw error;
-
-            showToast("Reseña eliminada", "success");
-
-            // Update modal state if open (Product Reviews)
-            if (selectedProductForReviews) {
-                setSelectedProductForReviews(prev => {
-                    if (!prev) return null;
-                    const newReviews = (prev.reviews || []).filter(r => r.id !== reviewId);
-                    const newRating = newReviews.length > 0
-                        ? parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1))
-                        : 0;
-                    return { ...prev, reviews: newReviews, rating: newRating };
-                });
-                setHasReviewedProduct(false);
-            } else {
-                // If no selected product, it was likely a store review
-                setHasReviewed(false);
-                // Real-time update for store reviews
-                setCompany(prev => {
-                    const updatedReviews = (prev.reviews || []).filter(r => r.id !== reviewId);
-                    const newRating = updatedReviews.length > 0
-                        ? parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1))
-                        : 0;
-                    return { ...prev, reviews: updatedReviews, rating: newRating };
-                });
-            }
-        } catch (error) {
-            console.error('Error deleting review:', error);
-            showToast("Error al eliminar", "error");
-        }
+        showToast("Esta es una función de demostración. No puedes eliminar reseñas en el modo demo.", "info");
     };
 
     const startEditReview = (review) => {
@@ -633,7 +212,7 @@ export default function CatalogPage() {
     const [tempSettings, setTempSettings] = useState(null);
     const containerRef = useRef(null);
 
-    const isOwner = user?.id === company?.user_id;
+    const isOwner = false; // Never owner in public demo view
 
     const DEFAULT_BRANDING = {
         banner: { x: 50, y: 50, zoom: 100 },
@@ -643,29 +222,12 @@ export default function CatalogPage() {
     const branding = company?.branding_settings || DEFAULT_BRANDING;
 
     const handleStartEdit = (type) => {
-        if (!isOwner) return;
-        setEditMode(type);
-        setTempSettings(JSON.parse(JSON.stringify(branding)));
+        showToast("Esta es una función de administrador. Podrás ajustar tu identidad visual en tu panel real.", "info");
     };
 
     const handleSaveBranding = async () => {
-        setLoading(true);
-        try {
-            const { error } = await supabase
-                .from('companies')
-                .update({ branding_settings: tempSettings })
-                .eq('id', company.id);
-
-            if (error) throw error;
-            setCompany({ ...company, branding_settings: tempSettings });
-            setEditMode(null);
-            showToast("Ajustes guardados correctamente", "success");
-        } catch (error) {
-            console.error('Error saving branding:', error);
-            showToast("Error al guardar los ajustes", "error");
-        } finally {
-            setLoading(false);
-        }
+        showToast("Esta es una función de administrador. Los cambios no se guardarán en el modo demo.", "info");
+        setEditMode(null);
     };
 
     const handleMouseMove = useCallback((e) => {
@@ -721,7 +283,7 @@ export default function CatalogPage() {
             <div
                 ref={editMode === 'banner' ? containerRef : null}
                 className={cn(
-                    "relative h-56 w-full bg-slate-900 lg:h-64 overflow-hidden group/banner",
+                    "relative h-48 w-full bg-slate-900 lg:h-64 overflow-hidden group/banner",
                     editMode === 'banner' ? "cursor-move" : (isOwner && "cursor-pointer")
                 )}
                 onDoubleClick={() => handleStartEdit('banner')}
@@ -786,8 +348,8 @@ export default function CatalogPage() {
                     </div>
                 )}
 
-                <div className="absolute inset-x-0 bottom-0 px-4 py-5 sm:py-6 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent text-white pointer-events-none">
-                    <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-end justify-between gap-4 pointer-events-auto">
+                <div className="absolute inset-x-0 bottom-0 px-4 py-4 sm:py-6 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent text-white pointer-events-none">
+                    <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-start md:items-end justify-between gap-4 pointer-events-auto">
                         {/* Shop Info Group */}
                         <div className="flex items-center md:items-end space-x-3 sm:space-x-4 w-full md:w-auto">
                             <div
@@ -860,7 +422,7 @@ export default function CatalogPage() {
                             <div className="mb-0 sm:mb-2 min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                     <h1 className="text-xl sm:text-2xl font-bold text-white lg:text-3xl truncate leading-tight">{company.name}</h1>
-                                    {company.plan === 'pro' && (
+                                    {(company.plan === 'pro' || isDemo) && (
                                         <BadgeCheck className="h-6 w-6 sm:h-7 sm:w-7 text-blue-400 fill-blue-400/20 flex-shrink-0" title="Cuenta Verificada (Pro)" />
                                     )}
                                 </div>
@@ -950,10 +512,32 @@ export default function CatalogPage() {
                         </div>
 
                         {/* Actions Group */}
-                        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end border-t border-white/10 pt-3 md:border-0 md:pt-0">
+                        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end border-t border-white/10 pt-3 md:border-0 md:pt-0 overflow-x-auto scrollbar-hide">
+                            {/* View Only / Menu Mode Switch for Restaurant */}
+                            {companySlug === 'restaurante-delicias' && (
+                                <div className="flex-shrink-0 flex items-center gap-1.5 bg-black/20 py-1 px-2.5 rounded-lg border border-white/10 backdrop-blur-md mr-auto md:mr-0">
+                                    <span className="text-[10px] font-black text-white/90 uppercase tracking-widest mr-2">
+                                        Modo Carta
+                                    </span>
+                                    <button
+                                        onClick={toggleViewOnly}
+                                        className={cn(
+                                            "w-8 h-4 rounded-full relative transition-colors duration-300 focus:outline-none",
+                                            isViewOnly ? "bg-emerald-500" : "bg-slate-600/50"
+                                        )}
+                                        title={isViewOnly ? "Desactivar Modo Carta" : "Activar Modo Carta"}
+                                    >
+                                        <div className={cn(
+                                            "absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 shadow-sm",
+                                            isViewOnly ? "translate-x-4" : "translate-x-0"
+                                        )} />
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Demo Admin Link Button */}
-                            {(company.slug === 'restaurante-delicias' || company.slug === 'tienda-moda') && (
-                                <Link to={company.slug === 'restaurante-delicias' ? '/demo/restaurante/dashboard' : '/demo/tienda/dashboard'}>
+                            {(isDemo || company.slug === 'restaurante-delicias' || company.slug === 'tienda-moda') && (
+                                <Link to={company.slug === 'restaurante-delicias' ? '/demo/restaurante/dashboard' : '/demo/tienda/dashboard'} className="flex-shrink-0">
                                     <Button variant="secondary" size="sm" className="hidden sm:flex h-8 bg-white/20 border-white/30 text-white hover:bg-white/30 text-[10px] sm:text-xs font-bold gap-1 px-3">
                                         <LayoutDashboard size={14} />
                                         Ver Panel
@@ -961,40 +545,34 @@ export default function CatalogPage() {
                                 </Link>
                             )}
 
-                            <div className="flex items-center gap-1 sm:gap-2">
+                            <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2">
 
                                 {(company.website || company.socials?.website) && (
-                                    <a
-                                        href={company.website || company.socials?.website}
-                                        target="_blank"
-                                        rel="nofollow noopener noreferrer"
+                                    <button
+                                        onClick={() => handleDemoAction("Ver Web")}
                                         className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
                                         title="Sitio Web"
                                     >
                                         <Globe size={16} className="sm:size-18" />
-                                    </a>
+                                    </button>
                                 )}
                                 {company.socials?.instagram && (
-                                    <a
-                                        href={company.socials.instagram}
-                                        target="_blank"
-                                        rel="nofollow noopener noreferrer"
+                                    <button
+                                        onClick={() => handleDemoAction("Ver Instagram")}
                                         className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
                                         title="Instagram"
                                     >
                                         <Instagram size={16} className="sm:size-18" />
-                                    </a>
+                                    </button>
                                 )}
                                 {company.socials?.tiktok && (
-                                    <a
-                                        href={company.socials.tiktok}
-                                        target="_blank"
-                                        rel="nofollow noopener noreferrer"
+                                    <button
+                                        onClick={() => handleDemoAction("Ver TikTok")}
                                         className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
                                         title="TikTok"
                                     >
                                         <Music2 size={16} className="sm:size-18" />
-                                    </a>
+                                    </button>
                                 )}
                                 {isOwner && (!company.website || !company.socials?.instagram || !company.socials?.tiktok) && (
                                     <button
@@ -1007,23 +585,11 @@ export default function CatalogPage() {
                                 )}
                             </div>
 
-                            <div className="h-4 w-px bg-white/20 mx-1" />
+                            <div className="h-4 w-px bg-white/20 mx-1 flex-shrink-0" />
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex-shrink-0 flex items-center gap-2">
                                 <button
-                                    onClick={async () => {
-                                        const shareData = {
-                                            title: company.name,
-                                            text: `Visita la tienda de ${company.name} en ktaloog`,
-                                            url: window.location.href,
-                                        };
-                                        if (navigator.share) {
-                                            try { await navigator.share(shareData); } catch (e) { }
-                                        } else {
-                                            showToast('Enlace de la tienda copiado', 'success');
-                                            try { await navigator.clipboard.writeText(window.location.href); } catch (e) { }
-                                        }
-                                    }}
+                                    onClick={() => handleDemoAction("Compartir Tienda")}
                                     className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
                                     title="Compartir"
                                 >
@@ -1111,8 +677,9 @@ export default function CatalogPage() {
                                                     product={product}
                                                     companySlug={company.slug}
                                                     isDemo={isDemo}
-                                                    cartEnabled={false} // Store logic, but no cart
+                                                    cartEnabled={!isViewOnly}
                                                     onReviewClick={() => handleOpenProductReviews(product)}
+                                                    viewOnly={isViewOnly}
                                                 />
                                             ))}
                                         </div>
@@ -1136,6 +703,7 @@ export default function CatalogPage() {
                                             key={product.id}
                                             product={product}
                                             companySlug={company.slug}
+                                            isDemo={isDemo}
                                             cartEnabled={true}
                                             onReviewClick={() => handleOpenProductReviews(product)}
                                         />
@@ -1154,6 +722,7 @@ export default function CatalogPage() {
                     )}
                 </div>
             </div>
+
 
 
             {/* QR Code Modal - Premium only */}
@@ -1303,7 +872,6 @@ export default function CatalogPage() {
                             <p className="text-xs font-bold text-emerald-600 bg-emerald-50 py-3 rounded-xl border border-emerald-100">
                                 Ya has calificado esta tienda. ¡Gracias por tu opinión!
                             </p>
-                            {/* Option to re-edit if they want, though simpler to use the button on the card */}
                         </div>
                     ) : null}
 
@@ -1473,44 +1041,10 @@ export default function CatalogPage() {
                                                 </Button>
                                             )}
                                             <Button
-                                                onClick={editingReview ? async () => {
-                                                    try {
-                                                        const { error } = await supabase
-                                                            .from('reviews')
-                                                            .update({
-                                                                rating: tempProductReview.rating,
-                                                                comment: tempProductReview.comment,
-                                                                created_at: new Date().toISOString()
-                                                            })
-                                                            .eq('id', editingReview.id)
-                                                            .eq('user_id', user.id);
-
-                                                        if (error) throw error;
-                                                        showToast("¡Reseña actualizada!", "success");
-
-                                                        // Update local products state
-                                                        setProducts(prevProducts => prevProducts.map(p => {
-                                                            if (p.id === selectedProductForReviews.id) {
-                                                                const newReviews = p.reviews.map(r => r.id === editingReview.id ? { ...r, rating: tempProductReview.rating, comment: tempProductReview.comment } : r);
-                                                                const newRating = parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1));
-                                                                return { ...p, reviews: newReviews, rating: newRating };
-                                                            }
-                                                            return p;
-                                                        }));
-
-                                                        // Update modal state
-                                                        setSelectedProductForReviews(prev => {
-                                                            const newReviews = prev.reviews.map(r => r.id === editingReview.id ? { ...r, rating: tempProductReview.rating, comment: tempProductReview.comment } : r);
-                                                            const newRating = parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1));
-                                                            return { ...prev, reviews: newReviews, rating: newRating };
-                                                        });
-
-                                                        setEditingReview(null);
-                                                        setTempProductReview({ rating: 0, comment: '' });
-                                                    } catch (error) {
-                                                        console.error('Error updating product review:', error);
-                                                        showToast("Error al actualizar", "error");
-                                                    }
+                                                onClick={editingReview ? () => {
+                                                    showToast("Esta es una función de demostración. Los cambios no se guardarán.", "info");
+                                                    setEditingReview(null);
+                                                    setTempProductReview({ rating: 0, comment: '' });
                                                 } : handleSubmitProductReview}
                                                 disabled={tempProductReview.rating === 0}
                                                 className="flex-[2] h-12 rounded-xl text-base font-bold shadow-lg shadow-primary-200/50"
@@ -1536,6 +1070,6 @@ export default function CatalogPage() {
                 </div>
             </Modal>
             {/* Follow categorization modal removed per user request */}
-        </div >
+        </div>
     );
 }

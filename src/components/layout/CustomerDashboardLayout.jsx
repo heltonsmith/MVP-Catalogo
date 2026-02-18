@@ -41,7 +41,6 @@ export function CustomerDashboardLayout() {
         { name: 'Favoritos', icon: <Heart size={20} />, path: '/dashboard/cliente/favoritos' },
         { name: 'Cotizaciones', icon: <ShoppingBag size={20} />, path: '/dashboard/cliente/cotizaciones' },
         { name: 'Mis Reseñas', icon: <Star size={20} />, path: '/dashboard/cliente/resenas' },
-        { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/dashboard/cliente/mensajes' },
         { name: 'Mi Perfil', icon: <Settings size={20} />, path: '/dashboard/cliente/perfil' },
     ];
 

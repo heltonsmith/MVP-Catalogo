@@ -1,31 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Eye, Star, Plus, Minus, Check } from 'lucide-react';
+import { ShoppingCart, Eye, Star, Plus, Minus } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatCurrency } from '../../utils';
-import { useCart } from '../../hooks/useCart';
 import { useToast } from '../ui/Toast';
 import { StarRating } from '../ui/StarRating';
 
-export function ProductCard({ product, companySlug, cartEnabled = true, isDemo = false, onReviewClick }) {
-    const { addToCart } = useCart();
+export function DemoProductCard({ product, companySlug, cartEnabled = true, onReviewClick, viewOnly }) {
     const { showToast } = useToast();
     const [quantity, setQuantity] = useState(1);
     const mainImage = product.images?.[0] || product.image || 'https://placehold.co/600x600?text=Sin+Imagen';
 
     const getLink = () => {
-        const baseLink = `/catalogo/${companySlug}/producto/${product.slug}`;
-        return isDemo ? `${baseLink}?mode=demo` : baseLink;
+        return `/demo/catalogo/${companySlug}/producto/${product.slug}`;
     };
 
     const handleAddToCart = () => {
-        if (cartEnabled) {
-            addToCart(product, quantity);
-            showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
-            setQuantity(1);
-        }
+        showToast('Esta es una acción demo: Añadir al Carrito. En la versión real, esta acción se realizaría correctamente.', 'demo');
     };
 
     return (
@@ -38,13 +31,7 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
-                        {cartEnabled ? (
-                            <Badge variant="success">Stock: {product.stock}</Badge>
-                        ) : (
-                            <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
-                                {product.stock > 0 ? 'Disponible' : 'No disponible'}
-                            </Badge>
-                        )}
+                        <Badge variant="success">Stock: {product.stock}</Badge>
                         {product.rating !== undefined && (
                             <button
                                 onClick={(e) => {
@@ -85,9 +72,6 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                                         <span className="font-bold text-emerald-600">{formatCurrency(tier.price)}</span>
                                     </div>
                                 ))}
-                                {product.wholesale_prices.length > 3 && (
-                                    <span className="text-[9px] text-slate-400 italic text-right">Ver más...</span>
-                                )}
                             </div>
                         )}
                     </div>
@@ -95,24 +79,22 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
             </CardContent>
 
             <CardFooter className="p-4 pt-0 flex-col gap-3">
-                {cartEnabled && (
-                    <>
-                        <div className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-1">
-                            <button
-                                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
-                                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                            >
-                                <Minus size={14} />
-                            </button>
-                            <span className="text-xs font-bold text-slate-700">{quantity}</span>
-                            <button
-                                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
-                                onClick={() => setQuantity(quantity + 1)}
-                            >
-                                <Plus size={14} />
-                            </button>
-                        </div>
-                    </>
+                {!viewOnly && (
+                    <div className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-1">
+                        <button
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
+                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        >
+                            <Minus size={14} />
+                        </button>
+                        <span className="text-xs font-bold text-slate-700">{quantity}</span>
+                        <button
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-primary-600 transition-colors"
+                            onClick={() => setQuantity(quantity + 1)}
+                        >
+                            <Plus size={14} />
+                        </button>
+                    </div>
                 )}
 
                 <div className="flex w-full gap-2">
@@ -122,10 +104,10 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                     >
                         <Button variant="secondary" size="sm" className="w-full font-bold">
                             <Eye className="mr-2 h-4 w-4" />
-                            {cartEnabled ? 'Ver' : 'Ver detalles'}
+                            Ver
                         </Button>
                     </Link>
-                    {cartEnabled && (
+                    {!viewOnly && (
                         <Button
                             size="sm"
                             variant="primary"

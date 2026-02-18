@@ -92,6 +92,10 @@ export default function DashboardQuotes() {
         }
     };
 
+    const handleDemoAction = (action) => {
+        showToast(`Esta es una acción demo: ${action}. En la versión real, esta acción se realizaría correctamente.`, "demo");
+    };
+
     useEffect(() => {
         fetchQuotes();
     }, [company?.id, isDemo, demoCompany.id, dateRange]);
@@ -99,7 +103,7 @@ export default function DashboardQuotes() {
     const updateStatus = async (quoteId, newStatus) => {
         if (isDemo) {
             setQuotes(quotes.map(q => q.id === quoteId ? { ...q, status: newStatus } : q));
-            showToast(`Estado actualizado a ${newStatus === 'answered' ? 'Respondida' : 'Completada'}`, "success");
+            handleDemoAction(`Actualizar estado a ${newStatus === 'answered' ? 'Respondida' : 'Completada'}`);
             return;
         }
 
@@ -192,7 +196,7 @@ export default function DashboardQuotes() {
 
                     {company?.plan === 'free' && (
                         <Button
-                            onClick={() => setShowUpgradeModal(true)}
+                            onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                             variant="secondary"
                             className="font-bold bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 h-11"
                         >
@@ -270,17 +274,21 @@ export default function DashboardQuotes() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <a
-                                                href={`https://wa.me/${quote.customer_whatsapp.replace(/\D/g, '')}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="w-full block"
+                                            <button
+                                                onClick={() => {
+                                                    if (isDemo) {
+                                                        handleDemoAction("Responder WhatsApp");
+                                                    } else {
+                                                        window.open(`https://wa.me/${quote.customer_whatsapp.replace(/\D/g, '')}`, '_blank');
+                                                    }
+                                                }}
+                                                className="w-full"
                                             >
                                                 <Button variant="secondary" size="sm" className="w-full text-xs font-bold gap-2 bg-white border-slate-200">
                                                     <MessageSquare size={14} />
                                                     Responder WhatsApp
                                                 </Button>
-                                            </a >
+                                            </button>
 
                                             {quote.status === 'pending' && (
                                                 <Button
@@ -338,10 +346,10 @@ export default function DashboardQuotes() {
                                 Gestiona todos tus pedidos de WhatsApp desde un solo lugar, marca estados, lleva el historial de clientes y potencia tus ventas.
                             </p>
                             <Button
-                                onClick={() => setShowUpgradeModal(true)}
+                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                                 className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-amber-200"
                             >
-                                <Sparkles size={18} className="mr-2" />
+                                <Plus size={18} className="mr-2" />
                                 Desbloquear ahora
                             </Button>
                             <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Disponible en todos los planes de pago</p>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
@@ -28,6 +28,34 @@ export const AuthProvider = ({ children }) => {
     // Ref to prevent multiple simultaneous loads for the same user
     const loadingForUserId = useRef(null);
 
+    const refreshUnreadNotifications = useCallback(async (overrideUserId) => {
+        const targetId = overrideUserId || user?.id;
+        if (!targetId) {
+            console.log('Auth: Skip refresh, no targetId');
+            return;
+        }
+
+        console.log('Auth: Refreshing unread notifications for:', targetId);
+        const { data, count, error } = await supabase
+            .from('notifications')
+            .select('id, is_read', { count: 'exact' })
+            .eq('user_id', targetId)
+            .eq('is_read', false);
+
+        if (error) {
+            console.error('Auth: Error refreshing unread notifications:', error);
+            return;
+        }
+
+        console.log('Auth: Raw data returned:', data?.length || 0, 'rows. Count header:', count);
+        // Robust boolean filtering
+        const unreadRows = (data || []).filter(n => n.is_read === false || n.is_read === 'f');
+        const newCount = count !== null ? count : unreadRows.length;
+
+        console.log('Auth: New count for', targetId, 'is', newCount);
+        setUnreadNotifications(newCount);
+    }, [user]);
+
     const loadUserData = async (userId, force = false) => {
         if (!userId || (!force && loadingForUserId.current === userId)) return;
         loadingForUserId.current = userId;
@@ -36,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const fetchProfile = async () => {
                 const query = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-                const { data } = await withTimeout(query, 15000, { data: null });
+                const { data } = await withTimeout(query, 4000, { data: null });
                 if (data) {
                     setProfile(data);
                 } else {
@@ -46,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
             const fetchCompany = async () => {
                 const query = supabase.from('companies').select('*').eq('user_id', userId).maybeSingle();
-                const { data } = await withTimeout(query, 15000, { data: null });
+                const { data } = await withTimeout(query, 4000, { data: null });
                 if (data) {
                     console.log('Auth: Company loaded');
                     setCompany(data);
@@ -68,15 +96,7 @@ export const AuthProvider = ({ children }) => {
             };
 
             const fetchUnreadNotifications = async () => {
-                const { count, error } = await supabase
-                    .from('notifications')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('user_id', userId)
-                    .eq('is_read', false);
-
-                if (!error) {
-                    setUnreadNotifications(count || 0);
-                }
+                await refreshUnreadNotifications(userId);
             };
 
             await Promise.allSettled([fetchProfile(), fetchCompany(), fetchUnreadNotifications()]);
@@ -106,7 +126,7 @@ export const AuthProvider = ({ children }) => {
                 console.log('Auth: Global safety timeout reached');
                 setLoading(false);
             }
-        }, 20000);
+        }, 10000);
 
         const init = async () => {
             console.log('Auth: Running initialization...');
@@ -141,28 +161,6 @@ export const AuthProvider = ({ children }) => {
 
             if (currentUser) {
                 loadUserData(currentUser.id);
-
-                // Set up real-time unread count
-                const channel = supabase
-                    .channel(`unread-notifications-${currentUser.id}`)
-                    .on('postgres_changes', {
-                        event: '*',
-                        schema: 'public',
-                        table: 'notifications',
-                        filter: `user_id=eq.${currentUser.id}`
-                    }, async () => {
-                        const { count } = await supabase
-                            .from('notifications')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('user_id', currentUser.id)
-                            .eq('is_read', false);
-                        setUnreadNotifications(count || 0);
-                    })
-                    .subscribe();
-
-                return () => {
-                    supabase.removeChannel(channel);
-                };
             } else {
                 loadingForUserId.current = null;
                 setProfile(null);
@@ -181,6 +179,37 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
+    // Dedicated effect for real-time notifications
+    useEffect(() => {
+        if (!user) return;
+
+        console.log('Auth: Setting up notifications subscription for:', user.id);
+
+        // Use a consistent channel name to avoid multiple connections if possible
+        const channel = supabase
+            .channel(`global:notifications:${user.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${user.id}`
+            }, (payload) => {
+                console.log('Auth: Notification event captured!', payload.eventType, payload.new?.id);
+                refreshUnreadNotifications(user.id);
+            })
+            .subscribe((status) => {
+                console.log('Auth: Notification channel status:', status);
+                if (status === 'SUBSCRIBED') {
+                    refreshUnreadNotifications(user.id);
+                }
+            });
+
+        return () => {
+            console.log('Auth: Removing notifications subscription for:', user.id);
+            supabase.removeChannel(channel);
+        };
+    }, [user, refreshUnreadNotifications]);
+
     const signIn = async (credentials) => {
         console.log('AuthContext: signIn called');
         return await supabase.auth.signInWithPassword(credentials);
@@ -194,6 +223,7 @@ export const AuthProvider = ({ children }) => {
         setPendingUpgrade(null);
         setUnreadNotifications(0);
     };
+
 
     const refreshCompany = async () => {
         if (user) {
@@ -213,18 +243,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const refreshUnreadNotifications = async () => {
-        if (!user) return;
-        const { count, error } = await supabase
-            .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-            .eq('is_read', false);
-
-        if (!error) {
-            setUnreadNotifications(count || 0);
-        }
-    };
 
     const value = useMemo(() => ({
         signUp: (data) => supabase.auth.signUp(data),

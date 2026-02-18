@@ -52,9 +52,37 @@ export default function DashboardProfile() {
         unreadCount
     } = useNotifications();
 
+    const DEMO_NOTIFICATIONS = [
+        {
+            id: 'demo-upgrade',
+            title: '¡Plan Pro Activado! 🚀',
+            content: `Hola ${company.name}, nos complace informarte que tu solicitud de actualización al Plan Pro ha sido aprobada. Ya puedes disfrutar de todas las funciones avanzadas, incluyendo métricas detalladas e integración completa con WhatsApp.`,
+            type: 'system',
+            created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+            is_read: false,
+            metadata: { status: 'approved' }
+        },
+        {
+            id: 'demo-welcome',
+            title: 'Bienvenido al Administrador de ktaloog',
+            content: 'Estamos felices de ayudarte a digitalizar tu catálogo. Por ser nuevo usuario, tienes acceso a soporte prioritario vía WhatsApp. Si tienes dudas, contáctanos.',
+            type: 'system',
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+            is_read: true
+        },
+        {
+            id: 'demo-tip',
+            title: 'Tip: Personaliza tu Marca',
+            content: 'Recuerda que puedes subir tu logo y banner desde esta misma sección para que tus clientes reconozcan tu marca inmediatamente.',
+            type: 'system',
+            created_at: new Date(Date.now() - 172800000).toISOString(),
+            is_read: true
+        }
+    ];
+
     const systemNotifications = useMemo(() =>
-        notifications.filter(n => n.type === 'system' || n.type === 'message'),
-        [notifications]
+        isDemo ? DEMO_NOTIFICATIONS : notifications.filter(n => n.type === 'system' || n.type === 'message'),
+        [notifications, isDemo]
     );
 
     const unreadSystemCount = useMemo(() =>
@@ -122,6 +150,10 @@ export default function DashboardProfile() {
     if (!company && isDemo) return <div className="p-8 text-center">Cargando datos de demostración...</div>;
 
     const downloadQR = () => {
+        if (isDemo) {
+            handleDemoAction("Descargar QR");
+            return;
+        }
         const svg = document.getElementById("QRCode");
         if (!svg) return;
         const svgData = new XMLSerializer().serializeToString(svg);
@@ -141,15 +173,14 @@ export default function DashboardProfile() {
         img.src = "data:image/svg+xml;base64," + btoa(svgData);
     };
 
-    const handleDemoAction = (e) => {
-        if (e) e.preventDefault();
-        showToast("Funcionalidad próximamente disponible", "info");
+    const handleDemoAction = (action) => {
+        showToast(`Esta es una acción demo: ${action}. En la versión real, esta acción se realizaría correctamente.`, "demo");
     };
 
     const handleSaveProfile = async (e) => {
         if (e) e.preventDefault();
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás guardar cambios.", "info");
+            handleDemoAction("Guardar Información General");
             return;
         }
         setLoading(true);
@@ -187,7 +218,7 @@ export default function DashboardProfile() {
         if (!file) return;
 
         if (isDemo) {
-            showToast("Esta es una demostración. No se pueden subir imágenes.", "info");
+            handleDemoAction("Subir Imagen");
             return;
         }
 
@@ -241,7 +272,7 @@ export default function DashboardProfile() {
     const handleUpdatePassword = async (e) => {
         e.preventDefault();
         if (isDemo) {
-            showToast("Esta es una demostración. No se puede cambiar la contraseña.", "info");
+            handleDemoAction("Actualizar Contraseña");
             return;
         }
         if (passwords.new !== passwords.confirm) {
@@ -280,7 +311,7 @@ export default function DashboardProfile() {
                                 Mensajes del Sistema
                             </div>
                             <CardContent className="p-6">
-                                {loadingNotifs ? (
+                                {(loadingNotifs && !isDemo) ? (
                                     <div className="flex justify-center py-12">
                                         <Loader2 className="animate-spin text-primary-500" size={32} />
                                     </div>
@@ -325,7 +356,7 @@ export default function DashboardProfile() {
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    notif.is_read ? markAsUnread(notif.id) : markAsRead(notif.id);
+                                                                    notif.is_read ? (isDemo ? null : markAsUnread(notif.id)) : (isDemo ? null : markAsRead(notif.id));
                                                                 }}
                                                                 className={cn(
                                                                     "p-2 rounded-lg transition-colors",
@@ -338,7 +369,11 @@ export default function DashboardProfile() {
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    deleteNotification(notif.id);
+                                                                    if (isDemo) {
+                                                                        handleDemoAction("Eliminar Notificación");
+                                                                    } else {
+                                                                        deleteNotification(notif.id);
+                                                                    }
                                                                 }}
                                                                 className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                                                                 title="Eliminar"
@@ -392,7 +427,7 @@ export default function DashboardProfile() {
                                         <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
                                         <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
                                     </div>
-                                    <div className="h-6 w-11 bg-primary-100 rounded-full relative cursor-pointer" onClick={handleDemoAction}>
+                                    <div className="h-6 w-11 bg-primary-100 rounded-full relative cursor-pointer" onClick={() => isDemo ? handleDemoAction("Cambiando Ajuste") : null}>
                                         <div className={cn("absolute top-1 h-4 w-4 bg-primary-600 rounded-full shadow-sm transition-all", item.default ? "right-1" : "left-1 bg-slate-400")} />
                                     </div>
                                 </div>
@@ -466,12 +501,12 @@ export default function DashboardProfile() {
                                             </div>
                                             <div>
                                                 <p className="text-xs font-bold text-emerald-800">
-                                                    {company.whatsapp ? `Conectado a ${company.whatsapp}` : "WhatsApp no configurado"}
+                                                    {isDemo ? `Conectado a +56 9 ${Math.floor(Math.random() * 90000000 + 10000000)}` : company.whatsapp ? `Conectado a ${company.whatsapp}` : "WhatsApp no configurado"}
                                                 </p>
                                                 <p className="text-[10px] text-emerald-600 font-medium">Recibiendo cotizaciones activamente.</p>
                                             </div>
                                         </div>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 text-xs font-bold" onClick={handleDemoAction}>
+                                        <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 text-xs font-bold" onClick={() => handleDemoAction("Desconectar WhatsApp")}>
                                             Desconectar
                                         </Button>
                                     </div>
@@ -488,7 +523,7 @@ export default function DashboardProfile() {
                                             )}
                                             <Button
                                                 variant="outline"
-                                                onClick={() => setShowUpgradeModal(true)}
+                                                onClick={() => isDemo ? handleDemoAction("Activar WhatsApp") : setShowUpgradeModal(true)}
                                                 className={cn(
                                                     "bg-white/80 backdrop-blur-sm border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-black rounded-xl",
                                                     pendingRequest && "border-amber-200 shadow-none opacity-90"
@@ -761,7 +796,7 @@ export default function DashboardProfile() {
                                                 </div>
                                             )}
                                             <Button
-                                                onClick={() => setShowUpgradeModal(true)}
+                                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                                                 className={cn(
                                                     "w-full h-10 font-black shadow-lg shadow-primary-100 transition-all text-xs",
                                                     pendingRequest ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 shadow-none" : "bg-primary-600 hover:bg-primary-700"
@@ -802,7 +837,7 @@ export default function DashboardProfile() {
                                         <p className="text-xs text-slate-500 mt-1">Remueve la mención "Catálogo por ktaloog" al final de tu tienda.</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className="h-6 w-11 bg-slate-100 rounded-full relative cursor-not-allowed">
+                                        <div className="h-6 w-11 bg-slate-100 rounded-full relative cursor-not-allowed" onClick={() => isDemo ? handleDemoAction("Marca Blanca") : null}>
                                             <div className="absolute left-1 top-1 h-4 w-4 bg-slate-400 rounded-full shadow-sm" />
                                         </div>
                                     </div>
@@ -819,7 +854,7 @@ export default function DashboardProfile() {
                                             )}
                                             <Button
                                                 variant="outline"
-                                                onClick={() => setShowUpgradeModal(true)}
+                                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                                                 className={cn(
                                                     "bg-white/80 backdrop-blur-sm border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 font-black rounded-xl",
                                                     pendingRequest && "border-amber-200 shadow-none opacity-90"
@@ -842,7 +877,7 @@ export default function DashboardProfile() {
                                 )}
                             </CardContent>
                         </Card>
-                    </div>
+                    </div >
                 );
         }
     };
@@ -857,7 +892,7 @@ export default function DashboardProfile() {
                 {activeTab === 'profile' && (
                     <Button
                         onClick={handleSaveProfile}
-                        disabled={loading || isDemo}
+                        disabled={loading}
                         className="shadow-lg shadow-primary-100 h-10 px-4 shrink-0 font-bold"
                     >
                         {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
@@ -959,7 +994,7 @@ export default function DashboardProfile() {
                                                 "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
                                     )
                                 )}
-                                onClick={() => setShowUpgradeModal(true)}
+                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                             >
                                 {pendingRequest ? (
                                     <>

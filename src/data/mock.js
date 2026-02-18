@@ -67,7 +67,7 @@ export const COMPANIES = [
             website: 'https://delicias.cl'
         },
         features: {
-            cartEnabled: false // Digital Menu mode (no cart)
+            cartEnabled: true // Enable cart so it can be toggled via "Menu Mode"
         },
         reviews: [
             { id: 1, user: 'Ana P.', rating: 5, comment: 'La comida estaba deliciosa y la atención fue excelente.', date: '2024-02-05' },

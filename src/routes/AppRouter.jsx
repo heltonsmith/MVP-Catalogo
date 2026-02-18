@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import LandingPage from '../pages/LandingPage';
 import CatalogPage from '../pages/CatalogPage';
+import DemoCatalogPage from '../pages/demo/DemoCatalogPage';
+import DemoProductDetailsPage from '../pages/demo/DemoProductDetailsPage';
 import ProductDetailsPage from '../pages/ProductDetailsPage';
 import CartPage from '../pages/CartPage';
 import LoginPage from '../pages/LoginPage';
@@ -37,6 +39,7 @@ import AdminSettings from '../pages/admin/AdminSettings';
 import AdminExplorer from '../pages/admin/AdminExplorer';
 
 import PublicExplorer from '../pages/PublicExplorer';
+import InboxPage from '../pages/InboxPage';
 
 export function AppRouter() {
     return (
@@ -44,10 +47,25 @@ export function AppRouter() {
             <Route element={<AppLayout />}>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/explorar" element={<PublicExplorer />} />
+                {/* Explicit Demo Slugs mapped to Demo Components */}
+                <Route path="/catalogo/ecoverde-spa" element={<DemoCatalogPage overrideSlug="ecoverde-spa" />} />
+                <Route path="/catalogo/technova-store" element={<DemoCatalogPage overrideSlug="technova-store" />} />
+                <Route path="/catalogo/restaurante-delicias" element={<DemoCatalogPage overrideSlug="restaurante-delicias" />} />
+                <Route path="/catalogo/ecoverde-spa/producto/:productSlug" element={<DemoProductDetailsPage overrideSlug="ecoverde-spa" />} />
+                <Route path="/catalogo/technova-store/producto/:productSlug" element={<DemoProductDetailsPage overrideSlug="technova-store" />} />
+                <Route path="/catalogo/restaurante-delicias/producto/:productSlug" element={<DemoProductDetailsPage overrideSlug="restaurante-delicias" />} />
+
                 <Route path="/catalogo/:companySlug" element={<CatalogPage />} />
                 <Route path="/catalogo/:companySlug/landing" element={<CatalogPage />} />
                 <Route path="/catalogo/:companySlug/producto/:productSlug" element={<ProductDetailsPage />} />
+
+
+                {/* Dedicated Demo Routes */}
+                <Route path="/demo/catalogo/:companySlug" element={<DemoCatalogPage />} />
+                <Route path="/demo/catalogo/:companySlug/producto/:productSlug" element={<DemoProductDetailsPage />} />
+
                 <Route path="/carrito" element={<CartPage />} />
+                <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/mensajes" element={<UserMessages />} />
                 <Route path="/precios" element={<PricingPage />} />
                 <Route path="/terminos" element={<TermsPage />} />

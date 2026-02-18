@@ -25,7 +25,6 @@ export function DemoRestaurantDashboardLayout() {
         { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/demo/restaurante/dashboard' },
         { name: 'Mis Productos', icon: <Package size={20} />, path: '/demo/restaurante/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/demo/restaurante/dashboard/categorias' },
-        { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/demo/restaurante/dashboard/mensajes', badge: '3' },
         // Note: No Cotizaciones for restaurant
         { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/demo/restaurante/dashboard/perfil' },
     ];
@@ -96,6 +95,14 @@ export function DemoRestaurantDashboardLayout() {
                         Esta es una versión de prueba. Los cambios no se guardarán.
                     </div>
                     <div className="space-y-2">
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start text-primary-600 hover:text-primary-700 hover:bg-primary-50 font-bold"
+                            onClick={() => navigate('/demo/catalogo/restaurante-delicias')}
+                        >
+                            <Store size={20} className="mr-3" />
+                            Mi Catálogo Demo
+                        </Button>
                         <Button
                             variant="ghost"
                             className="w-full justify-start text-slate-500 hover:text-slate-700 hover:bg-slate-50"

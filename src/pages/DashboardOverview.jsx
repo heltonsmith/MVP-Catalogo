@@ -177,7 +177,7 @@ export default function DashboardOverview() {
                     )}
                     {displayCompany.plan === 'free' && (
                         <Button
-                            onClick={() => setShowUpgradeModal(true)}
+                            onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                             variant="secondary"
                             className={cn(
                                 "flex-1 sm:flex-none font-black transition-all",
@@ -240,7 +240,11 @@ export default function DashboardOverview() {
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            setShowUpgradeModal(true);
+                                            if (isDemo) {
+                                                handleDemoAction("Mejorar Plan");
+                                            } else {
+                                                setShowUpgradeModal(true);
+                                            }
                                         }}
                                         variant="outline"
                                         size="default"
@@ -275,14 +279,14 @@ export default function DashboardOverview() {
                             <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 border border-slate-200 shadow-sm">
                                 <Link2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
                                 <code className="text-xs text-slate-600 font-mono flex-1 truncate">
-                                    {window.location.origin}/catalogo/{displayCompany.slug}
+                                    {window.location.origin}{isDemo ? `/demo/catalogo/${displayCompany.slug}` : `/catalogo/${displayCompany.slug}`}
                                 </code>
                             </div>
                         </div>
                         <div className="flex gap-2 w-full sm:w-auto">
                             <Button
                                 onClick={() => {
-                                    const catalogUrl = `${window.location.origin}/catalogo/${displayCompany.slug}`;
+                                    const catalogUrl = `${window.location.origin}${isDemo ? `/demo/catalogo/${displayCompany.slug}` : `/catalogo/${displayCompany.slug}`}`;
                                     navigator.clipboard.writeText(catalogUrl);
                                     showToast("¡Enlace copiado al portapapeles!", "success");
                                 }}
@@ -292,17 +296,17 @@ export default function DashboardOverview() {
                                 <Copy className="h-4 w-4" />
                                 Copiar Enlace
                             </Button>
-                            <Link
-                                to={`/catalogo/${displayCompany.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <button
+                                onClick={() => {
+                                    window.open(`/catalogo/${displayCompany.slug}`, '_blank');
+                                }}
                                 className="flex-1 sm:flex-none"
                             >
                                 <Button className="w-full font-bold gap-2">
                                     <ExternalLink className="h-4 w-4" />
-                                    Ver Catálogo
+                                    {isDemo ? 'Ver Demo' : 'Ver Catálogo'}
                                 </Button>
-                            </Link>
+                            </button>
                         </div>
                     </div>
                 </CardContent>
@@ -410,7 +414,7 @@ export default function DashboardOverview() {
                                         <h4 className="font-bold text-slate-900 text-xs mb-1">Análisis de Productos</h4>
                                         <p className="text-[10px] text-slate-500 mb-4 px-2 text-center leading-relaxed">Descubre qué productos cotizan más tus clientes y optimiza tu inventario.</p>
                                         <Button
-                                            onClick={() => setShowUpgradeModal(true)}
+                                            onClick={() => isDemo ? handleDemoAction("Ver Analíticas") : setShowUpgradeModal(true)}
                                             variant="secondary"
                                             size="sm"
                                             className="font-bold bg-white/90 border-purple-100 text-purple-600 hover:bg-white shadow-sm text-[10px]"
@@ -510,7 +514,7 @@ export default function DashboardOverview() {
                                     <h4 className="font-bold text-slate-900 text-xs mb-1">Actividad en Tiempo Real</h4>
                                     <p className="text-[10px] text-slate-500 mb-4 px-4 leading-relaxed">Visualiza todas las cotizaciones y mensajes de tus clientes vía WhatsApp, ordenados por fecha con filtros avanzados.</p>
                                     <Button
-                                        onClick={() => setShowUpgradeModal(true)}
+                                        onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                                         className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-8 text-[10px] shadow-lg shadow-emerald-200 px-6 rounded-lg"
                                     >
                                         Mejorar Plan
@@ -520,7 +524,7 @@ export default function DashboardOverview() {
 
                             <div className="p-3 bg-slate-50/50">
                                 <Button
-                                    onClick={() => company.plan === 'free' ? setShowUpgradeModal(true) : null}
+                                    onClick={() => isDemo ? handleDemoAction("Ver historial completo") : (company.plan === 'free' ? setShowUpgradeModal(true) : null)}
                                     variant="ghost"
                                     className="w-full h-8 text-xs font-bold text-slate-400 hover:text-primary-600"
                                 >

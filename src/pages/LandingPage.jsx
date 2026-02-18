@@ -92,13 +92,13 @@ export default function LandingPage() {
                                     </Button>
                                 </Link>
                                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 sm:border-l border-slate-200 sm:pl-4">
-                                    <Link to="/catalogo/ecoverde-spa?mode=demo" className="group w-full sm:w-auto">
+                                    <Link to="/demo/catalogo/ecoverde-spa" className="group w-full sm:w-auto">
                                         <Button variant="outline" size="lg" className="h-14 w-full bg-white border-slate-200 text-slate-700 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 transition-all shadow-sm group-hover:shadow-md">
                                             <Store className="mr-2 h-5 w-5 text-slate-400 group-hover:text-primary-500 transition-colors" />
                                             Demo Tienda
                                         </Button>
                                     </Link>
-                                    <Link to="/catalogo/restaurante-delicias?mode=demo" className="group w-full sm:w-auto">
+                                    <Link to="/demo/catalogo/restaurante-delicias" className="group w-full sm:w-auto">
                                         <Button variant="outline" size="lg" className="h-14 w-full bg-white border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm group-hover:shadow-md">
                                             <Utensils className="mr-2 h-5 w-5 text-slate-400 group-hover:text-orange-500 transition-colors" />
                                             Demo Restaurante

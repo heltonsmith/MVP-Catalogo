@@ -196,15 +196,31 @@ export function NotificationCenter() {
                                                 )}
                                                 onClick={() => handleSelect(notification.id)}
                                             >
-                                                <div className={cn(
-                                                    "flex-shrink-0 h-9 w-9 rounded-2xl flex items-center justify-center mt-0.5 shadow-sm border border-white",
-                                                    isRejected && !notification.is_read ? "bg-rose-100 text-rose-600" :
-                                                        notification.type === 'quote' ? 'bg-blue-50 text-blue-600' :
-                                                            notification.type === 'stock' ? 'bg-amber-50 text-amber-600' :
-                                                                notification.type === 'system' ? 'bg-primary-50 text-primary-600' :
-                                                                    notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
-                                                )}>
-                                                    {getIcon(notification)}
+                                                <div className="flex-shrink-0 mt-0.5">
+                                                    {notification.metadata?.actor_avatar ? (
+                                                        <div className="h-9 w-9 rounded-2xl overflow-hidden shadow-sm border border-white ring-2 ring-slate-100">
+                                                            <img
+                                                                src={notification.metadata.actor_avatar}
+                                                                alt={notification.metadata.customer_name || 'Avatar'}
+                                                                className="h-full w-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.target.onerror = null;
+                                                                    e.target.parentElement.innerHTML = '<div class="h-full w-full bg-slate-100 flex items-center justify-center"><Bell size={16} class="text-slate-400" /></div>';
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className={cn(
+                                                            "h-9 w-9 rounded-2xl flex items-center justify-center shadow-sm border border-white",
+                                                            isRejected && !notification.is_read ? "bg-rose-100 text-rose-600" :
+                                                                notification.type === 'quote' ? 'bg-blue-50 text-blue-600' :
+                                                                    notification.type === 'stock' ? 'bg-amber-50 text-amber-600' :
+                                                                        notification.type === 'system' ? 'bg-primary-50 text-primary-600' :
+                                                                            notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
+                                                        )}>
+                                                            {getIcon(notification)}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">

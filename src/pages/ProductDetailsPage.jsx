@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ShoppingCart, Share2, ShieldCheck, Package, Truck, Utensils, User, Loader2 } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, Minus, ChevronRight, Star, ArrowLeft, Share2, Utensils, MessageCircle, Truck, Package, ShieldCheck, Heart, Trash2, Pencil, Loader2, ChevronLeft } from 'lucide-react';
 import { PRODUCTS, COMPANIES, CATEGORIES } from '../data/mock';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
@@ -12,6 +12,7 @@ import { useCart } from '../hooks/useCart';
 import { useToast } from '../components/ui/Toast';
 import { motion } from 'framer-motion';
 import NotFoundPage from './NotFoundPage';
+import { useSettings } from '../hooks/useSettings';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -19,13 +20,13 @@ export default function ProductDetailsPage() {
     const { showToast } = useToast();
     const { user, profile } = useAuth();
     const [searchParams] = useSearchParams();
-    const isDemo = searchParams.get('mode') === 'demo';
 
     const { productSlug, companySlug } = useParams();
     const navigate = useNavigate();
     const { addToCart } = useCart();
     const [quantity, setQuantity] = useState(1);
     const [isReviewsOpen, setIsReviewsOpen] = useState(false);
+    const { getSetting } = useSettings();
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -33,28 +34,13 @@ export default function ProductDetailsPage() {
     const [company, setCompany] = useState(null);
     const [hasReviewed, setHasReviewed] = useState(false);
     const [tempReview, setTempReview] = useState({ rating: 0, comment: '' });
+    const [editingReview, setEditingReview] = useState(null); // { id, rating, comment }
 
     useEffect(() => {
         const fetchProductData = async () => {
-            if (isDemo) {
-                const demoProduct = PRODUCTS.find(p => p.slug === productSlug);
-                const demoCompany = COMPANIES.find(c => c.slug === companySlug);
-
-                if (demoProduct && demoCompany) {
-                    setProduct({
-                        ...demoProduct,
-                        images: demoProduct.images || []
-                    });
-                    setCompany(demoCompany);
-                } else {
-                    setError('Not found');
-                }
-                setLoading(false);
-                return;
-            }
-
             try {
                 setLoading(true);
+
 
                 // 1. Fetch Company
                 const { data: companyData, error: companyError } = await supabase
@@ -89,10 +75,30 @@ export default function ProductDetailsPage() {
                     .eq('product_id', productData.id)
                     .order('created_at', { ascending: false });
 
+                // 4. Fetch avatars manually
+                let avatarsMap = {};
+                if (reviewsData && reviewsData.length > 0) {
+                    const userIds = [...new Set(reviewsData.map(r => r.user_id).filter(Boolean))];
+                    if (userIds.length > 0) {
+                        const { data: profilesData } = await supabase
+                            .from('profiles')
+                            .select('id, avatar_url')
+                            .in('id', userIds);
+
+                        if (profilesData) {
+                            profilesData.forEach(p => {
+                                avatarsMap[p.id] = p.avatar_url;
+                            });
+                        }
+                    }
+                }
+
                 // Transform reviews to match mock structure
                 const transformedReviews = (reviewsData || []).map(r => ({
                     id: r.id,
                     user: r.customer_name || 'Anónimo',
+                    user_id: r.user_id,
+                    avatar: avatarsMap[r.user_id],
                     date: new Date(r.created_at).toLocaleDateString(),
                     rating: r.rating,
                     comment: r.comment
@@ -126,7 +132,7 @@ export default function ProductDetailsPage() {
         };
 
         fetchProductData();
-    }, [productSlug, companySlug, isDemo]);
+    }, [productSlug, companySlug]);
 
     useEffect(() => {
         if (user && product) {
@@ -183,6 +189,7 @@ export default function ProductDetailsPage() {
                     {
                         id: Date.now(), // Temporary ID until refresh
                         user: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
+                        user_id: user.id,
                         date: new Date().toLocaleDateString(),
                         rating: tempReview.rating,
                         comment: tempReview.comment
@@ -204,6 +211,89 @@ export default function ProductDetailsPage() {
         }
     };
 
+    const handleUpdateReview = async () => {
+        if (!user || !editingReview) return;
+
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .update({
+                    rating: tempReview.rating,
+                    comment: tempReview.comment,
+                    created_at: new Date().toISOString()
+                })
+                .eq('id', editingReview.id)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+
+            showToast("¡Reseña actualizada!", "success");
+
+            // Update local state
+            setProduct(prev => {
+                const updatedReviews = prev.reviews.map(r =>
+                    r.id === editingReview.id
+                        ? { ...r, rating: tempReview.rating, comment: tempReview.comment }
+                        : r
+                );
+
+                const newRating = parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1));
+
+                return {
+                    ...prev,
+                    reviews: updatedReviews,
+                    rating: newRating
+                };
+            });
+
+            setEditingReview(null);
+            setTempReview({ rating: 0, comment: '' });
+        } catch (error) {
+            console.error('Error updating review:', error);
+            showToast("Error al actualizar", "error");
+        }
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!confirm('¿Estás seguro de que quieres eliminar tu reseña?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .delete()
+                .eq('id', reviewId)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+
+            showToast("Reseña eliminada", "success");
+            setHasReviewed(false);
+
+            // Update local state
+            setProduct(prev => {
+                const updatedReviews = prev.reviews.filter(r => r.id !== reviewId);
+                const newRating = updatedReviews.length > 0
+                    ? parseFloat((updatedReviews.reduce((acc, r) => acc + r.rating, 0) / updatedReviews.length).toFixed(1))
+                    : 0;
+
+                return {
+                    ...prev,
+                    reviews: updatedReviews,
+                    rating: newRating
+                };
+            });
+        } catch (error) {
+            console.error('Error deleting review:', error);
+            showToast("Error al eliminar", "error");
+        }
+    };
+
+    const startEditReview = (review) => {
+        setEditingReview(review);
+        setTempReview({ rating: review.rating, comment: review.comment || '' });
+    };
+
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen py-20 gap-4">
@@ -218,19 +308,11 @@ export default function ProductDetailsPage() {
     }
 
     const handleAddToCart = () => {
-        if (isDemo) {
-            showToast('Esta es una función de demostración. En la versión real, añadiría el producto al carrito.', 'demo');
-            return;
-        }
         addToCart(product, quantity);
         showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
     };
 
     const handleShare = async () => {
-        if (isDemo) {
-            showToast('Esta es una función de demostración. En la versión real, permitiría compartir el producto.', 'demo');
-            return;
-        }
         const shareData = {
             title: product.name,
             text: `Mira este producto en ${company.name}: ${product.name} `,
@@ -254,6 +336,7 @@ export default function ProductDetailsPage() {
         }
     };
 
+    const isOwner = user?.id === company?.user_id;
     const isRestaurant = company.slug === 'restaurante-delicias';
 
     return (
@@ -468,18 +551,45 @@ export default function ProductDetailsPage() {
                     {product.reviews && product.reviews.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {product.reviews.map(review => (
-                                <div key={review.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-300">
+                                <div key={review.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-300 group relative">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm">
-                                                <User size={20} className="text-slate-300" />
+                                            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm overflow-hidden">
+                                                {review.avatar ? (
+                                                    <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
+                                                ) : review.user && review.user !== 'Anónimo' ? (
+                                                    <span className="font-bold text-slate-500 text-lg">{review.user.charAt(0).toUpperCase()}</span>
+                                                ) : (
+                                                    <User size={20} className="text-slate-300" />
+                                                )}
                                             </div>
                                             <div>
                                                 <span className="font-black text-slate-900 text-sm block uppercase tracking-tight">{review.user}</span>
                                                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{review.date}</span>
                                             </div>
                                         </div>
-                                        <StarRating rating={review.rating} size={12} />
+                                        <div className="flex items-center gap-2">
+                                            <StarRating rating={review.rating} size={12} />
+                                            {/* Edit/Delete Actions for Owner */}
+                                            {user && review.user_id === user.id && (
+                                                <div className="flex gap-1 ml-2">
+                                                    <button
+                                                        onClick={() => startEditReview(review)}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteReview(review.id)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <p className="text-slate-600 text-sm italic leading-relaxed">"{review.comment}"</p>
                                 </div>
@@ -497,7 +607,7 @@ export default function ProductDetailsPage() {
                 <div id="write-review" className="mt-12 bg-slate-50 rounded-3xl p-6 md:p-8 border border-slate-100">
                     <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Utensils className="text-primary-600" size={20} />
-                        Deja tu opinión sobre este producto
+                        {editingReview ? 'Editar tu opinión' : 'Deja tu opinión sobre este producto'}
                     </h3>
 
                     {!user ? (
@@ -506,7 +616,11 @@ export default function ProductDetailsPage() {
                                 Inicia sesión para opinar
                             </Button>
                         </div>
-                    ) : hasReviewed ? (
+                    ) : isOwner ? (
+                        <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            <p className="text-slate-500 font-medium italic">Como dueño de la tienda, no puedes calificar tus propios productos.</p>
+                        </div>
+                    ) : (hasReviewed && !editingReview) ? (
                         <div className="text-center py-8 bg-emerald-50 rounded-2xl border border-emerald-100">
                             <p className="text-emerald-700 font-medium">¡Ya has opinado sobre este producto! Gracias.</p>
                         </div>
@@ -533,11 +647,11 @@ export default function ProductDetailsPage() {
                             </div>
 
                             <Button
-                                onClick={handleSubmitReview}
+                                onClick={editingReview ? handleUpdateReview : handleSubmitReview}
                                 disabled={tempReview.rating === 0}
                                 className="w-full"
                             >
-                                Publicar Opinión
+                                {editingReview ? 'Actualizar Opinión' : 'Publicar Opinión'}
                             </Button>
                         </div>
                     )}
@@ -566,15 +680,45 @@ export default function ProductDetailsPage() {
                             <div key={review.id} className="border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                                            <User size={18} className="text-slate-400" />
+                                        <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                            {review.avatar ? (
+                                                <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
+                                            ) : (
+                                                <User size={18} className="text-slate-400" />
+                                            )}
                                         </div>
                                         <div>
                                             <span className="font-bold text-slate-800 text-sm block">{review.user}</span>
                                             <span className="text-[10px] text-slate-400 font-medium">{review.date}</span>
                                         </div>
                                     </div>
-                                    <StarRating rating={review.rating} size={12} />
+                                    <div className="flex items-center gap-2">
+                                        {user && review.user_id === user.id && (
+                                            <div className="flex items-center gap-1 mr-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setIsReviewsOpen(false);
+                                                        setEditingReview(review);
+                                                        setTempReview({ rating: review.rating, comment: review.comment });
+                                                        // Scroll to form automatically
+                                                        document.getElementById('write-review')?.scrollIntoView({ behavior: 'smooth' });
+                                                    }}
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
+                                                    title="Editar"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteReview(review.id)}
+                                                    className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        <StarRating rating={review.rating} size={12} />
+                                    </div>
                                 </div>
                                 <p className="text-slate-600 text-sm italic leading-relaxed pl-12">"{review.comment}"</p>
                             </div>

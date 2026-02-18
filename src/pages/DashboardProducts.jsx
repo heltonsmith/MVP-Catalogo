@@ -128,6 +128,10 @@ export default function DashboardProducts() {
         }
     };
 
+    const handleDemoAction = (action) => {
+        showToast(`Esta es una acción demo: ${action}. En la versión real, esta acción se realizaría correctamente.`, "demo");
+    };
+
     useEffect(() => {
         fetchProducts();
         fetchCategories();
@@ -175,7 +179,7 @@ export default function DashboardProducts() {
 
     const handleAddProduct = () => {
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás agregar productos.", "info");
+            handleDemoAction("Añadir Producto");
             return;
         }
         if (limitReached) {
@@ -188,7 +192,7 @@ export default function DashboardProducts() {
 
     const handleEditProduct = (product) => {
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás editar productos.", "info");
+            handleDemoAction("Editar Producto");
             return;
         }
         setProductToEdit(product);
@@ -197,7 +201,7 @@ export default function DashboardProducts() {
 
     const handleDeleteProductClick = (id) => {
         if (isDemo) {
-            showToast("Esta es una demostración. En la versión real podrás eliminar productos.", "info");
+            handleDemoAction("Eliminar Producto");
             return;
         }
         handleDeleteProduct(id);
@@ -261,7 +265,7 @@ export default function DashboardProducts() {
                                 </div>
                             )}
                             <Button
-                                onClick={() => setShowUpgradeModal(true)}
+                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
                                 variant="secondary"
                                 size="sm"
                                 className={cn(
@@ -293,9 +297,13 @@ export default function DashboardProducts() {
                     <div className="flex gap-2 mr-2 pr-4 border-r border-slate-200">
                         <Button
                             onClick={() => {
-                                const catalogUrl = `${window.location.origin}/catalogo/${company.slug}`;
-                                navigator.clipboard.writeText(catalogUrl);
-                                showToast("¡Enlace copiado!", "success");
+                                if (isDemo) {
+                                    handleDemoAction("Copiar Enlace");
+                                } else {
+                                    const catalogUrl = `${window.location.origin}/catalogo/${company.slug}`;
+                                    navigator.clipboard.writeText(catalogUrl);
+                                    showToast("¡Enlace copiado!", "success");
+                                }
                             }}
                             variant="secondary"
                             size="sm"
@@ -305,10 +313,14 @@ export default function DashboardProducts() {
                             <Copy size={16} />
                             <span className="hidden md:inline">Copiar Enlace</span>
                         </Button>
-                        <Link
-                            to={`/catalogo/${company.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            onClick={() => {
+                                if (isDemo) {
+                                    handleDemoAction("Ver Catálogo");
+                                } else {
+                                    window.open(`/catalogo/${company.slug}`, '_blank');
+                                }
+                            }}
                         >
                             <Button
                                 variant="secondary"
@@ -318,7 +330,7 @@ export default function DashboardProducts() {
                                 <ExternalLink size={16} />
                                 <span className="hidden md:inline">Ver Catálogo</span>
                             </Button>
-                        </Link>
+                        </button>
                     </div>
                     <Button
                         onClick={handleAddProduct}
@@ -402,11 +414,14 @@ export default function DashboardProducts() {
                             <p className="text-slate-400 text-[11px]">Tu plan actual solo permite mostrar {productLimit} productos. Los demás siguen guardados pero no son visibles para tus clientes.</p>
                         </div>
                     </div>
-                    <Link to="/precios">
-                        <Button variant="secondary" size="sm" className="h-8 bg-white/10 border-white/10 text-white hover:bg-white/20 text-[10px] font-bold">
-                            Recuperar Visibilidad
-                        </Button>
-                    </Link>
+                    <Button
+                        onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : null}
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 bg-white/10 border-white/10 text-white hover:bg-white/20 text-[10px] font-bold"
+                    >
+                        Recuperar Visibilidad
+                    </Button>
                 </div>
             )}
 

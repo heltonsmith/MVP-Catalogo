@@ -6,7 +6,6 @@ import {
     Settings,
     LogOut,
     Layers,
-    MessageCircle,
     ExternalLink,
     ChevronRight,
     Store,
@@ -18,14 +17,11 @@ import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
 import { TooltipCard } from '../ui/Tooltip';
 
-import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 
 export function DashboardLayout() {
     const navigate = useNavigate();
     const { user, profile, company, loading, signOut, unreadNotifications } = useAuth();
 
-    // Fetch unread messages count
-    const { unreadCount } = useUnreadMessages(company?.id);
 
     useEffect(() => {
         if (!loading) {
@@ -51,12 +47,6 @@ export function DashboardLayout() {
         { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
         { name: 'Mis Productos', icon: <Package size={20} />, path: '/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/dashboard/categorias' },
-        {
-            name: 'Mensajes',
-            icon: <MessageCircle size={20} />,
-            path: '/dashboard/mensajes',
-            badge: unreadCount > 0 ? unreadCount.toString() : null
-        },
         { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/dashboard/cotizaciones' },
         {
             name: 'Ajustes Perfil',
@@ -96,15 +86,9 @@ export function DashboardLayout() {
 
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     {menuItems.map((item) => {
-                        const isLocked = company?.plan === 'free' && ['Mensajes', 'Cotizaciones'].includes(item.name);
+                        const isLocked = company?.plan === 'free' && ['Cotizaciones'].includes(item.name);
 
                         const getTooltipContent = (name) => {
-                            if (name === 'Mensajes') {
-                                return {
-                                    title: '💬 Mensajes',
-                                    description: 'Almacena todos los mensajes que envíen clientes u otras tiendas. Gestiona conversaciones, responde y mantiene un historial completo.'
-                                };
-                            }
                             if (name === 'Cotizaciones') {
                                 return {
                                     title: '📋 Cotizaciones',
@@ -230,7 +214,7 @@ export function DashboardLayout() {
                 {/* Mobile Bottom Navigation - FIXED */}
                 <nav className="flex-none h-16 border-t border-slate-200 bg-white md:hidden grid grid-cols-5 z-50">
                     {menuItems.slice(0, 5).map((item) => {
-                        const isLocked = company?.plan === 'free' && ['Mensajes', 'Cotizaciones'].includes(item.name);
+                        const isLocked = company?.plan === 'free' && ['Cotizaciones'].includes(item.name);
                         return (
                             <NavLink
                                 key={item.path}

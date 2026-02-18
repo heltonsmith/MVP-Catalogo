@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Rocket, LogOut, User, Store, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Menu, X, Rocket, LogOut, User, Store, ChevronDown, Inbox } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { cn } from '../../utils';
 import { COMPANIES } from '../../data/mock';
@@ -11,18 +12,108 @@ import { COMPANIES } from '../../data/mock';
 export function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const { carts } = useCart();
-    const { user, company, signOut, profile } = useAuth();
+    const { user, company, signOut, profile, unreadNotifications, refreshUnreadNotifications } = useAuth();
+    const [localCompany, setLocalCompany] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
+    const [inboxUnread, setInboxUnread] = useState(0);
+
+    const currentCompany = company || localCompany;
+
+    useEffect(() => {
+        if (!user || company || localCompany) return;
+        const fetchStore = async () => {
+            const { data } = await supabase.from('companies').select('*').eq('user_id', user.id).maybeSingle();
+            if (data) setLocalCompany(data);
+        };
+        fetchStore();
+    }, [user, company]);
+
+    const [isViewOnly, setIsViewOnly] = useState(() => {
+        return localStorage.getItem('demo_view_only') === 'true';
+    });
+
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setIsViewOnly(localStorage.getItem('demo_view_only') === 'true');
+        };
+
+        const handleCustomEvent = (e) => {
+            setIsViewOnly(e.detail.isViewOnly);
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('demo-view-mode-change', handleCustomEvent);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('demo-view-mode-change', handleCustomEvent);
+        };
+    }, []);
+
+    // Fetch unread inbox messages
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchUnread = async () => {
+            try {
+                // Count unread as customer
+                const { count: customerCount } = await supabase
+                    .from('messages')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('customer_id', user.id)
+                    .eq('sender_type', 'store')
+                    .eq('is_read', false)
+                    .eq('visible_to_customer', true);
+
+                let total = customerCount || 0;
+
+                // Count unread as store owner (if applicable)
+                if (currentCompany) {
+                    const { count: storeCount } = await supabase
+                        .from('messages')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('company_id', currentCompany.id)
+                        .eq('sender_type', 'customer')
+                        .eq('is_read', false)
+                        .eq('visible_to_store', true);
+                    total += (storeCount || 0);
+                }
+                setInboxUnread(total);
+            } catch (error) {
+                console.error('Error fetching unread count:', error);
+            }
+        };
+
+        fetchUnread();
+
+        // Subscribe to messages changes
+        const channel = supabase.channel(`navbar_inbox_${user.id}_${Date.now()}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'messages'
+            }, () => {
+                fetchUnread();
+                if (refreshUnreadNotifications) refreshUnreadNotifications();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user, currentCompany, location.pathname, unreadNotifications]); // React to global notification changes too
 
     // Detect current company from URL and check if cart is enabled
     const cartVisible = useMemo(() => {
-        const match = location.pathname.match(/^\/catalogo\/([^/]+)/);
+        if (isViewOnly) return false;
+
+        const match = location.pathname.match(/^\/catalogo\/([^/]+)/) || location.pathname.match(/^\/demo\/catalogo\/([^/]+)/);
         if (!match) return true; // Not on a catalog page, show cart by default
         const slug = match[1];
         const company = COMPANIES.find(c => c.slug === slug);
         return company ? company.features?.cartEnabled !== false : true;
-    }, [location.pathname]);
+    }, [location.pathname, isViewOnly]);
 
     // Calculate total items across all carts
     const totalItems = Object.values(carts).reduce((total, cartItems) => {
@@ -36,8 +127,8 @@ export function Navbar() {
             name: 'Tiendas Demo',
             path: '#',
             submenu: [
-                { name: 'Tienda', path: '/catalogo/ecoverde-spa?mode=demo' },
-                { name: 'Restaurante', path: '/catalogo/restaurante-delicias?mode=demo' }
+                { name: 'Tienda', path: '/catalogo/ecoverde-spa' },
+                { name: 'Restaurante', path: '/catalogo/restaurante-delicias' }
             ]
         },
     ];
@@ -114,7 +205,27 @@ export function Navbar() {
                             </Link>
                         )}
                         {user && (
-                            <div className="hidden md:flex items-center gap-3 mr-2">
+                            <Link
+                                to="/inbox"
+                                onClick={(e) => {
+                                    if (window.location.pathname === '/inbox') {
+                                        e.preventDefault();
+                                        window.location.reload();
+                                    }
+                                }}
+                            >
+                                <Button variant="ghost" size="icon" className="relative text-slate-600 hover:text-primary-600">
+                                    <Inbox size={20} />
+                                    {inboxUnread > 0 && location.pathname !== '/inbox' && (
+                                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
+                                            {inboxUnread}
+                                        </span>
+                                    )}
+                                </Button>
+                            </Link>
+                        )}
+                        {user && (
+                            <div className="flex items-center gap-1 sm:gap-3 mr-1">
                                 <NotificationCenter />
                             </div>
                         )}
