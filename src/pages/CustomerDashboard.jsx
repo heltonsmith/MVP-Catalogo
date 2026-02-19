@@ -242,13 +242,11 @@ export default function CustomerDashboard() {
                                                 </Link>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[9px] bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded-md uppercase tracking-widest">
-                                                        {fav.type === 'retail' ? 'Minorista' : fav.type === 'wholesale' ? 'Mayorista' : 'Restaurante'}
+                                                        {fav.company?.business_type === 'retail' ? 'Minorista' :
+                                                            fav.company?.business_type === 'wholesale' ? 'Mayorista' :
+                                                                fav.company?.business_type === 'mixed' ? 'Mayorista y Detalle' :
+                                                                    'Restaurante'}
                                                     </span>
-                                                    {fav.user_category && (
-                                                        <span className="text-[9px] bg-primary-50 text-primary-600 font-black px-2 py-0.5 rounded-md uppercase tracking-widest truncate max-w-[80px]">
-                                                            {fav.user_category}
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </div>
                                             <ArrowRight size={16} className="text-slate-200 group-hover:text-primary-400 group-hover:translate-x-1 transition-all self-center" />
@@ -294,11 +292,11 @@ export default function CustomerDashboard() {
                                             </div>
                                             <span className={cn(
                                                 "text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
-                                                quote.status === 'pending' ? "bg-amber-100 text-amber-700" :
+                                                quote.status === 'pending' ? "bg-emerald-100 text-emerald-700" :
                                                     quote.status === 'completed' ? "bg-emerald-100 text-emerald-700" :
                                                         "bg-slate-100 text-slate-600"
                                             )}>
-                                                {quote.status === 'pending' ? 'Pendiente' : 'Listo'}
+                                                {quote.status === 'pending' ? 'Enviada' : 'Listo'}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between pt-3 border-t border-slate-50 group-hover:border-slate-100">

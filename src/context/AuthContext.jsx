@@ -179,36 +179,78 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
-    // Dedicated effect for real-time notifications
+    // Dedicated effect for real-time notifications with auto-reconnect + polling fallback
     useEffect(() => {
         if (!user) return;
 
         console.log('Auth: Setting up notifications subscription for:', user.id);
 
-        // Use a consistent channel name to avoid multiple connections if possible
-        const channel = supabase
-            .channel(`global:notifications:${user.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                console.log('Auth: Notification event captured!', payload.eventType, payload.new?.id);
-                refreshUnreadNotifications(user.id);
-            })
-            .subscribe((status) => {
-                console.log('Auth: Notification channel status:', status);
-                if (status === 'SUBSCRIBED') {
+        let channelRef = null;
+        let reconnectTimer = null;
+        let isMounted = true;
+
+        const setupChannel = () => {
+            if (!isMounted) return;
+
+            // Remove old channel if exists
+            if (channelRef) {
+                supabase.removeChannel(channelRef);
+                channelRef = null;
+            }
+
+            channelRef = supabase
+                .channel(`global:notifications:${user.id}:${Date.now()}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`
+                }, (payload) => {
+                    console.log('Auth: Notification event captured!', payload.eventType, payload.new?.id);
                     refreshUnreadNotifications(user.id);
-                }
-            });
+                })
+                .subscribe((status) => {
+                    console.log('Auth: Notification channel status:', status);
+                    if (status === 'SUBSCRIBED') {
+                        refreshUnreadNotifications(user.id);
+                        // Clear any pending reconnect timer
+                        if (reconnectTimer) {
+                            clearTimeout(reconnectTimer);
+                            reconnectTimer = null;
+                        }
+                    } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                        console.warn('Auth: Channel failed with status:', status, '— scheduling reconnect in 5s');
+                        // Immediately poll to ensure count is fresh
+                        refreshUnreadNotifications(user.id);
+                        // Schedule reconnect
+                        if (isMounted && !reconnectTimer) {
+                            reconnectTimer = setTimeout(() => {
+                                reconnectTimer = null;
+                                console.log('Auth: Reconnecting notification channel...');
+                                setupChannel();
+                            }, 5000);
+                        }
+                    }
+                });
+        };
+
+        setupChannel();
+
+        // Polling fallback: refresh every 30s in case realtime is unreliable
+        const pollInterval = setInterval(() => {
+            if (isMounted) refreshUnreadNotifications(user.id);
+        }, 30000);
 
         return () => {
-            console.log('Auth: Removing notifications subscription for:', user.id);
-            supabase.removeChannel(channel);
+            isMounted = false;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            clearInterval(pollInterval);
+            if (channelRef) {
+                console.log('Auth: Removing notifications subscription for:', user.id);
+                supabase.removeChannel(channelRef);
+            }
         };
-    }, [user, refreshUnreadNotifications]);
+    }, [user?.id, refreshUnreadNotifications]);
 
     const signIn = async (credentials) => {
         console.log('AuthContext: signIn called');

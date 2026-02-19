@@ -48,27 +48,7 @@ export function useNotifications() {
 
     useEffect(() => {
         if (!user) return;
-
         fetchNotifications();
-
-        const channel = supabase
-            .channel(`global:notifications:${user.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                console.log('useNotifications: Real-time update detected!', payload.eventType);
-                fetchNotifications();
-            })
-            .subscribe((status) => {
-                console.log('useNotifications: Subscription status:', status);
-            });
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
     }, [user, fetchNotifications]);
 
     const markAsRead = async (id) => {

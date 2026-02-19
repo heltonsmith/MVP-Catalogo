@@ -793,7 +793,7 @@ export default function CatalogPage() {
                             <div
                                 ref={editMode === 'logo' ? containerRef : null}
                                 className={cn(
-                                    "relative h-14 w-14 sm:h-20 sm:w-20 lg:h-28 lg:w-28 rounded-[16px] sm:rounded-2xl bg-white p-1 ring-2 sm:ring-4 ring-white shadow-lg flex-shrink-0 group/logo overflow-hidden",
+                                    "relative h-14 w-14 sm:h-20 sm:w-20 lg:h-28 lg:w-28 rounded-full bg-white p-1 ring-2 sm:ring-4 ring-white shadow-lg flex-shrink-0 group/logo overflow-hidden",
                                     editMode === 'logo' ? "cursor-move" : (isOwner && "cursor-pointer")
                                 )}
                                 onDoubleClick={(e) => {

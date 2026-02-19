@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react';
 import {
     Heart,
     Store,
-    Trash2,
     Search,
     BadgeCheck,
     Star,
-    Tag,
-    FolderPlus
+    AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -27,9 +25,8 @@ export default function CustomerFavorites() {
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // For editing favorite category
-    const [editingFavorite, setEditingFavorite] = useState(null);
-    const [tempCategory, setTempCategory] = useState('');
+    // For removal confirmation
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
         if (user) {
@@ -46,7 +43,36 @@ export default function CustomerFavorites() {
                 .eq('user_id', user.id);
 
             if (error) throw error;
-            setFavorites(data || []);
+
+            if (data && data.length > 0) {
+                const companyIds = data.map(f => f.company_id);
+                // Fetch reviews to calculate real ratings
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select('company_id, rating')
+                    .is('product_id', null)
+                    .in('company_id', companyIds);
+
+                const ratingsMap = {};
+                reviewsData?.forEach(r => {
+                    if (!ratingsMap[r.company_id]) ratingsMap[r.company_id] = { sum: 0, count: 0 };
+                    ratingsMap[r.company_id].sum += r.rating;
+                    ratingsMap[r.company_id].count += 1;
+                });
+
+                const dataWithRatings = data.map(f => ({
+                    ...f,
+                    company: {
+                        ...f.company,
+                        calculatedRating: ratingsMap[f.company_id]
+                            ? (ratingsMap[f.company_id].sum / ratingsMap[f.company_id].count).toFixed(1)
+                            : 0
+                    }
+                }));
+                setFavorites(dataWithRatings);
+            } else {
+                setFavorites([]);
+            }
         } catch (error) {
             console.error('Error loading favorites:', error);
             showToast("Error al cargar favoritos", "error");
@@ -55,39 +81,23 @@ export default function CustomerFavorites() {
         }
     };
 
-    const removeFavorite = async (id) => {
+    const removeFavorite = async () => {
+        if (!confirmDelete) return;
         try {
-            const { error } = await supabase.from('favorites').delete().eq('id', id);
+            const { error } = await supabase.from('favorites').delete().eq('id', confirmDelete.id);
             if (error) throw error;
-            setFavorites(prev => prev.filter(f => f.id !== id));
+            setFavorites(prev => prev.filter(f => f.id !== confirmDelete.id));
+            setConfirmDelete(null);
             showToast("Eliminado de favoritos", "success");
         } catch (error) {
             showToast("Error al eliminar", "error");
         }
     };
 
-    const saveFavoriteCategory = async () => {
-        if (!editingFavorite) return;
-        try {
-            const { error } = await supabase
-                .from('favorites')
-                .update({ user_category: tempCategory })
-                .eq('id', editingFavorite.id);
-
-            if (error) throw error;
-
-            setFavorites(prev => prev.map(f => f.id === editingFavorite.id ? { ...f, user_category: tempCategory } : f));
-            setEditingFavorite(null);
-            showToast("Categoría guardada", "success");
-        } catch (error) {
-            showToast("Error al guardar", "error");
-        }
-    };
 
     const filteredFavorites = favorites.filter(f => {
         const matchesTab = activeTab === 'all' || f.company?.business_type === activeTab;
-        const matchesSearch = f.company?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            f.user_category?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = f.company?.name?.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTab && matchesSearch;
     });
 
@@ -172,40 +182,22 @@ export default function CustomerFavorites() {
                                                         fav.company?.business_type === 'mixed' ? 'Mayorista y Detalle' :
                                                             'Restaurante'}
                                             </span>
-                                            {fav.user_category ? (
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingFavorite(fav);
-                                                        setTempCategory(fav.user_category);
-                                                    }}
-                                                    className="text-[9px] bg-primary-50 text-primary-600 font-black px-2 py-0.5 rounded-md uppercase tracking-widest flex items-center gap-1 border border-primary-100 hover:bg-primary-100 transition-colors"
-                                                >
-                                                    <Tag size={10} /> {fav.user_category}
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingFavorite(fav);
-                                                        setTempCategory('');
-                                                    }}
-                                                    className="text-[9px] bg-slate-50 text-slate-400 font-bold px-2 py-0.5 rounded-md uppercase tracking-widest border border-dashed border-slate-200 hover:border-primary-300 hover:text-primary-500 transition-all flex items-center gap-1"
-                                                >
-                                                    <FolderPlus size={10} /> Categorizar
-                                                </button>
-                                            )}
+                                            <div className="flex items-center flex-wrap gap-2 mb-4 h-6">
+                                                {/* Category info only, no edit */}
+                                            </div>
                                         </div>
 
                                         <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                                             <div className="flex items-center gap-2">
                                                 <Star size={12} className="fill-amber-400 text-amber-400" />
-                                                <span className="text-xs font-black text-slate-700">{fav.company?.rating || '4.9'}</span>
+                                                <span className="text-xs font-black text-slate-700">{fav.company?.calculatedRating > 0 ? fav.company.calculatedRating : 'Sin calif.'}</span>
                                             </div>
                                             <button
-                                                onClick={() => removeFavorite(fav.id)}
-                                                className="h-9 w-9 rounded-xl bg-slate-50 text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-all flex items-center justify-center border border-transparent hover:border-rose-100"
+                                                onClick={() => setConfirmDelete(fav)}
+                                                className="h-9 w-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 transition-all flex items-center justify-center border border-rose-100 group/heart"
                                                 title="Eliminar favorito"
                                             >
-                                                <Trash2 size={16} />
+                                                <Heart size={16} fill="currentColor" />
                                             </button>
                                         </div>
                                     </div>
@@ -229,32 +221,26 @@ export default function CustomerFavorites() {
                 </div>
             )}
 
-            {/* Categorize Modal */}
+            {/* Remove Confirmation Modal */}
             <Modal
-                isOpen={!!editingFavorite}
-                onClose={() => setEditingFavorite(null)}
-                title="Sincronizar Categoría"
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                title="Quitar de Favoritos"
                 maxWidth="sm"
             >
-                <div className="p-8 space-y-8 text-center bg-slate-50/50">
-                    <div className="h-20 w-20 bg-primary-600 text-white rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-primary-100">
-                        <Tag size={36} />
+                <div className="p-8 space-y-8 text-center">
+                    <div className="h-20 w-20 bg-rose-50 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-xl shadow-rose-100/50">
+                        <Heart size={36} fill="currentColor" />
                     </div>
                     <div>
-                        <h4 className="text-xl font-black text-slate-900 tracking-tight">Clasifica tu tienda</h4>
-                        <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed">Organiza tus favoritos para encontrarlos más rápido. Puedes usar etiquetas como "Mayorista", "Regalos", etc.</p>
+                        <h4 className="text-xl font-black text-slate-900 tracking-tight">¿Estás seguro?</h4>
+                        <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed">
+                            Se eliminará <span className="font-bold text-slate-900">{confirmDelete?.company?.name}</span> de tu lista de favoritos.
+                        </p>
                     </div>
-                    <div className="space-y-6">
-                        <Input
-                            placeholder="Escribe una etiqueta..."
-                            value={tempCategory}
-                            onChange={(e) => setTempCategory(e.target.value)}
-                            className="bg-white border-slate-200 h-14 rounded-2xl text-center font-bold"
-                        />
-                        <div className="flex gap-4">
-                            <Button variant="outline" className="flex-1 h-12 rounded-2xl border-2 font-black" onClick={() => setEditingFavorite(null)}>CANCELAR</Button>
-                            <Button className="flex-1 h-12 rounded-2xl shadow-lg shadow-primary-100 font-black" onClick={saveFavoriteCategory}>GUARDAR</Button>
-                        </div>
+                    <div className="flex gap-4">
+                        <Button variant="outline" className="flex-1 h-12 rounded-2xl border-2 font-black" onClick={() => setConfirmDelete(null)}>CANCELAR</Button>
+                        <Button className="flex-1 h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-100 font-black text-white" onClick={removeFavorite}>ELIMINAR</Button>
                     </div>
                 </div>
             </Modal>

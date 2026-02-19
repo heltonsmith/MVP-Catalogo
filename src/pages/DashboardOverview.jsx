@@ -296,17 +296,15 @@ export default function DashboardOverview() {
                                 <Copy className="h-4 w-4" />
                                 Copiar Enlace
                             </Button>
-                            <button
+                            <Button
                                 onClick={() => {
                                     window.open(`/catalogo/${displayCompany.slug}`, '_blank');
                                 }}
-                                className="flex-1 sm:flex-none"
+                                className="flex-1 sm:flex-none w-full font-bold gap-2"
                             >
-                                <Button className="w-full font-bold gap-2">
-                                    <ExternalLink className="h-4 w-4" />
-                                    {isDemo ? 'Ver Demo' : 'Ver Catálogo'}
-                                </Button>
-                            </button>
+                                <ExternalLink className="h-4 w-4" />
+                                {isDemo ? 'Ver Demo' : 'Ver Catálogo'}
+                            </Button>
                         </div>
                     </div>
                 </CardContent>

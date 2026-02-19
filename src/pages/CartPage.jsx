@@ -104,12 +104,39 @@ export default function CartPage() {
         }
 
         // Calculate total using wholesale pricing
-        let grandTotal = 0;
+        const { totalPrice } = getCartTotal(companyId);
 
         try {
-            // 1. Save to Supabase
-            const { totalPrice } = getCartTotal(companyId);
+            // 1. Generate WhatsApp Message for actual sending
+            let message = `*Nueva Cotización - ${company.name} (Ktaloog)* 🛒\n`;
+            message += `-----------\n\n`;
+            message += `📅 Fecha: ${formatDate()}\n`;
+            message += `👤 Nombre: ${customerInfo.name}\n`;
+            message += `📧 Correo: ${customerInfo.email}\n`;
+            message += `-----------\n\n`;
+            message += `*Cotización:*\n\n`;
 
+            cartItems.forEach((item, index) => {
+                const { unitPrice, isWholesale, tierMinQty } = getEffectivePrice(item);
+                const subtotal = unitPrice * item.quantity;
+
+                message += `${index + 1}. *${item.name}*\n`;
+                message += `   SKU: ${item.sku || 'N/A'}\n`;
+                if (isWholesale) {
+                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (por mayor, ${tierMinQty}+ un.)\n`;
+                } else {
+                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (unitario)\n`;
+                }
+                message += `   Subtotal: ${formatCurrency(subtotal)}\n\n`;
+            });
+
+            message += `-----------\n`;
+            message += `*💰 Total estimado: ${formatCurrency(totalPrice)}*\n\n`;
+            message += `_Enviado desde Ktaloog_`;
+
+            const link = generateWhatsAppLink(company.whatsapp, message);
+
+            // 2. Save to Supabase (Main Quotes table for admin)
             const { data: quote, error: quoteError } = await supabase
                 .from('quotes')
                 .insert([{
@@ -117,14 +144,15 @@ export default function CartPage() {
                     customer_name: customerInfo.name,
                     customer_whatsapp: customerInfo.email, // Store email in whatsapp field for now
                     total: totalPrice,
-                    status: 'pending'
+                    status: 'pending',
+                    customer_id: user?.id || null
                 }])
                 .select()
                 .single();
 
             if (quoteError) throw quoteError;
 
-            // 2. Save Quote Items
+            // 3. Save Quote Items
             const quoteItemsToCheck = cartItems.map(item => {
                 const { unitPrice } = getEffectivePrice(item);
                 return {
@@ -141,13 +169,19 @@ export default function CartPage() {
 
             if (itemsError) throw itemsError;
 
-            // 3. Save copy for WhatsApp History (Panel de Cliente)
+            // 4. Track quote (only for real stores, not demo)
+            if (!company.slug?.includes('demo')) {
+                try {
+                    await supabase.rpc('increment_quotes', { company_id: companyId });
+                } catch (error) {
+                    console.error('Error tracking quote:', error);
+                }
+            }
+
+            // 5. Save copy for WhatsApp History (Panel de Cliente)
             if (user) {
-                // Generate the descriptive message for history
-                let historyContent = `Cotización para ${company.name}\n`;
                 const detailedItems = cartItems.map(item => {
                     const { unitPrice } = getEffectivePrice(item);
-                    historyContent += `${item.name} x${item.quantity} - ${formatCurrency(unitPrice)}\n`;
                     return {
                         id: item.id,
                         name: item.name,
@@ -158,53 +192,21 @@ export default function CartPage() {
                     };
                 });
 
-                await supabase.from('whatsapp_quotes').insert([{
+                const { error: whatsappError } = await supabase.from('whatsapp_quotes').insert([{
                     user_id: user.id,
                     company_id: companyId,
                     customer_name: customerInfo.name,
                     customer_email: customerInfo.email,
-                    content: historyContent,
+                    content: message, // Save the actual message body
                     items: detailedItems,
-                    total: totalPrice
+                    total: totalPrice,
+                    status: 'pending'
                 }]);
-            }
 
-            // 4. Generate WhatsApp Message for actual sending
-            let message = `*Nueva Cotización - ${company.name} (Ktaloog)* 🛒\n`;
-            message += `-----------\n\n`;
-            message += `📅 Fecha: ${formatDate()}\n`;
-            message += `👤 Nombre: ${customerInfo.name}\n`;
-            message += `📧 Correo: ${customerInfo.email}\n`;
-            message += `-----------\n\n`;
-            message += `*Cotización:*\n\n`;
-
-            cartItems.forEach((item, index) => {
-                const { unitPrice, isWholesale, tierMinQty } = getEffectivePrice(item);
-                const subtotal = unitPrice * item.quantity;
-                grandTotal += subtotal;
-
-                message += `${index + 1}. *${item.name}*\n`;
-                message += `   SKU: ${item.sku || 'N/A'}\n`;
-                if (isWholesale) {
-                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (por mayor, ${tierMinQty}+ un.)\n`;
-                } else {
-                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (unitario)\n`;
-                }
-                message += `   Subtotal: ${formatCurrency(subtotal)}\n\n`;
-            });
-
-            message += `-----------\n`;
-            message += `*💰 Total estimado: ${formatCurrency(grandTotal)}*\n\n`;
-            message += `_Enviado desde Ktaloog_`;
-
-            const link = generateWhatsAppLink(company.whatsapp, message);
-
-            // Track quote (only for real stores, not demo)
-            if (!company.slug?.includes('demo')) {
-                try {
-                    await supabase.rpc('increment_quotes', { company_id: companyId });
-                } catch (error) {
-                    console.error('Error tracking quote:', error);
+                if (whatsappError) {
+                    console.error('Error saving WhatsApp history:', whatsappError);
+                    // We don't throw here to at least let the user open WhatsApp,
+                    // but we log it for debugging.
                 }
             }
 

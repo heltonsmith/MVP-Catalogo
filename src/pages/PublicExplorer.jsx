@@ -84,7 +84,32 @@ export default function PublicExplorer() {
 
             const { data, error } = await query.limit(40);
             if (error) throw error;
-            setResults(data || []);
+
+            if (data && data.length > 0) {
+                const companyIds = data.map(c => c.id);
+                // Fetch only actual store reviews (product_id is null)
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select('company_id, rating')
+                    .is('product_id', null)
+                    .in('company_id', companyIds);
+
+                const ratingsMap = {};
+                reviewsData?.forEach(r => {
+                    if (!ratingsMap[r.company_id]) ratingsMap[r.company_id] = { sum: 0, count: 0 };
+                    ratingsMap[r.company_id].sum += r.rating;
+                    ratingsMap[r.company_id].count += 1;
+                });
+
+                const dataWithRatings = data.map(c => ({
+                    ...c,
+                    rating: ratingsMap[c.id] ? (ratingsMap[c.id].sum / ratingsMap[c.id].count).toFixed(1) : 0
+                }));
+
+                setResults(dataWithRatings);
+            } else {
+                setResults([]);
+            }
         } catch (error) {
             console.error('Explorer error:', error);
         } finally {
@@ -163,21 +188,19 @@ export default function PublicExplorer() {
         const date = new Date(dateString);
         const now = new Date();
         const diffTime = Math.abs(now - date);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays <= 30;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays < 3;
     };
 
-    // Helper to format antiquity
-    const getAntiquity = (dateString) => {
-        if (!dateString) return 'Reciente';
+    // Helper to format registration date
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Fecha desconocida';
         const date = new Date(dateString);
-        const now = new Date();
-        const diffMonths = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth());
-
-        if (diffMonths < 1) return 'Recién unido';
-        if (diffMonths < 12) return `${diffMonths} meses`;
-        const years = Math.floor(diffMonths / 12);
-        return `${years} año${years > 1 ? 's' : ''}`;
+        return date.toLocaleDateString('es-CL', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
     };
 
     // Helper to get initials from company name
@@ -265,9 +288,9 @@ export default function PublicExplorer() {
                             <Link key={store.id} to={`/catalogo/${store.slug}`}>
                                 <Card className="group border-none shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden bg-white h-full rounded-[2.5rem]">
                                     <CardContent className="p-0 flex flex-col h-full">
-                                        <div className="h-40 bg-slate-50 relative m-3 rounded-[2rem] overflow-hidden group/img flex items-center justify-center border border-slate-100">
+                                        <div className="h-32 bg-white relative m-3 rounded-[2rem] overflow-hidden group/img flex items-center justify-center border border-slate-100">
                                             {/* Logo Only - Centered with margins */}
-                                            <div className="h-24 w-24 rounded-2xl bg-white p-1 ring-4 ring-slate-100/50 shadow-sm flex-shrink-0 overflow-hidden transition-transform duration-500 group-hover:scale-110">
+                                            <div className="h-24 w-24 rounded-full bg-white p-1 ring-2 ring-slate-200 shadow-md flex-shrink-0 overflow-hidden transition-transform duration-500 group-hover:scale-105">
                                                 {store.logo ? (
                                                     <img
                                                         src={store.logo}
@@ -310,22 +333,27 @@ export default function PublicExplorer() {
                                             </div>
                                         </div>
 
-                                        <div className="p-8 pt-12 flex-1">
+                                        <div className="px-5 pt-4 pb-2 flex-1">
                                             <div className="flex items-start justify-between">
-                                                <h3 className="font-black text-slate-900 text-xl leading-tight group-hover:text-primary-600 transition-colors">
+                                                <h3 className="font-black text-slate-900 text-base leading-tight group-hover:text-primary-600 transition-colors">
                                                     {store.name}
                                                 </h3>
                                             </div>
 
-                                            {/* Rating and Reviews */}
+                                            {/* Rating and Date */}
                                             <div className="flex items-center gap-4 mt-2 mb-3">
                                                 <div className="flex items-center gap-1">
-                                                    <Star size={14} className={cn("fill-amber-400 text-amber-400", !store.rating && "text-slate-300 fill-slate-300")} />
-                                                    <span className="text-sm font-bold text-slate-900">{store.rating || 'N/A'}</span>
+                                                    {[1, 2, 3, 4, 5].map(i => {
+                                                        const r = parseFloat(store.rating) || 0;
+                                                        return <Star key={i} size={13} className={i <= Math.round(r) ? "fill-amber-400 text-amber-400" : "fill-slate-200 text-slate-200"} />;
+                                                    })}
+                                                    {parseFloat(store.rating) > 0 && (
+                                                        <span className="text-xs font-bold text-slate-700 ml-1">{parseFloat(store.rating).toFixed(1)}</span>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-1 text-slate-400 text-xs">
-                                                    <Clock size={12} />
-                                                    <span>{getAntiquity(store.created_at)}</span>
+                                                    <Calendar size={12} className="text-slate-400" />
+                                                    <span className="text-slate-500">Unido: {formatDate(store.created_at)}</span>
                                                 </div>
                                             </div>
 
@@ -333,7 +361,7 @@ export default function PublicExplorer() {
                                                 {store.description || `Bienvenidos a ${store.name}`}
                                             </p>
 
-                                            <div className="mt-auto pt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-50">
+                                            <div className="mt-auto pt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-50">
                                                 <div className="flex items-center gap-1.5 text-slate-400 font-bold text-xs">
                                                     {!store.is_online ? (
                                                         <>
@@ -363,7 +391,7 @@ export default function PublicExplorer() {
                                             </div>
                                         </div>
 
-                                        <div className="mx-8 mb-8">
+                                        <div className="mx-4 mb-4">
                                             <Button className="w-full h-12 rounded-2xl bg-slate-50 text-slate-900 border-none font-bold hover:bg-primary-600 hover:text-white transition-all shadow-none group-hover:shadow-lg group-hover:shadow-primary-100">
                                                 Ver Catálogo
                                                 <ArrowRight size={18} className="ml-2 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
