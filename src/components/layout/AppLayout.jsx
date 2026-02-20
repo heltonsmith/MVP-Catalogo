@@ -3,31 +3,50 @@ import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { COMPANIES } from '../../data/mock';
 import { useMemo } from 'react';
+import { useCart } from '../../hooks/useCart';
 
 export function AppLayout() {
     const { pathname } = useLocation();
-    const { companySlug } = useParams();
+    const { companyInfo } = useCart();
 
-    // Identify if we are in a catalog or product page of a PRO company
-    const isProCatalog = useMemo(() => {
-        if (!companySlug) return false;
-        const company = COMPANIES.find(c => c.slug === companySlug);
-        return company?.plan === 'pro';
-    }, [companySlug]);
+    // Extract slug from pathname since useParams might not catch it in the layout wrapper
+    const catalogMatch = pathname.match(/\/catalogo\/([^\/]+)/);
+    const companySlug = catalogMatch ? catalogMatch[1] : null;
 
+    // Identify current company from path or context
+    const currentCompany = useMemo(() => {
+        if (!companySlug) return null;
+        // Try to find by slug in context first (real companies)
+        const contextCompany = Object.values(companyInfo).find(c => c.slug === companySlug);
+        if (contextCompany) return contextCompany;
+
+        // Fallback to mock data
+        return COMPANIES.find(c => c.slug === companySlug);
+    }, [companySlug, companyInfo]);
+
+    const plan = currentCompany?.plan?.toLowerCase();
+    const isPaidPlan = plan === 'pro' || plan === 'plus' || plan === 'custom' || plan === 'pago';
+    const isLandingRoute = pathname.includes('/landing');
+
+    // Hide header/footer if:
+    // 1. It's a /landing route
+    // 2. AND the company has a paid plan
+    // 3. AND landing_enabled is true (defaulting to true for now if it's a paid landing route)
+    const hideBranding = isLandingRoute && isPaidPlan && currentCompany?.landing_enabled !== false;
+
+    // Legacy behavior for specific landing pages if needed (mobile only original logic)
     const isCatalogRoute = pathname.includes('/catalogo/');
-    const isLandingMode = pathname.endsWith('/landing');
-    const hideBrandingOnMobile = isCatalogRoute && isProCatalog && isLandingMode;
+    const hideBrandingOnMobile = isCatalogRoute && isPaidPlan && isLandingRoute && !hideBranding;
 
     return (
         <div className="flex min-h-screen flex-col overflow-x-hidden">
-            <div className={hideBrandingOnMobile ? 'hidden md:block' : ''}>
+            <div className={(hideBranding || hideBrandingOnMobile) ? 'hidden' : ''}>
                 <Navbar />
             </div>
             <main className="flex-1">
                 <Outlet />
             </main>
-            <div className={hideBrandingOnMobile ? 'hidden md:block' : ''}>
+            <div className={(hideBranding || hideBrandingOnMobile) ? 'hidden' : ''}>
                 <Footer />
             </div>
         </div>

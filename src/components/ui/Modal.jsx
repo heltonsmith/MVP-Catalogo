@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, title, children, className, maxWidth = 
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className={cn(
-                                "w-full overflow-hidden rounded-[24px] sm:rounded-[32px] bg-white shadow-2xl pointer-events-auto flex flex-col max-h-[90vh] sm:max-h-[85vh]",
+                                "w-full overflow-hidden rounded-[24px] sm:rounded-[32px] bg-white shadow-2xl pointer-events-auto flex flex-col max-h-[82vh] sm:max-h-[85vh]",
                                 maxWidthClasses[maxWidth] || maxWidthClasses.lg,
                                 "mx-auto ring-1 ring-slate-900/5",
                                 className
@@ -60,7 +60,7 @@ export function Modal({ isOpen, onClose, title, children, className, maxWidth = 
                                     <X size={20} />
                                 </button>
                             )}
-                            <div className="flex-1 overflow-y-auto">
+                            <div className="flex-1 overflow-y-auto pb-20 sm:pb-6">
                                 {children}
                             </div>
                         </motion.div>

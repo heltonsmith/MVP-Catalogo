@@ -337,7 +337,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -349,7 +349,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                        className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh]"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
@@ -673,7 +673,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-3xl">
+                        <div className="p-4 pb-10 sm:pb-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-3xl">
                             <Button type="button" variant="ghost" onClick={onClose}>
                                 Cancelar
                             </Button>

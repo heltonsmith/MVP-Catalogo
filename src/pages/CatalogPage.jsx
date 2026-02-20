@@ -153,7 +153,11 @@ export default function CatalogPage() {
                     name: companyData.name,
                     slug: companyData.slug,
                     whatsapp: companyData.whatsapp,
-                    logo: companyData.logo
+                    logo: companyData.logo,
+                    user_id: companyData.user_id,
+                    whatsapp_enabled: companyData.whatsapp_enabled,
+                    plan: companyData.plan,
+                    landing_enabled: companyData.landing_enabled
                 });
 
                 // Transform products to include categories array, images, and ratings
@@ -238,6 +242,8 @@ export default function CatalogPage() {
             if (company && company.id && !company.slug?.includes('demo')) {
                 try {
                     await supabase.rpc('increment_views', { company_id: company.id });
+                    // Also log individual visit for period-based analytics
+                    await supabase.from('store_visits').insert({ company_id: company.id });
                 } catch (error) {
                     console.error('Error tracking view:', error);
                     // Fail silently - don't block user experience
@@ -337,6 +343,21 @@ export default function CatalogPage() {
                 setIsFollowing(true);
                 setFollowCategory(category);
                 showToast("¡Ahora sigues a esta tienda!", "success");
+
+                // Send notification to store owner if enabled
+                if (company.user_id) {
+                    const prefs = company.notification_prefs || {};
+                    if (prefs.notify_follow !== false) {
+                        const customerName = profile?.full_name || user.email?.split('@')[0] || 'Un cliente';
+                        await supabase.from('notifications').insert([{
+                            user_id: company.user_id,
+                            type: 'follow',
+                            title: 'Nuevo seguidor',
+                            content: `${customerName} ha comenzado a seguir tu tienda.`,
+                            metadata: { follower_id: user.id, follower_name: customerName, company_id: company.id }
+                        }]);
+                    }
+                }
             }
             loadStoreMetrics();
         } catch (error) {
@@ -721,7 +742,7 @@ export default function CatalogPage() {
             <div
                 ref={editMode === 'banner' ? containerRef : null}
                 className={cn(
-                    "relative h-56 w-full bg-slate-900 lg:h-64 overflow-hidden group/banner",
+                    "relative min-h-[14rem] w-full bg-slate-900 lg:min-h-[16rem] group/banner flex flex-col justify-center",
                     editMode === 'banner' ? "cursor-move" : (isOwner && "cursor-pointer")
                 )}
                 onDoubleClick={() => handleStartEdit('banner')}
@@ -736,7 +757,7 @@ export default function CatalogPage() {
                     <img
                         src={company.banner}
                         alt={company.name}
-                        className="h-full w-full object-cover transition-transform duration-300"
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-300"
                         style={{
                             objectPosition: editMode === 'banner'
                                 ? `${tempSettings.banner.x}% ${tempSettings.banner.y}%`
@@ -746,12 +767,12 @@ export default function CatalogPage() {
                         }}
                     />
                 ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-slate-800 to-slate-900" />
+                    <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-slate-800 to-slate-900" />
                 )}
 
                 {/* Banner Overlay Controls */}
                 {isOwner && !editMode && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/banner:opacity-100 transition-opacity bg-black/20 pointer-events-none">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/banner:opacity-100 transition-opacity bg-black/20 pointer-events-none z-10">
                         <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 text-slate-900 text-xs font-bold shadow-xl">
                             <Move size={14} /> Doble clic para ajustar banner
                         </div>
@@ -786,14 +807,14 @@ export default function CatalogPage() {
                     </div>
                 )}
 
-                <div className="absolute inset-x-0 bottom-0 px-4 py-5 sm:py-6 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent text-white pointer-events-none">
-                    <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-end justify-between gap-4 pointer-events-auto">
+                <div className="relative z-10 w-full px-4 pt-24 pb-4 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent text-white pointer-events-none">
+                    <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pointer-events-auto">
                         {/* Shop Info Group */}
-                        <div className="flex items-center md:items-end space-x-3 sm:space-x-4 w-full md:w-auto">
+                        <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full md:w-auto">
                             <div
                                 ref={editMode === 'logo' ? containerRef : null}
                                 className={cn(
-                                    "relative h-14 w-14 sm:h-20 sm:w-20 lg:h-28 lg:w-28 rounded-full bg-white p-1 ring-2 sm:ring-4 ring-white shadow-lg flex-shrink-0 group/logo overflow-hidden",
+                                    "relative mt-2 sm:mt-0 h-14 w-14 sm:h-20 sm:w-20 lg:h-28 lg:w-28 rounded-full bg-white p-1 ring-2 sm:ring-4 ring-white shadow-lg flex-shrink-0 group/logo overflow-hidden",
                                     editMode === 'logo' ? "cursor-move" : (isOwner && "cursor-pointer")
                                 )}
                                 onDoubleClick={(e) => {
@@ -895,74 +916,93 @@ export default function CatalogPage() {
                                     )}
                                 </div>
                                 {/* Popularity Metrics */}
-                                <div className="flex flex-wrap items-center gap-2 mt-2">
-                                    <button
-                                        onClick={toggleFollow}
-                                        className={cn(
-                                            "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
-                                            isFollowing
-                                                ? "bg-primary-600/30 border-primary-500/50 text-white shadow-primary-500/20"
-                                                : "bg-white/10 border-white/10 text-white hover:bg-white/20"
-                                        )}
-                                        title={isFollowing ? "Dejar de seguir" : "Seguir tienda"}
-                                    >
-                                        <Users size={14} className={cn("transition-colors", isFollowing ? "text-primary-400" : "text-white/70")} />
-                                        <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
-                                            {followerCount.toLocaleString()} <span className="hidden lg:inline">{followerCount === 1 ? 'Seguidor' : 'Seguidores'}</span>
+                                <div className="flex flex-wrap items-center gap-4 sm:gap-2 mt-4">
+                                    <div className="flex flex-col items-center gap-1">
+                                        <button
+                                            onClick={toggleFollow}
+                                            className={cn(
+                                                "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
+                                                isFollowing
+                                                    ? "bg-primary-600/30 border-primary-500/50 text-white shadow-primary-500/20"
+                                                    : "bg-white/10 border-white/10 text-white hover:bg-white/20"
+                                            )}
+                                            title={isFollowing ? "Dejar de seguir" : "Seguir tienda"}
+                                        >
+                                            <Users size={14} className={cn("transition-colors", isFollowing ? "text-primary-400" : "text-white/70")} />
+                                            <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
+                                                {followerCount.toLocaleString()} <span className="hidden lg:inline">{followerCount === 1 ? 'Seguidor' : 'Seguidores'}</span>
+                                            </span>
+                                        </button>
+                                        <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
+                                            {isFollowing ? 'Siguiendo' : 'Seguir'}
                                         </span>
-                                    </button>
+                                    </div>
 
-                                    <button
-                                        onClick={toggleFavorite}
-                                        className={cn(
-                                            "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
-                                            isFavorite
-                                                ? "bg-rose-600/30 border-rose-500/50 text-white shadow-rose-500/20"
-                                                : "bg-white/10 border-white/10 text-white hover:bg-white/20"
-                                        )}
-                                        title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                                    >
-                                        <Heart size={14} className={cn("transition-colors", isFavorite ? "text-rose-400 fill-rose-400" : "text-white/70")} />
-                                        <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
-                                            {favoriteCount.toLocaleString()} <span className="hidden lg:inline">{favoriteCount === 1 ? 'Favorito' : 'Favoritos'}</span>
+                                    <div className="flex flex-col items-center gap-1">
+                                        <button
+                                            onClick={toggleFavorite}
+                                            className={cn(
+                                                "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
+                                                isFavorite
+                                                    ? "bg-rose-600/30 border-rose-500/50 text-white shadow-rose-500/20"
+                                                    : "bg-white/10 border-white/10 text-white hover:bg-white/20"
+                                            )}
+                                            title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                                        >
+                                            <Heart size={14} className={cn("transition-colors", isFavorite ? "text-rose-400 fill-rose-400" : "text-white/70")} />
+                                            <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
+                                                {favoriteCount.toLocaleString()} <span className="hidden lg:inline">{favoriteCount === 1 ? 'Favorito' : 'Favoritos'}</span>
+                                            </span>
+                                        </button>
+                                        <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
+                                            Favorito
                                         </span>
-                                    </button>
+                                    </div>
 
                                     {/* Enviar Mensaje Button */}
-                                    <button
-                                        onClick={() => {
-                                            if (!user) {
-                                                navigate('/login?redirectTo=' + encodeURIComponent(location.pathname));
-                                            } else {
-                                                window.open(`/inbox?chatId=${company.id}`, '_blank');
-                                            }
-                                        }}
-                                        className="flex items-center gap-2 bg-primary-600 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border border-primary-500 shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all active:scale-95 group/msg"
-                                        title="Enviar mensaje"
-                                    >
-                                        <MessageCircle size={14} className="text-white fill-white/10 group-hover/msg:fill-white/20 transition-all" />
-                                        <span className="hidden sm:inline text-xs font-bold text-white uppercase tracking-wider whitespace-nowrap">
-                                            Enviar Mensaje
+                                    <div className="flex flex-col items-center gap-1">
+                                        <button
+                                            onClick={() => {
+                                                if (!user) {
+                                                    navigate('/login?redirectTo=' + encodeURIComponent(location.pathname));
+                                                } else {
+                                                    // 2. Track quote analytics for EACH product in the cart
+                                                    const trackProductQuotes = async () => {
+                                                        if (company && company.id && !company.slug?.includes('demo')) {
+                                                            const uniqueProductIds = [...new Set(cart.map(item => item.id))];
+                                                            for (const pid of uniqueProductIds) {
+                                                                try {
+                                                                    await supabase.rpc('increment_product_quote', { product_id: pid });
+                                                                } catch (e) {
+                                                                    console.error(`Error tracking quote for product ${pid}:`, e);
+                                                                }
+                                                            }
+                                                        }
+                                                    };
+                                                    trackProductQuotes();
+
+                                                    window.open(whatsappUrl, '_blank');
+                                                }
+                                            }}
+                                            className="flex items-center gap-2 bg-primary-600 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border border-primary-500 shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all active:scale-95 group/msg"
+                                            title="Enviar mensaje"
+                                        >
+                                            <MessageCircle size={14} className="text-white fill-white/10 group-hover/msg:fill-white/20 transition-all" />
+                                            <span className="hidden sm:inline text-xs font-bold text-white uppercase tracking-wider whitespace-nowrap">
+                                                Enviar Mensaje
+                                            </span>
+                                        </button>
+                                        <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
+                                            Mensaje
                                         </span>
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Actions Group */}
-                        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end border-t border-white/10 pt-3 md:border-0 md:pt-0">
-                            {/* Demo Admin Link Button */}
-                            {(company.slug === 'restaurante-delicias' || company.slug === 'tienda-moda') && (
-                                <Link to={company.slug === 'restaurante-delicias' ? '/demo/restaurante/dashboard' : '/demo/tienda/dashboard'}>
-                                    <Button variant="secondary" size="sm" className="hidden sm:flex h-8 bg-white/20 border-white/30 text-white hover:bg-white/30 text-[10px] sm:text-xs font-bold gap-1 px-3">
-                                        <LayoutDashboard size={14} />
-                                        Ver Panel
-                                    </Button>
-                                </Link>
-                            )}
-
-                            <div className="flex items-center gap-1 sm:gap-2">
-
+                        <div className="flex items-center w-full md:w-auto justify-between md:justify-end border-t border-white/10 pt-4 md:border-0 md:pt-0">
+                            <div className="flex items-center gap-3 sm:gap-2">
                                 {(company.website || company.socials?.website) && (
                                     <a
                                         href={company.website || company.socials?.website}
@@ -1007,38 +1047,40 @@ export default function CatalogPage() {
                                 )}
                             </div>
 
-                            <div className="h-4 w-px bg-white/20 mx-1" />
+                            <div className="flex items-center">
+                                <div className="h-4 w-px bg-white/20 mx-3 md:mx-1" />
 
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={async () => {
-                                        const shareData = {
-                                            title: company.name,
-                                            text: `Visita la tienda de ${company.name} en ktaloog`,
-                                            url: window.location.href,
-                                        };
-                                        if (navigator.share) {
-                                            try { await navigator.share(shareData); } catch (e) { }
-                                        } else {
-                                            showToast('Enlace de la tienda copiado', 'success');
-                                            try { await navigator.clipboard.writeText(window.location.href); } catch (e) { }
-                                        }
-                                    }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                    title="Compartir"
-                                >
-                                    <Share2 size={16} className="sm:size-18" />
-                                </button>
-
-                                {company.plan && company.plan !== 'free' && (
+                                <div className="flex items-center gap-3 sm:gap-2">
                                     <button
-                                        onClick={() => setIsQROpen(true)}
+                                        onClick={async () => {
+                                            const shareData = {
+                                                title: company.name,
+                                                text: `Visita la tienda de ${company.name} en ktaloog`,
+                                                url: window.location.href,
+                                            };
+                                            if (navigator.share) {
+                                                try { await navigator.share(shareData); } catch (e) { }
+                                            } else {
+                                                showToast('Enlace de la tienda copiado', 'success');
+                                                try { await navigator.clipboard.writeText(window.location.href); } catch (e) { }
+                                            }
+                                        }}
                                         className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
-                                        title="Ver QR de la tienda"
+                                        title="Compartir"
                                     >
-                                        <QrCode size={16} className="sm:size-18" />
+                                        <Share2 size={16} className="sm:size-18" />
                                     </button>
-                                )}
+
+                                    {company.plan && company.plan !== 'free' && (
+                                        <button
+                                            onClick={() => setIsQROpen(true)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 active:scale-95"
+                                            title="Ver QR de la tienda"
+                                        >
+                                            <QrCode size={16} className="sm:size-18" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

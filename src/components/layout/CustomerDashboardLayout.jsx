@@ -121,6 +121,9 @@ export function CustomerDashboardLayout() {
                 {/* Mobile Header */}
                 <header className="flex-none h-16 flex items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden z-30">
                     <div className="flex items-center space-x-3">
+                        <NavLink to="/" className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-primary-600 transition-colors">
+                            <Home size={24} />
+                        </NavLink>
                         <div className="h-8 w-8 rounded-lg bg-primary-600 flex items-center justify-center overflow-hidden shrink-0">
                             {profile?.avatar_url ? (
                                 <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -132,9 +135,6 @@ export function CustomerDashboardLayout() {
                             Mi Cuenta
                         </span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleLogout}>
-                        <LogOut size={20} className="text-red-500" />
-                    </Button>
                 </header>
 
                 <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">

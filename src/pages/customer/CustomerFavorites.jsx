@@ -131,7 +131,7 @@ export default function CustomerFavorites() {
                 </div>
             </div>
 
-            <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 self-start w-fit">
+            <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 self-start w-fit max-w-full overflow-x-auto scrollbar-hide">
                 {['all', 'retail', 'wholesale', 'mixed', 'restaurant'].map(t => (
                     <button
                         key={t}

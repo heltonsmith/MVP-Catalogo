@@ -51,8 +51,7 @@ export function DashboardLayout() {
         {
             name: 'Ajustes Perfil',
             icon: <Settings size={20} />,
-            path: '/dashboard/perfil',
-            badge: unreadNotifications > 0 ? unreadNotifications.toString() : null
+            path: '/dashboard/perfil'
         },
     ];
 
@@ -199,9 +198,16 @@ export function DashboardLayout() {
                             {company?.name || 'Mi Tienda'}
                         </span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleLogout}>
-                        <LogOut size={20} className="text-red-500" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        <NavLink to="/">
+                            <Button variant="ghost" size="icon">
+                                <Home size={20} className="text-slate-500" />
+                            </Button>
+                        </NavLink>
+                        <Button variant="ghost" size="icon" onClick={handleLogout}>
+                            <LogOut size={20} className="text-red-500" />
+                        </Button>
+                    </div>
                 </header>
 
                 {/* Content */}

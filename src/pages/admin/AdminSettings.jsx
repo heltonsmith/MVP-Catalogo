@@ -94,12 +94,8 @@ export default function AdminSettings() {
 
     return (
         <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-                <h1 className="text-2xl font-bold text-slate-900">Configuración del Sistema</h1>
-                <Button className="gap-2" onClick={handleSave} disabled={saving}>
-                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                    {saving ? 'Guardando...' : 'Guardar Cambios'}
-                </Button>
+            <div className="mb-8">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Configuración del Sistema</h1>
             </div>
 
             <div className="space-y-6 pb-12">
@@ -369,6 +365,13 @@ export default function AdminSettings() {
                         <Button variant="secondary" size="sm" disabled>Configurar Webhooks</Button>
                     </CardContent>
                 </Card>
+
+                <div className="mt-8 flex justify-end">
+                    <Button className="w-full sm:w-auto gap-2 h-12 sm:h-auto shadow-lg shadow-primary-500/20" onClick={handleSave} disabled={saving}>
+                        {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                        {saving ? 'Guardando...' : 'Guardar Cambios'}
+                    </Button>
+                </div>
             </div>
         </div>
     );

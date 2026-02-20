@@ -178,10 +178,10 @@ export default function AdminOverview() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
-                    <p className="text-slate-500 mt-1">Gestión global de la plataforma y suscripciones.</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
+                    <p className="text-slate-500 text-sm mt-1">Gestión global de la plataforma y suscripciones.</p>
                 </div>
             </div>
 

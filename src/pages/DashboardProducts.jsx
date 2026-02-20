@@ -313,7 +313,10 @@ export default function DashboardProducts() {
                             <Copy size={16} />
                             <span className="hidden md:inline">Copiar Enlace</span>
                         </Button>
-                        <button
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-10 px-3 gap-2 font-bold"
                             onClick={() => {
                                 if (isDemo) {
                                     handleDemoAction("Ver Catálogo");
@@ -322,15 +325,9 @@ export default function DashboardProducts() {
                                 }
                             }}
                         >
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                className="h-10 px-3 gap-2 font-bold"
-                            >
-                                <ExternalLink size={16} />
-                                <span className="hidden md:inline">Ver Catálogo</span>
-                            </Button>
-                        </button>
+                            <ExternalLink size={16} />
+                            <span className="hidden md:inline">Ver Catálogo</span>
+                        </Button>
                     </div>
                     <Button
                         onClick={handleAddProduct}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     User,
     Camera,
@@ -9,7 +10,8 @@ import {
     EyeOff,
     Loader2,
     Shield,
-    Smartphone
+    Smartphone,
+    LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -20,7 +22,8 @@ import { useToast } from '../../components/ui/Toast';
 import { cn } from '../../utils';
 
 export default function CustomerProfile() {
-    const { user, profile, refreshProfile } = useAuth();
+    const navigate = useNavigate();
+    const { user, profile, refreshProfile, signOut } = useAuth();
     const { showToast } = useToast();
     const fileInputRef = useRef(null);
     const [loading, setLoading] = useState(false);
@@ -291,6 +294,24 @@ export default function CustomerProfile() {
                                         </>
                                     )}
                                 </Button>
+                            </div>
+
+                            <div className="pt-8 border-t border-slate-100 mt-8">
+                                <div className="bg-red-50 p-6 rounded-3xl border border-red-100">
+                                    <h4 className="text-sm font-black text-red-900 uppercase tracking-widest mb-2">Sesión</h4>
+                                    <p className="text-xs text-red-600 mb-4 font-medium">¿Deseas salir de tu cuenta? Podrás volver a ingresar en cualquier momento.</p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full h-12 border-2 border-red-200 text-red-600 hover:bg-red-600 hover:text-white font-black rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest transition-all"
+                                        onClick={async () => {
+                                            await signOut();
+                                            navigate('/login');
+                                        }}
+                                    >
+                                        <LogOut size={18} /> Cerrar Sesión
+                                    </Button>
+                                </div>
                             </div>
                         </form>
                     </CardContent>

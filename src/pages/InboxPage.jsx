@@ -19,8 +19,10 @@ import {
     Loader2,
     Image as ImageIcon,
     Pencil,
-    X
+    X,
+    AlertTriangle
 } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
 
 export default function InboxPage() {
     const { user, company, profile, loading: authLoading } = useAuth();
@@ -41,6 +43,8 @@ export default function InboxPage() {
     const [editText, setEditText] = useState('');
     const messagesEndRef = useRef(null);
     const messageContainerRef = useRef(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [chatToDelete, setChatToDelete] = useState(null);
 
     // Derive current role context
     // If user has a company, they might be acting as store owner. 
@@ -379,8 +383,9 @@ export default function InboxPage() {
         }
     };
 
-    const handleSelectChat = (id, tab = activeTab) => {
+    const handleSelectChat = (id) => {
         setSelectedChatId(id);
+        setIsMobileListVisible(false);
         // Optimistic clear in the list
         setConversations(prev => prev.map(c => c.id === id ? { ...c, unread: 0 } : c));
     };
@@ -432,19 +437,22 @@ export default function InboxPage() {
         }
     };
 
-    const handleDeleteConversation = async () => {
-        if (!confirm('¿Estás seguro de borrar esta conversación? Se eliminarán los mensajes para ti.')) return;
+    const handleDeleteConversationByChatId = (idToHide) => {
+        setChatToDelete(idToHide);
+    };
 
+    const handleConfirmDelete = async () => {
+        if (!chatToDelete) return;
+        setIsDeleting(true);
         try {
             const visibilityField = activeTab === 'buying' ? 'visible_to_customer' : 'visible_to_store';
-            const otherVisibilityField = activeTab === 'buying' ? 'visible_to_store' : 'visible_to_customer';
 
             // 1. Hide for me
             const hideQuery = supabase.from('messages').update({ [visibilityField]: false });
             if (activeTab === 'buying') {
-                hideQuery.eq('company_id', selectedChatId).eq('customer_id', user.id);
+                hideQuery.eq('company_id', chatToDelete).eq('customer_id', user.id);
             } else {
-                hideQuery.eq('company_id', currentCompany.id).eq('customer_id', selectedChatId);
+                hideQuery.eq('company_id', currentCompany.id).eq('customer_id', chatToDelete);
             }
             const { error: hideError } = await hideQuery;
             if (hideError) throw hideError;
@@ -452,22 +460,28 @@ export default function InboxPage() {
             // 2. Cleanup: If both hidden, delete permanently
             const deleteQuery = supabase.from('messages').delete().eq('visible_to_customer', false).eq('visible_to_store', false);
             if (activeTab === 'buying') {
-                deleteQuery.eq('company_id', selectedChatId).eq('customer_id', user.id);
+                deleteQuery.eq('company_id', chatToDelete).eq('customer_id', user.id);
             } else {
-                deleteQuery.eq('company_id', currentCompany.id).eq('customer_id', selectedChatId);
+                deleteQuery.eq('company_id', currentCompany.id).eq('customer_id', chatToDelete);
             }
             await deleteQuery;
 
             showToast('Conversación eliminada para ti', 'success');
-            setConversations(prev => prev.filter(c => c.id !== selectedChatId));
-            setSelectedChatId(null);
-            setIsMobileListVisible(true);
-
+            setConversations(prev => prev.filter(c => c.id !== chatToDelete));
+            if (selectedChatId === chatToDelete) {
+                setSelectedChatId(null);
+                setIsMobileListVisible(true);
+            }
         } catch (err) {
             console.error(err);
             showToast('Error al eliminar', 'error');
+        } finally {
+            setIsDeleting(false);
+            setChatToDelete(null);
         }
     };
+
+    const handleDeleteConversation = () => handleDeleteConversationByChatId(selectedChatId);
 
     const handleDeleteMessage = async (msgId) => {
         try {
@@ -501,7 +515,7 @@ export default function InboxPage() {
     };
 
     return (
-        <div className="bg-slate-50 flex flex-col min-h-screen">
+        <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
             {/* Simple Top Bar */}
             <header className="bg-white border-b border-slate-200 h-16 sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -537,7 +551,7 @@ export default function InboxPage() {
                 </div>
             </header>
 
-            <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:px-8 flex flex-col md:flex-row gap-4 h-[500px] my-8 relative shrink-0">
+            <main className="flex-1 min-h-0 max-w-7xl w-full mx-auto p-0 md:p-6 lg:px-8 flex flex-col md:flex-row gap-0 md:gap-4 md:h-[600px] md:my-8 relative shrink-0">
                 {/* Conversations Sidebar */}
                 <div className={cn(
                     "w-full md:w-72 lg:w-80 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0",
@@ -563,51 +577,70 @@ export default function InboxPage() {
                             </div>
                         ) : (
                             conversations.map(chat => (
-                                <button
-                                    key={chat.id}
-                                    onClick={() => handleSelectChat(chat.id)}
-                                    className={cn(
-                                        "w-full p-4 flex gap-3 text-left transition-colors border-b border-slate-50 hover:bg-slate-50",
-                                        selectedChatId === chat.id && "bg-slate-50 border-l-4 border-l-primary-500"
-                                    )}
-                                >
-                                    <div className="relative shrink-0">
-                                        <div className="h-12 w-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-                                            {chat.avatar ? (
-                                                <img src={chat.avatar} alt={chat.name} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <div className="h-full w-full flex items-center justify-center text-slate-400">
-                                                    {chat.role === 'store' ? <Store size={20} /> : <User size={20} />}
-                                                </div>
-                                            )}
+                                <div key={chat.id} className="relative group/chat">
+                                    <button
+                                        onClick={() => handleSelectChat(chat.id)}
+                                        className={cn(
+                                            "w-full p-4 flex gap-3 text-left transition-colors border-b border-slate-50 hover:bg-slate-50",
+                                            selectedChatId === chat.id && "bg-slate-50 border-l-4 border-l-primary-500"
+                                        )}
+                                    >
+                                        <div className="relative shrink-0">
+                                            <div className="h-12 w-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
+                                                {chat.avatar ? (
+                                                    <img src={chat.avatar} alt={chat.name} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <div className="h-full w-full flex items-center justify-center text-slate-400">
+                                                        {chat.role === 'store' ? <Store size={20} /> : <User size={20} />}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Online Indicator Mockup */}
+                                            <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
                                         </div>
-                                        {/* Online Indicator Mockup */}
-                                        <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-baseline mb-1">
-                                            <h3 className="font-bold text-slate-900 truncate">{chat.name}</h3>
-                                            <span className="text-[10px] text-slate-400 font-medium">
-                                                {new Date(chat.date).toLocaleDateString() === new Date().toLocaleDateString()
-                                                    ? new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                    : new Date(chat.date).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <p className={cn(
-                                                "text-xs truncate max-w-[140px]",
-                                                chat.unread > 0 ? "font-bold text-slate-900" : "text-slate-500"
-                                            )}>
-                                                {chat.lastMessage}
-                                            </p>
-                                            {chat.unread > 0 && (
-                                                <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">
-                                                    {chat.unread}
+                                        <div className="flex-1 min-w-0 pr-4">
+                                            <div className="flex justify-between items-baseline mb-1">
+                                                <h3 className="font-bold text-slate-900 truncate text-sm">{chat.name}</h3>
+                                                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap ml-auto">
+                                                    {new Date(chat.date).toLocaleDateString() === new Date().toLocaleDateString()
+                                                        ? new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                        : new Date(chat.date).toLocaleDateString()}
                                                 </span>
-                                            )}
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <p className={cn(
+                                                    "text-xs truncate max-w-[140px]",
+                                                    chat.unread > 0 ? "font-bold text-slate-900" : "text-slate-500"
+                                                )}>
+                                                    {chat.lastMessage}
+                                                </p>
+                                                {chat.unread > 0 && (
+                                                    <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                                        {chat.unread}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteConversationByChatId(chat.id);
+                                        }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover/chat:opacity-100 transition-opacity md:flex hidden"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteConversationByChatId(chat.id);
+                                        }}
+                                        className="absolute right-0 top-0 h-8 w-8 flex items-center justify-center text-slate-300 active:text-red-500 md:hidden"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
                             ))
                         )}
                     </div>
@@ -621,7 +654,7 @@ export default function InboxPage() {
                     {selectedChatId ? (
                         <>
                             {/* Chat Header */}
-                            <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+                            <div className="h-16 md:h-16 px-4 md:px-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setIsMobileListVisible(true)} className="md:hidden -ml-2 p-2 text-slate-400">
                                         <ArrowLeft size={20} />
@@ -758,6 +791,43 @@ export default function InboxPage() {
                     )}
                 </div>
             </main>
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={!!chatToDelete}
+                onClose={() => !isDeleting && setChatToDelete(null)}
+                title="Borrar conversación"
+                maxWidth="sm"
+            >
+                <div className="p-6">
+                    <div className="flex items-center gap-4 mb-4 text-red-600">
+                        <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                            <AlertTriangle size={20} />
+                        </div>
+                        <p className="font-bold">¿Estás seguro de borrar esta conversación?</p>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-6">
+                        Se eliminarán los mensajes para ti. La otra persona aún podrá ver la conversación a menos que también la elimine.
+                    </p>
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setChatToDelete(null)}
+                            disabled={isDeleting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                            onClick={handleConfirmDelete}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Borrar'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

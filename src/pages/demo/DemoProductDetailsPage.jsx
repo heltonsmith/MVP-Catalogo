@@ -324,15 +324,13 @@ export default function DemoProductDetailsPage({ overrideSlug }) {
 
             {/* Reviews Section at the bottom */}
             <div id="reviews" className="mt-16 pt-12 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-8">
-                    <div>
-                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
-                            <User className="text-primary-600" size={24} /> Opiniones de Clientes
-                        </h3>
-                        <div className="flex items-center gap-2 mt-2">
-                            <StarRating rating={product.rating} count={product.reviews?.length} size={16} />
-                            <span className="text-sm font-bold text-slate-400">({product.reviews?.length || 0} valoraciones)</span>
-                        </div>
+                <div className="flex flex-col items-center text-center mb-10">
+                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+                        <User className="text-primary-600" size={24} /> Opiniones de Clientes
+                    </h3>
+                    <div className="flex items-center gap-2 mt-2">
+                        <StarRating rating={product.rating} count={product.reviews?.length} size={16} />
+                        <span className="text-sm font-bold text-slate-400">({product.reviews?.length || 0} valoraciones)</span>
                     </div>
                 </div>
 

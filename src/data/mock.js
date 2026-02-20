@@ -360,7 +360,7 @@ export const QUOTES = [
         customer_name: 'Helton Smith',
         customer_whatsapp: '+56986920235',
         quote_items: [
-            { id: 1, quantity: 5, price_at_time: 2500, products: { name: 'Cepillo de Bambú' } }
+            { id: 1, quantity: 5, price_at_time: 2500, products: { name: 'Cepillo de Bambú', sku: 'ECO-BAM-002' } }
         ],
         total: 12500,
         status: 'completed',
@@ -373,8 +373,8 @@ export const QUOTES = [
         customer_name: 'María González',
         customer_whatsapp: '+56987654321',
         quote_items: [
-            { id: 1, quantity: 3, price_at_time: 3500, products: { name: 'Jabón Artesanal de Lavanda' } },
-            { id: 2, quantity: 2, price_at_time: 5000, products: { name: 'Bolsa de Algodón Orgánico' } }
+            { id: 1, quantity: 3, price_at_time: 3500, products: { name: 'Jabón Artesanal de Lavanda', sku: 'ECO-JAB-003' } },
+            { id: 2, quantity: 2, price_at_time: 5000, products: { name: 'Bolsa de Algodón Orgánico', sku: 'ECO-BAG-001' } }
         ],
         total: 20500,
         status: 'pending',
@@ -387,8 +387,8 @@ export const QUOTES = [
         customer_name: 'Carlos Ramírez',
         customer_whatsapp: '+56912345678',
         quote_items: [
-            { id: 1, quantity: 2, price_at_time: 12000, products: { name: 'Botella Térmica Acero Inoxidable' } },
-            { id: 2, quantity: 10, price_at_time: 2500, products: { name: 'Cepillo de Bambú' } }
+            { id: 1, quantity: 2, price_at_time: 12000, products: { name: 'Botella Térmica Acero Inoxidable', sku: 'ECO-BOT-004' } },
+            { id: 2, quantity: 10, price_at_time: 2500, products: { name: 'Cepillo de Bambú', sku: 'ECO-BAM-002' } }
         ],
         total: 49000,
         status: 'pending',
@@ -401,7 +401,7 @@ export const QUOTES = [
         customer_name: 'Ana Martínez',
         customer_whatsapp: '+56998765432',
         quote_items: [
-            { id: 1, quantity: 5, price_at_time: 5000, products: { name: 'Bolsa de Algodón Orgánico' } }
+            { id: 1, quantity: 5, price_at_time: 5000, products: { name: 'Bolsa de Algodón Orgánico', sku: 'ECO-BAG-001' } }
         ],
         total: 25000,
         status: 'cancelled',

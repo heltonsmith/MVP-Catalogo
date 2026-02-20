@@ -295,25 +295,34 @@ export default function CustomerQuotes() {
             <Modal
                 isOpen={deleteModalOpen}
                 onClose={() => setDeleteModalOpen(false)}
-                title="¿Eliminar cotización?"
+                maxWidth="sm"
             >
-                <div className="space-y-4">
-                    <p className="text-slate-600 text-sm">
+                <div className="p-8 pb-10 text-center">
+                    <div className="mx-auto w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mb-6 text-rose-500 animate-in zoom-in-50 duration-300">
+                        <Trash2 size={40} className="drop-shadow-sm" />
+                    </div>
+
+                    <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">
+                        ¿Eliminar cotización?
+                    </h3>
+
+                    <p className="text-slate-500 text-sm font-medium leading-relaxed px-4 mb-10">
                         Esta acción no se puede deshacer. Se eliminará el registro de tu historial, pero el mensaje de WhatsApp enviado no se borrará del chat.
                     </p>
-                    <div className="flex gap-3 justify-end pt-2">
+
+                    <div className="flex flex-col sm:flex-row gap-3">
                         <Button
                             variant="ghost"
                             onClick={() => setDeleteModalOpen(false)}
-                            className="rounded-xl text-slate-500 hover:text-slate-800"
+                            className="flex-1 rounded-2xl h-14 text-sm font-black text-slate-400 hover:text-slate-600 hover:bg-slate-50 uppercase tracking-widest order-2 sm:order-1"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={confirmDelete}
-                            className="rounded-xl bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-200"
+                            className="flex-1 rounded-2xl h-14 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black shadow-xl shadow-rose-200 uppercase tracking-widest order-1 sm:order-2"
                         >
-                            Eliminar
+                            Sí, Eliminar
                         </Button>
                     </div>
                 </div>

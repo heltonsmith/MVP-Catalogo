@@ -43,7 +43,7 @@ export default function PublicExplorer() {
     const [activeFilter, setActiveFilter] = useState('all');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const { showToast } = useToast();
     const [userFavorites, setUserFavorites] = useState(new Set());
 
@@ -165,6 +165,21 @@ export default function PublicExplorer() {
                 newFavs.add(store.id);
                 setUserFavorites(newFavs);
                 showToast("¡Guardado en favoritos!", "success");
+
+                // Send notification to store owner if enabled
+                if (store.user_id) {
+                    const prefs = store.notification_prefs || {};
+                    if (prefs.notify_favorite !== false) {
+                        const customerName = profile?.full_name || user.email?.split('@')[0] || 'Un cliente';
+                        await supabase.from('notifications').insert([{
+                            user_id: store.user_id,
+                            type: 'favorite',
+                            title: 'Tienda en favoritos',
+                            content: `${customerName} ha guardado tu tienda en sus favoritos.`,
+                            metadata: { user_id: user.id, customer_name: customerName, company_id: store.id }
+                        }]);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error toggling favorite:', error);

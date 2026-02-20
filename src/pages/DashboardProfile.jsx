@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2 } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2, Link as LinkIcon } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
@@ -294,7 +294,10 @@ export default function DashboardProfile() {
             setPasswords({ current: '', new: '', confirm: '' });
         } catch (error) {
             console.error('Error updating password:', error);
-            showToast("Error al actualizar la contraseña", "error");
+            const message = error.message === 'New password should be different from the old password.'
+                ? "La nueva contraseña debe ser diferente a la anterior"
+                : error.message || "Error al actualizar la contraseña";
+            showToast(message, "error");
         } finally {
             setLoading(false);
         }
@@ -409,6 +412,49 @@ export default function DashboardProfile() {
                     </div>
                 );
             case 'notifications':
+                const notifPrefs = company?.notification_prefs || { notify_follow: true, notify_favorite: true, notify_quote: true };
+
+                const handleTogglePref = async (key) => {
+                    if (isDemo) {
+                        handleDemoAction("Cambiar preferencia de notificación");
+                        return;
+                    }
+                    const newPrefs = { ...notifPrefs, [key]: !notifPrefs[key] };
+                    try {
+                        const { error } = await supabase
+                            .from('companies')
+                            .update({ notification_prefs: newPrefs })
+                            .eq('id', company.id);
+                        if (error) throw error;
+                        await refreshCompany();
+                        showToast(newPrefs[key] ? "Notificación activada" : "Notificación desactivada", "success");
+                    } catch (error) {
+                        console.error('Error updating notification prefs:', error);
+                        showToast("Error al guardar preferencia", "error");
+                    }
+                };
+
+                const NOTIF_ITEMS = [
+                    {
+                        key: 'notify_follow',
+                        title: 'Nuevo seguidor',
+                        desc: 'Recibir una notificación cuando un cliente nuevo siga tu tienda.',
+                        icon: '👤'
+                    },
+                    {
+                        key: 'notify_favorite',
+                        title: 'Guardado en favoritos',
+                        desc: 'Recibir una notificación cuando un cliente guarde tu tienda en favoritos.',
+                        icon: '❤️'
+                    },
+                    {
+                        key: 'notify_quote',
+                        title: 'Cotización vía WhatsApp',
+                        desc: 'Recibir una notificación cuando un cliente envíe una cotización por WhatsApp.',
+                        icon: '💬'
+                    }
+                ];
+
                 return (
                     <Card className="border-none shadow-sm bg-white animate-in fade-in slide-in-from-right-4 duration-300">
                         <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center gap-2">
@@ -416,20 +462,30 @@ export default function DashboardProfile() {
                             Preferencias de Notificaciones
                         </div>
                         <CardContent className="p-6 space-y-6">
-                            {[
-                                { title: 'Nuevos Pedidos', desc: 'Recibir un email cuando llegue un nuevo pedido.', default: true },
-                                { title: 'Resumen Semanal', desc: 'Recibir estadísticas de rendimiento cada lunes.', default: true },
-                                { title: 'Alertas de Stock', desc: 'Notificar cuando un producto tenga bajo stock (< 5 unidades).', default: false },
-                                { title: 'Novedades de la Plataforma', desc: 'Enterarme de nuevas funciones y actualizaciones.', default: true }
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-start justify-between">
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
-                                        <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                            <p className="text-xs text-slate-500 -mt-2 mb-2">
+                                Controla qué notificaciones aparecen en tu campanita de alertas.
+                            </p>
+                            {NOTIF_ITEMS.map((item) => (
+                                <div key={item.key} className="flex items-start justify-between">
+                                    <div className="flex items-start gap-3">
+                                        <span className="text-lg mt-0.5">{item.icon}</span>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
+                                            <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                                        </div>
                                     </div>
-                                    <div className="h-6 w-11 bg-primary-100 rounded-full relative cursor-pointer" onClick={() => isDemo ? handleDemoAction("Cambiando Ajuste") : null}>
-                                        <div className={cn("absolute top-1 h-4 w-4 bg-primary-600 rounded-full shadow-sm transition-all", item.default ? "right-1" : "left-1 bg-slate-400")} />
-                                    </div>
+                                    <button
+                                        onClick={() => handleTogglePref(item.key)}
+                                        className={cn(
+                                            "h-6 w-11 rounded-full relative transition-colors duration-200 shrink-0 ml-4",
+                                            notifPrefs[item.key] ? "bg-primary-500" : "bg-slate-200"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "absolute top-1 h-4 w-4 rounded-full shadow-sm transition-all duration-200",
+                                            notifPrefs[item.key] ? "right-1 bg-white" : "left-1 bg-white"
+                                        )} />
+                                    </button>
                                 </div>
                             ))}
                         </CardContent>
@@ -493,21 +549,110 @@ export default function DashboardProfile() {
                                 )}
                             </div>
                             <CardContent className="p-6 relative">
-                                <div className={cn("transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none")}>
-                                    <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                <div className={cn("space-y-6 transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none")}>
+                                    {/* Edit Number Section */}
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Número de WhatsApp</label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Ej: +56912345678"
+                                                className="bg-slate-50 border-slate-100 flex-1 font-medium"
+                                                value={formData.whatsapp}
+                                                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                                            />
+                                            <Button
+                                                size="sm"
+                                                className="px-4 font-bold"
+                                                onClick={async () => {
+                                                    if (isDemo) {
+                                                        handleDemoAction("Guardar número de WhatsApp");
+                                                        return;
+                                                    }
+                                                    try {
+                                                        setLoading(true);
+                                                        const { error } = await supabase
+                                                            .from('companies')
+                                                            .update({ whatsapp: formData.whatsapp })
+                                                            .eq('id', company.id);
+                                                        if (error) throw error;
+                                                        await refreshCompany();
+                                                        showToast("Número actualizado correctamente", "success");
+                                                    } catch (err) {
+                                                        console.error('Error updating whatsapp:', err);
+                                                        showToast("Error al actualizar número", "error");
+                                                    } finally {
+                                                        setLoading(false);
+                                                    }
+                                                }}
+                                                disabled={loading}
+                                            >
+                                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+                                            </Button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 px-1">Incluye el código de país (ej: +56).</p>
+                                    </div>
+
+                                    {/* Connection Status Box */}
+                                    <div className={cn(
+                                        "flex items-center justify-between p-4 rounded-2xl border transition-all duration-300",
+                                        company.whatsapp_enabled !== false ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-200"
+                                    )}>
                                         <div className="flex items-center gap-4">
-                                            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                                                <Smartphone size={20} className="text-emerald-600" />
+                                            <div className={cn(
+                                                "h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-colors",
+                                                company.whatsapp_enabled !== false ? "bg-emerald-100" : "bg-slate-200"
+                                            )}>
+                                                <Smartphone size={20} className={company.whatsapp_enabled !== false ? "text-emerald-600" : "text-slate-500"} />
                                             </div>
                                             <div>
-                                                <p className="text-xs font-bold text-emerald-800">
-                                                    {isDemo ? `Conectado a +56 9 ${Math.floor(Math.random() * 90000000 + 10000000)}` : company.whatsapp ? `Conectado a ${company.whatsapp}` : "WhatsApp no configurado"}
+                                                <p className={cn(
+                                                    "text-xs font-bold transition-colors",
+                                                    company.whatsapp_enabled !== false ? "text-emerald-800" : "text-slate-600"
+                                                )}>
+                                                    {isDemo
+                                                        ? (company.whatsapp_enabled !== false ? `Conectado a ${formData.whatsapp || '+56 9 1234 5678'}` : "WhatsApp Desconectado")
+                                                        : (company.whatsapp ? `Conectado a ${company.whatsapp}` : "WhatsApp no configurado")
+                                                    }
                                                 </p>
-                                                <p className="text-[10px] text-emerald-600 font-medium">Recibiendo cotizaciones activamente.</p>
+                                                <p className="text-[10px] font-medium opacity-80 text-slate-500">
+                                                    {company.whatsapp_enabled !== false ? "Recibiendo cotizaciones activamente." : "Las cotizaciones están pausadas temporalmente."}
+                                                </p>
                                             </div>
                                         </div>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 text-xs font-bold" onClick={() => handleDemoAction("Desconectar WhatsApp")}>
-                                            Desconectar
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className={cn(
+                                                "px-4 font-bold transition-colors",
+                                                company.whatsapp_enabled !== false ? "text-red-500 hover:bg-red-50" : "text-emerald-600 hover:bg-emerald-50"
+                                            )}
+                                            onClick={async () => {
+                                                if (isDemo) {
+                                                    handleDemoAction(company.whatsapp_enabled !== false ? "Desconectar WhatsApp" : "Conectar WhatsApp");
+                                                    return;
+                                                }
+
+                                                try {
+                                                    setLoading(true);
+                                                    const newState = company.whatsapp_enabled === false;
+                                                    const { error } = await supabase
+                                                        .from('companies')
+                                                        .update({ whatsapp_enabled: newState })
+                                                        .eq('id', company.id);
+
+                                                    if (error) throw error;
+                                                    await refreshCompany();
+                                                    showToast(newState ? "WhatsApp Conectado" : "WhatsApp Desconectado", "success");
+                                                } catch (err) {
+                                                    console.error('Error toggling WhatsApp state:', err);
+                                                    showToast("Error al cambiar estado de WhatsApp", "error");
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                            disabled={loading}
+                                        >
+                                            {company.whatsapp_enabled !== false ? "Desconectar" : "Conectar"}
                                         </Button>
                                     </div>
                                 </div>
@@ -831,16 +976,73 @@ export default function DashboardProfile() {
                                 )}
                             </div>
                             <CardContent className="p-6 relative">
-                                <div className={cn("flex items-center justify-between transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none select-none")}>
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 text-sm">Ocultar logotipo de la plataforma</h4>
-                                        <p className="text-xs text-slate-500 mt-1">Remueve la mención "Catálogo por ktaloog" al final de tu tienda.</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-6 w-11 bg-slate-100 rounded-full relative cursor-not-allowed" onClick={() => isDemo ? handleDemoAction("Marca Blanca") : null}>
-                                            <div className="absolute left-1 top-1 h-4 w-4 bg-slate-400 rounded-full shadow-sm" />
+                                <div className={cn("space-y-4 transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none select-none")}>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 text-sm">Modo Landing Page (Enlace Limpio)</h4>
+                                            <p className="text-xs text-slate-500 mt-1">Habilita una URL especial que oculta el menú superior y el footer de ktaloog.</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div
+                                                className={cn(
+                                                    "h-6 w-11 rounded-full relative transition-colors duration-200 cursor-pointer",
+                                                    company.landing_enabled ? "bg-emerald-500" : "bg-slate-200"
+                                                )}
+                                                onClick={async () => {
+                                                    if (isDemo) {
+                                                        handleDemoAction("Modo Landing");
+                                                        return;
+                                                    }
+                                                    try {
+                                                        setLoading(true);
+                                                        const newState = !company.landing_enabled;
+                                                        const { error } = await supabase
+                                                            .from('companies')
+                                                            .update({ landing_enabled: newState })
+                                                            .eq('id', company.id);
+
+                                                        if (error) throw error;
+                                                        await refreshCompany();
+                                                        showToast(newState ? "Modo Landing activado" : "Modo Landing desactivado", "success");
+                                                    } catch (err) {
+                                                        console.error('Error toggling landing mode:', err);
+                                                        showToast("Error al cambiar modo landing", "error");
+                                                    } finally {
+                                                        setLoading(false);
+                                                    }
+                                                }}
+                                            >
+                                                <div className={cn(
+                                                    "absolute top-1 h-4 w-4 bg-white rounded-full shadow-sm transition-all duration-200",
+                                                    company.landing_enabled ? "left-6" : "left-1"
+                                                )} />
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {company.landing_enabled && (
+                                        <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <LinkIcon size={12} />
+                                                    Tu Enlace Limpio
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        const link = `${window.location.origin}/catalogo/${company.slug}/landing`;
+                                                        navigator.clipboard.writeText(link);
+                                                        showToast("Enlace copiado al portapapeles", "success");
+                                                    }}
+                                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 underline"
+                                                >
+                                                    Copiar Enlace
+                                                </button>
+                                            </div>
+                                            <div className="bg-white px-3 py-2 rounded-lg border border-slate-100 text-xs font-mono text-slate-600 break-all">
+                                                {window.location.origin}/catalogo/{company.slug}/landing
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {!isPro && (
@@ -889,55 +1091,59 @@ export default function DashboardProfile() {
                     <h1 className="text-2xl font-bold text-slate-900">Configuración</h1>
                     <p className="text-slate-500">Gestiona la información de tu tienda y preferencias de cuenta.</p>
                 </div>
-                {activeTab === 'profile' && (
-                    <Button
-                        onClick={handleSaveProfile}
-                        disabled={loading}
-                        className="shadow-lg shadow-primary-100 h-10 px-4 shrink-0 font-bold"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
-                        <span>{isDemo ? 'Modo Demo (Solo Lectura)' : 'Guardar Cambios'}</span>
-                    </Button>
-                )}
+                <div className="hidden md:block">
+                    {activeTab === 'profile' && (
+                        <Button
+                            onClick={handleSaveProfile}
+                            disabled={loading}
+                            className="shadow-lg shadow-primary-100 h-10 px-4 shrink-0 font-bold"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
+                            <span>{isDemo ? 'Modo Demo' : 'Guardar Cambios'}</span>
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Navigation */}
                 <div className="space-y-4">
-                    <div className="bg-white rounded-3xl border border-slate-100 p-2 shadow-sm">
+                    <div className="bg-white rounded-3xl border border-slate-100 p-2 shadow-sm flex lg:flex-col overflow-x-auto no-scrollbar lg:overflow-x-visible gap-1 lg:gap-0 sticky top-0 md:relative z-20">
                         {[
-                            { id: 'profile', name: 'Perfil de Tienda', icon: <User size={18} /> },
+                            { id: 'profile', name: 'Perfil', fullName: 'Perfil de Tienda', icon: <User size={18} /> },
                             {
                                 id: 'messages',
-                                name: 'Mensajes Sistema',
+                                name: 'Mensajes',
+                                fullName: 'Mensajes Sistema',
                                 icon: <MessageSquare size={18} />,
                                 badge: unreadSystemCount > 0 ? unreadSystemCount : null
                             },
                             {
                                 id: 'notifications',
-                                name: 'Notificaciones',
-                                icon: <Bell size={18} />,
-                                badge: (unreadCount - unreadSystemCount) > 0 ? (unreadCount - unreadSystemCount) : null
+                                name: 'Alertas',
+                                fullName: 'Notificaciones',
+                                icon: <Bell size={18} />
                             },
-                            { id: 'security', name: 'Seguridad', icon: <Shield size={18} /> },
-                            { id: 'whatsapp', name: 'Integración WhatsApp', icon: <Smartphone size={18} /> },
+                            { id: 'security', name: 'Seguridad', fullName: 'Seguridad', icon: <Shield size={18} /> },
+                            { id: 'whatsapp', name: 'WhatsApp', fullName: 'Integración WhatsApp', icon: <Smartphone size={18} /> },
                         ].map((item, i) => (
                             <button
                                 key={i}
                                 onClick={() => setActiveTab(item.id)}
                                 className={cn(
-                                    "w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all",
+                                    "flex items-center justify-between px-4 py-2.5 lg:py-3 rounded-2xl text-[11px] lg:text-sm font-bold transition-all whitespace-nowrap shrink-0 lg:shrink",
                                     activeTab === item.id
                                         ? "bg-primary-50 text-primary-600 shadow-sm ring-1 ring-primary-100"
                                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                 )}
                             >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 lg:gap-3">
                                     {item.icon}
-                                    {item.name}
+                                    <span className="lg:hidden">{item.name}</span>
+                                    <span className="hidden lg:inline">{item.fullName}</span>
                                 </div>
                                 {item.badge && (
-                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white ml-2 lg:ml-0">
                                         {item.badge}
                                     </span>
                                 )}
@@ -945,71 +1151,73 @@ export default function DashboardProfile() {
                         ))}
                     </div>
 
-                    <Card className="bg-white border-none overflow-hidden relative shadow-lg shadow-slate-200/50 group ring-1 ring-slate-100">
-                        <CardContent className="p-6 relative z-10">
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className={cn(
-                                    "h-12 w-12 rounded-2xl flex items-center justify-center border shadow-sm group-hover:scale-110 transition-transform duration-500",
-                                    company.plan === 'free' ? "bg-slate-50 border-slate-100" :
-                                        company.plan === 'plus' ? "bg-blue-50 border-blue-100" :
-                                            company.plan === 'pro' ? "bg-amber-50 border-amber-100" :
-                                                "bg-emerald-50 border-emerald-100"
-                                )}>
-                                    {company.plan === 'free' && <Rocket size={24} className="text-secondary-500 fill-secondary-500/10" />}
-                                    {company.plan === 'plus' && <Zap size={24} className="text-blue-500 fill-blue-500/10" />}
-                                    {company.plan === 'pro' && <Sparkles size={24} className="text-amber-500 fill-amber-500/10" />}
-                                    {company.plan === 'custom' && <Shield size={24} className="text-slate-800 fill-slate-800/10" />}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h4 className="font-bold text-lg leading-tight text-slate-900">
-                                            Plan {company.plan === 'free' ? 'Gratuito' : company.plan.charAt(0).toUpperCase() + company.plan.slice(1)}
-                                        </h4>
-                                        <span className={cn(
-                                            "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                            company.plan === 'free' ? "bg-slate-100 text-slate-600 border-slate-200" :
-                                                company.plan === 'plus' ? "bg-blue-100 text-blue-800 border-blue-200" :
-                                                    company.plan === 'pro' ? "bg-amber-100 text-amber-800 border-amber-200" :
-                                                        "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                        )}>
-                                            {company.plan.toUpperCase()}
-                                        </span>
+                    <div className="hidden lg:block">
+                        <Card className="bg-white border-none overflow-hidden relative shadow-lg shadow-slate-200/50 group ring-1 ring-slate-100">
+                            <CardContent className="p-6 relative z-10">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className={cn(
+                                        "h-12 w-12 rounded-2xl flex items-center justify-center border shadow-sm group-hover:scale-110 transition-transform duration-500",
+                                        company.plan === 'free' ? "bg-slate-50 border-slate-100" :
+                                            company.plan === 'plus' ? "bg-blue-50 border-blue-100" :
+                                                company.plan === 'pro' ? "bg-amber-50 border-amber-100" :
+                                                    "bg-emerald-50 border-emerald-100"
+                                    )}>
+                                        {company.plan === 'free' && <Rocket size={24} className="text-secondary-500 fill-secondary-500/10" />}
+                                        {company.plan === 'plus' && <Zap size={24} className="text-blue-500 fill-blue-500/10" />}
+                                        {company.plan === 'pro' && <Sparkles size={24} className="text-amber-500 fill-amber-500/10" />}
+                                        {company.plan === 'custom' && <Shield size={24} className="text-slate-800 fill-slate-800/10" />}
                                     </div>
-                                    <p className="text-slate-500 text-[11px] font-medium mt-0.5">
-                                        Límite de productos activo
-                                    </p>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-bold text-lg leading-tight text-slate-900">
+                                                Plan {company.plan === 'free' ? 'Gratuito' : company.plan.charAt(0).toUpperCase() + company.plan.slice(1)}
+                                            </h4>
+                                            <span className={cn(
+                                                "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                                                company.plan === 'free' ? "bg-slate-100 text-slate-600 border-slate-200" :
+                                                    company.plan === 'plus' ? "bg-blue-100 text-blue-800 border-blue-200" :
+                                                        company.plan === 'pro' ? "bg-amber-100 text-amber-800 border-amber-200" :
+                                                            "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                            )}>
+                                                {company.plan.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <p className="text-slate-500 text-[11px] font-medium mt-0.5">
+                                            Límite de productos activo
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <p className="text-slate-600 text-xs mb-6 leading-relaxed border-t border-slate-100 pt-4">
-                                Mejora tu plan para desbloquear más productos, fotos y analíticas avanzadas.
-                            </p>
+                                <p className="text-slate-600 text-xs mb-6 leading-relaxed border-t border-slate-100 pt-4">
+                                    Mejora tu plan para desbloquear más productos, fotos y analíticas avanzadas.
+                                </p>
 
-                            <Button
-                                className={cn(
-                                    "w-full font-bold shadow-lg transition-all",
-                                    pendingRequest ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 shadow-none" : (
-                                        company.plan === 'free' ? "bg-primary-600 hover:bg-primary-700 shadow-primary-100" :
-                                            company.plan === 'plus' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" :
-                                                "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
-                                    )
-                                )}
-                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
-                            >
-                                {pendingRequest ? (
-                                    <>
-                                        <Clock size={16} className="mr-2" />
-                                        Solicitud en Revisión
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles size={16} className="mr-2 text-yellow-300" />
-                                        {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar Plan'}
-                                    </>
-                                )}
-                            </Button>
-                        </CardContent>
-                    </Card>
+                                <Button
+                                    className={cn(
+                                        "w-full font-bold shadow-lg transition-all",
+                                        pendingRequest ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 shadow-none" : (
+                                            company.plan === 'free' ? "bg-primary-600 hover:bg-primary-700 shadow-primary-100" :
+                                                company.plan === 'plus' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-100" :
+                                                    "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
+                                        )
+                                    )}
+                                    onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
+                                >
+                                    {pendingRequest ? (
+                                        <>
+                                            <Clock size={16} className="mr-2" />
+                                            Solicitud en Revisión
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={16} className="mr-2 text-yellow-300" />
+                                            {company.plan === 'free' ? 'Mejorar Plan' : 'Gestionar Plan'}
+                                        </>
+                                    )}
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
 
                 {/* Main Content Areas */}

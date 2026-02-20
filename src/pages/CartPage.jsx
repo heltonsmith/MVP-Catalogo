@@ -22,7 +22,7 @@ export default function CartPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [customerInfo, setCustomerInfo] = useState({ name: '', email: '' });
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     // Resolved company data from Supabase (fallback)
     const [resolvedCompanies, setResolvedCompanies] = useState({});
 
@@ -56,7 +56,7 @@ export default function CartPage() {
         const fetchCompanies = async () => {
             const { data } = await supabase
                 .from('companies')
-                .select('id, name, slug, whatsapp, logo')
+                .select('id, name, slug, whatsapp, logo, user_id, whatsapp_enabled')
                 .in('id', unresolvedIds);
 
             if (data) {
@@ -86,20 +86,28 @@ export default function CartPage() {
         });
     };
 
-    const handleSendWhatsApp = async () => {
-        if (!selectedCompanyId || !customerInfo.name || !customerInfo.email) {
-            showToast("Por favor completa todos los campos", "error");
+    const handleSendQuote = async () => {
+        if (!customerInfo.name || !customerInfo.email) {
+            showToast("Por favor, completa tus datos", "info");
             return;
         }
 
-        setIsSubmitting(true);
         const companyId = selectedCompanyId;
-        const cartItems = carts[companyId];
         const company = getCompany(companyId);
+
+        // Check if store has WhatsApp enabled (default true if undefined)
+        if (company && company.whatsapp_enabled === false) {
+            showToast("La tienda tiene desconectado el WhatsApp actualmente. Por favor, ponte en contacto vía mensajería interna.", "warning");
+            setIsSending(false);
+            return;
+        }
+
+        setIsSending(true);
+        const cartItems = carts[companyId];
 
         if (!company || !cartItems || cartItems.length === 0) {
             showToast("No se encontró la tienda o el carrito está vacío", "error");
-            setIsSubmitting(false);
+            setIsSending(false);
             return;
         }
 
@@ -192,21 +200,49 @@ export default function CartPage() {
                     };
                 });
 
-                const { error: whatsappError } = await supabase.from('whatsapp_quotes').insert([{
-                    user_id: user.id,
-                    company_id: companyId,
-                    customer_name: customerInfo.name,
-                    customer_email: customerInfo.email,
-                    content: message, // Save the actual message body
-                    items: detailedItems,
-                    total: totalPrice,
-                    status: 'pending'
-                }]);
+                const { data: whatsappQuote, error: whatsappError } = await supabase
+                    .from('whatsapp_quotes')
+                    .insert([{
+                        user_id: user.id,
+                        company_id: companyId,
+                        customer_name: customerInfo.name,
+                        customer_email: customerInfo.email,
+                        content: message,
+                        items: detailedItems,
+                        total: totalPrice,
+                        status: 'pending'
+                    }])
+                    .select()
+                    .single();
 
                 if (whatsappError) {
                     console.error('Error saving WhatsApp history:', whatsappError);
-                    // We don't throw here to at least let the user open WhatsApp,
-                    // but we log it for debugging.
+                } else if (company.user_id) {
+                    // 6. Send notification to the store owner (if enabled in prefs)
+                    const prefs = company.notification_prefs || {};
+                    const notifyQuote = prefs.notify_quote !== false; // default true
+                    if (notifyQuote) {
+                        const { error: notifError } = await supabase
+                            .from('notifications')
+                            .insert([{
+                                user_id: company.user_id,
+                                type: 'quote',
+                                title: 'Nueva Cotización por WhatsApp',
+                                content: `${customerInfo.name} ha enviado una cotización de ${formatCurrency(totalPrice)}.`,
+                                metadata: {
+                                    quote_id: whatsappQuote?.id,
+                                    customer_name: customerInfo.name,
+                                    customer_email: customerInfo.email,
+                                    total: totalPrice,
+                                    company_id: companyId,
+                                    items_count: cartItems.length
+                                }
+                            }]);
+
+                        if (notifError) {
+                            console.error('Error sending quote notification:', notifError);
+                        }
+                    }
                 }
             }
 
@@ -221,7 +257,7 @@ export default function CartPage() {
             console.error('Error saving quote:', error);
             showToast("Error al registrar la cotización. Intenta nuevamente.", "error");
         } finally {
-            setIsSubmitting(false);
+            setIsSending(false);
         }
     };
 
@@ -436,10 +472,10 @@ export default function CartPage() {
                     <div className="pt-2">
                         <Button
                             className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 font-bold rounded-xl shadow-lg shadow-emerald-100"
-                            onClick={handleSendWhatsApp}
-                            disabled={isSubmitting || !customerInfo.name || !customerInfo.email}
+                            onClick={handleSendQuote}
+                            disabled={isSending || !customerInfo.name || !customerInfo.email}
                         >
-                            {isSubmitting ? (
+                            {isSending ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Registrando...

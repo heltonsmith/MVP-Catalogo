@@ -57,7 +57,7 @@ export default function CustomerDashboard() {
         try {
             const [favs, qts, revs] = await Promise.all([
                 supabase.from('favorites').select('*, company:companies(*)').eq('user_id', user.id).limit(4),
-                supabase.from('whatsapp_quotes').select('*, company:companies(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+                supabase.from('whatsapp_quotes').select('*, company:companies(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1),
                 supabase.from('reviews').select('count', { count: 'exact' }).eq('user_id', user.id)
             ]);
 

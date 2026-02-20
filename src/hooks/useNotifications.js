@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../components/ui/Toast';
 
 export function useNotifications() {
-    const { user, refreshUnreadNotifications, setUnreadNotifications } = useAuth();
+    const { user, setUnreadNotifications, unreadNotifications } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
-    const { showToast } = useToast();  // Assuming useToast is available via hook or context
 
     const fetchNotifications = useCallback(async () => {
         if (!user) return;
@@ -16,84 +14,43 @@ export function useNotifications() {
         try {
             const { data, error } = await supabase
                 .from('notifications')
-                .select('id, type, title, content, is_read, created_at, metadata, user_id')
+                .select('*')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
             const fetchedNotifications = data || [];
-            // Robust check: Ensure array
-            if (!Array.isArray(fetchedNotifications)) {
-                console.error('Fetched notifications is not an array:', fetchedNotifications);
-                setNotifications([]);
-                return;
-            }
             setNotifications(fetchedNotifications);
-
-            // Debug: Log the first notification to see types
-            if (fetchedNotifications.length > 0) {
-                console.log('useNotifications: Sample notification:', {
-                    id: fetchedNotifications[0].id,
-                    is_read: fetchedNotifications[0].is_read,
-                    type: typeof fetchedNotifications[0].is_read
-                });
-            }
 
             const count = fetchedNotifications.filter(n => n.is_read === false || n.is_read === 'f').length;
             setUnreadCount(count);
 
-            // Synchronize with global state in AuthContext
             if (setUnreadNotifications) {
-                console.log('useNotifications: Syncing global unread count:', count);
                 setUnreadNotifications(count);
             }
         } catch (error) {
             console.error('Error fetching notifications:', error);
-            // We use console.error, but let's try to surface it if possible without crashing
-            // showToast("Error al cargar notificaciones", "error"); 
         } finally {
             setLoading(false);
         }
-
     }, [user, setUnreadNotifications]);
 
+    // Fetch on mount
     useEffect(() => {
         if (!user) return;
         fetchNotifications();
-
-        console.log('useNotifications: Setting up realtime subscription');
-        const channel = supabase
-            .channel(`notifications_list:${user.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, (payload) => {
-                console.log('useNotifications: Realtime event receive', payload);
-
-                if (payload.eventType === 'INSERT') {
-                    setNotifications(prev => [payload.new, ...prev]);
-                    setUnreadCount(prev => prev + 1);
-                } else if (payload.eventType === 'DELETE') {
-                    setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
-                    // We don't verify is_read here easily without old record data might be partial, 
-                    // but typically deleting reduces unread count if it was unread.
-                    // Ideally we'd sync unread count completely or check payload.old if available (Record)
-                    // For now, simpler to re-fetch count or just let AuthContext sync it eventually.
-                } else if (payload.eventType === 'UPDATE') {
-                    setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new : n));
-                    // Check if read status changed to adjust counter locally? 
-                    // It's complex to calc diff. AuthContext handles the badge. 
-                    // This local unreadCount is mostly for the hook consumers.
-                }
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
     }, [user, fetchNotifications]);
+
+    // Re-fetch the full list whenever AuthContext detects a realtime change
+    // AuthContext's realtime subscription is reliable and updates unreadNotifications count.
+    // We piggyback on that to keep the notification list in sync.
+    useEffect(() => {
+        if (!user) return;
+        // Only re-fetch if we already loaded once (avoid double-fetch on mount)
+        if (!loading) {
+            fetchNotifications();
+        }
+    }, [unreadNotifications]);
 
     const markAsRead = async (id) => {
         // Optimistic update
@@ -108,7 +65,6 @@ export function useNotifications() {
                 .eq('id', id);
 
             if (error) {
-                // Rollback on error
                 fetchNotifications();
                 throw error;
             }
@@ -130,7 +86,6 @@ export function useNotifications() {
                 .eq('id', id);
 
             if (error) {
-                // Rollback on error
                 fetchNotifications();
                 throw error;
             }
@@ -156,7 +111,6 @@ export function useNotifications() {
                 .eq('id', id);
 
             if (error) {
-                // Rollback on error
                 fetchNotifications();
                 throw error;
             }
@@ -181,7 +135,6 @@ export function useNotifications() {
                 .eq('is_read', false);
 
             if (error) {
-                // Rollback on error
                 fetchNotifications();
                 throw error;
             }
@@ -205,7 +158,6 @@ export function useNotifications() {
                 .eq('user_id', user.id);
 
             if (error) {
-                // Rollback on error
                 fetchNotifications();
                 throw error;
             }

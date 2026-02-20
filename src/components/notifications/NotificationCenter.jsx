@@ -13,7 +13,8 @@ export function NotificationCenter() {
         markAsUnread,
         deleteNotification,
         markAllAsRead,
-        clearAll
+        clearAll,
+        refresh
     } = useNotifications();
 
     const [isOpen, setIsOpen] = useState(false);
@@ -120,7 +121,11 @@ export function NotificationCenter() {
     return (
         <div className="relative" ref={dropdownRef}>
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const willOpen = !isOpen;
+                    setIsOpen(willOpen);
+                    if (willOpen) refresh();
+                }}
                 className="relative p-2 text-slate-500 hover:text-primary-600 transition-colors rounded-full hover:bg-slate-100 active:scale-95"
                 title="Notificaciones"
             >
@@ -133,7 +138,7 @@ export function NotificationCenter() {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-3 w-85 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute -right-12 sm:right-0 mt-3 w-[calc(100vw-2rem)] sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-w-[400px]">
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
                         <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                             Notificaciones

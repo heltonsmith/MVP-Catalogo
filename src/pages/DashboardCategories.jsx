@@ -213,23 +213,23 @@ export default function DashboardCategories() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Categorías</h1>
-                    <p className="text-slate-500">Organiza tus productos para que sea más fácil encontrarlos.</p>
+                    <p className="text-slate-500 text-sm">Organiza tus productos para que sea más fácil encontrarlos.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="w-full sm:w-auto">
                     <form onSubmit={handleAddCategory} className="flex items-center gap-2">
                         <Input
-                            placeholder="Nombre de nueva categoría..."
+                            placeholder="Categoría..."
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
-                            className="bg-white border-slate-200 h-10 min-w-[200px]"
+                            className="bg-white border-slate-200 h-11 flex-1 sm:min-w-[200px] text-sm"
                             disabled={isAdding}
                         />
-                        <Button type="submit" disabled={isAdding || !newCategoryName.trim()} className="shadow-lg shadow-primary-100 h-10 px-4 shrink-0">
-                            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5 md:mr-2" />}
-                            <span className="hidden md:inline">Añadir</span>
+                        <Button type="submit" disabled={isAdding || !newCategoryName.trim()} className="shadow-lg shadow-primary-100 h-11 px-4 shrink-0">
+                            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5 sm:mr-2" />}
+                            <span className="hidden sm:inline">Añadir</span>
                         </Button>
                     </form>
                 </div>

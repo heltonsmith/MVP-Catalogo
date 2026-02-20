@@ -1,6 +1,7 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const CartContext = createContext();
+const CART_STORAGE_KEY = 'ktaloog_carts';
 
 // Helper: get the effective price for an item based on quantity and wholesale tiers
 function getEffectivePrice(item) {
@@ -18,9 +19,23 @@ function getEffectivePrice(item) {
 
 export const CartProvider = ({ children }) => {
     // State structure: { [companyId]: [items] }
-    const [carts, setCarts] = useState({});
+    const [carts, setCarts] = useState(() => {
+        try {
+            const saved = localStorage.getItem(CART_STORAGE_KEY);
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            console.error("Error loading cart from localStorage:", e);
+            return {};
+        }
+    });
+
     // Company info: { [companyId]: { name, slug, whatsapp, logo } }
     const [companyInfo, setCompanyInfoState] = useState({});
+
+    // Sync to localStorage
+    useEffect(() => {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(carts));
+    }, [carts]);
 
     const getCart = (companyId) => carts[companyId] || [];
 
