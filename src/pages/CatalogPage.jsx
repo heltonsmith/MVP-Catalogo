@@ -21,7 +21,7 @@ import NotFoundPage from './NotFoundPage';
 export default function CatalogPage() {
     const { showToast } = useToast();
     const { user, profile, refreshCompany } = useAuth();
-    const { setCompanyInfo } = useCart();
+    const { cart, setCompanyInfo } = useCart();
     const [searchParams] = useSearchParams();
     const { companySlug } = useParams();
     const navigate = useNavigate();
@@ -323,6 +323,11 @@ export default function CatalogPage() {
             return;
         }
 
+        if (isOwner) {
+            showToast("No puedes seguirte a ti mismo", "warning");
+            return;
+        }
+
         try {
             if (isFollowing) {
                 await supabase
@@ -385,6 +390,11 @@ export default function CatalogPage() {
     const toggleFavorite = async () => {
         if (!user) {
             showToast("Debes iniciar sesión para usar esta función", "info");
+            return;
+        }
+
+        if (isOwner) {
+            showToast("No puedes guardar tu propia tienda en favoritos", "warning");
             return;
         }
 
@@ -965,11 +975,13 @@ export default function CatalogPage() {
                                             onClick={() => {
                                                 if (!user) {
                                                     navigate('/login?redirectTo=' + encodeURIComponent(location.pathname));
+                                                } else if (isOwner) {
+                                                    showToast("No puedes enviarte mensajes a ti mismo", "warning");
                                                 } else {
-                                                    // 2. Track quote analytics for EACH product in the cart
+                                                    // 1. Track quote analytics for EACH product in the cart
                                                     const trackProductQuotes = async () => {
                                                         if (company && company.id && !company.slug?.includes('demo')) {
-                                                            const uniqueProductIds = [...new Set(cart.map(item => item.id))];
+                                                            const uniqueProductIds = [...new Set((cart || []).map(item => item.id))];
                                                             for (const pid of uniqueProductIds) {
                                                                 try {
                                                                     await supabase.rpc('increment_product_quote', { product_id: pid });
@@ -981,7 +993,8 @@ export default function CatalogPage() {
                                                     };
                                                     trackProductQuotes();
 
-                                                    window.open(whatsappUrl, '_blank');
+                                                    // 2. Open Internal Inbox instead of WhatsApp
+                                                    navigate(`/inbox?new_chat=${company.id}`);
                                                 }
                                             }}
                                             className="flex items-center gap-2 bg-primary-600 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border border-primary-500 shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all active:scale-95 group/msg"
@@ -1155,6 +1168,7 @@ export default function CatalogPage() {
                                                     isDemo={isDemo}
                                                     cartEnabled={false} // Store logic, but no cart
                                                     onReviewClick={() => handleOpenProductReviews(product)}
+                                                    isOwner={isOwner}
                                                 />
                                             ))}
                                         </div>
@@ -1180,6 +1194,7 @@ export default function CatalogPage() {
                                             companySlug={company.slug}
                                             cartEnabled={true}
                                             onReviewClick={() => handleOpenProductReviews(product)}
+                                            isOwner={isOwner}
                                         />
                                     ))}
                                 </div>

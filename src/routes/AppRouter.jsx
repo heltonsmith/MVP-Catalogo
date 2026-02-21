@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from '../pages/LandingPage';
 import CatalogPage from '../pages/CatalogPage';
 import DemoCatalogPage from '../pages/demo/DemoCatalogPage';
@@ -66,7 +66,7 @@ export function AppRouter() {
 
                 <Route path="/carrito" element={<CartPage />} />
                 <Route path="/inbox" element={<InboxPage />} />
-                <Route path="/mensajes" element={<UserMessages />} />
+                <Route path="/mensajes" element={<Navigate to="/inbox" replace />} />
                 <Route path="/precios" element={<PricingPage />} />
                 <Route path="/terminos" element={<TermsPage />} />
                 <Route path="/nosotros" element={<AboutUsPage />} />
@@ -93,7 +93,7 @@ export function AppRouter() {
                 <Route path="pedidos" element={<CustomerOrders />} />
                 <Route path="resenas" element={<CustomerReviews />} />
                 <Route path="cotizaciones" element={<CustomerQuotes />} />
-                <Route path="mensajes" element={<CustomerMessages />} />
+                <Route path="mensajes" element={<Navigate to="/inbox" replace />} />
                 <Route path="perfil" element={<CustomerProfile />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>

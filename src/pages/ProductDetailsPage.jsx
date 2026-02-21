@@ -323,6 +323,10 @@ export default function ProductDetailsPage() {
     }
 
     const handleAddToCart = () => {
+        if (isOwner) {
+            showToast("No puedes agregar tus propios productos al carrito", "warning");
+            return;
+        }
         addToCart(product, quantity);
         showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
     };

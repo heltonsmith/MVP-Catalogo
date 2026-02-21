@@ -9,7 +9,7 @@ import { useCart } from '../../hooks/useCart';
 import { useToast } from '../ui/Toast';
 import { StarRating } from '../ui/StarRating';
 
-export function ProductCard({ product, companySlug, cartEnabled = true, isDemo = false, onReviewClick }) {
+export function ProductCard({ product, companySlug, cartEnabled = true, isDemo = false, onReviewClick, isOwner = false }) {
     const { addToCart } = useCart();
     const { showToast } = useToast();
     const [quantity, setQuantity] = useState(1);
@@ -22,6 +22,10 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
 
     const handleAddToCart = () => {
         if (cartEnabled) {
+            if (isOwner) {
+                showToast("No puedes agregar tus propios productos al carrito", "warning");
+                return;
+            }
             addToCart(product, quantity);
             showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
             setQuantity(1);

@@ -76,7 +76,13 @@ export default function PublicExplorer() {
             }
 
             if (activeFilter !== 'all') {
-                query = query.eq('business_type', activeFilter);
+                if (activeFilter === 'retail') {
+                    query = query.in('business_type', ['retail', 'mixed']);
+                } else if (activeFilter === 'wholesale') {
+                    query = query.in('business_type', ['wholesale', 'mixed']);
+                } else {
+                    query = query.eq('business_type', activeFilter);
+                }
             }
 
             // Prioritize sponsored and then recent
@@ -136,6 +142,11 @@ export default function PublicExplorer() {
 
         if (!user) {
             showToast("Inicia sesión para guardar favoritos", "info");
+            return;
+        }
+
+        if (store.user_id === user.id) {
+            showToast("No puedes guardar tu propia tienda en favoritos", "warning");
             return;
         }
 

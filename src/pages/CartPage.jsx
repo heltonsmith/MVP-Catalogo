@@ -111,6 +111,12 @@ export default function CartPage() {
             return;
         }
 
+        if (user && company && user.id === company.user_id) {
+            showToast("No puedes enviarte cotizaciones a ti mismo", "warning");
+            setIsSending(false);
+            return;
+        }
+
         // Calculate total using wholesale pricing
         const { totalPrice } = getCartTotal(companyId);
 

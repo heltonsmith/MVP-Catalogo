@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     MessageSquare,
     Search,
@@ -26,11 +26,28 @@ export default function CustomerMessages() {
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [replyText, setReplyText] = useState('');
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const id = searchParams.get('id');
-        if (id) setSelectedCompanyId(id);
-    }, [searchParams]);
+        const validateAndSetCompany = async () => {
+            const id = searchParams.get('id');
+            if (id) {
+                // Validate company existence
+                const { data, error } = await supabase
+                    .from('companies')
+                    .select('id')
+                    .eq('id', id)
+                    .maybeSingle();
+
+                if (!data || error) {
+                    navigate('/404');
+                    return;
+                }
+                setSelectedCompanyId(id);
+            }
+        };
+        validateAndSetCompany();
+    }, [searchParams, navigate]);
 
     useEffect(() => {
         if (!user?.id) return;

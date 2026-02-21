@@ -71,16 +71,46 @@ export default function InboxPage() {
     const hasStore = !!currentCompany || (profile?.role !== 'client' && profile?.role !== 'user' && profile?.role !== undefined);
 
     useEffect(() => {
-        // Handle new chat initiation from URL
-        const requestedChatId = searchParams.get('chatId') || searchParams.get('new_chat');
-        if (requestedChatId) {
-            setSelectedChatId(requestedChatId);
-            // If it's from a store page (new_chat param usually), default to buying context
-            if (searchParams.get('new_chat')) {
-                setActiveTab('buying');
+        const validateRequestedChat = async () => {
+            const requestedChatId = searchParams.get('chatId') || searchParams.get('new_chat');
+            if (requestedChatId) {
+                // Determine if we are looking for a company or a profile
+                const isBuying = searchParams.get('new_chat') || activeTab === 'buying';
+
+                if (isBuying) {
+                    const { data, error } = await supabase
+                        .from('companies')
+                        .select('id')
+                        .eq('id', requestedChatId)
+                        .maybeSingle();
+
+                    if (!data || error) {
+                        navigate('/404');
+                        return;
+                    }
+                } else {
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('id')
+                        .eq('id', requestedChatId)
+                        .maybeSingle();
+
+                    if (!data || error) {
+                        navigate('/404');
+                        return;
+                    }
+                }
+
+                setSelectedChatId(requestedChatId);
+                // If it's from a store page (new_chat param usually), default to buying context
+                if (searchParams.get('new_chat')) {
+                    setActiveTab('buying');
+                }
             }
-        }
-    }, [searchParams]);
+        };
+
+        validateRequestedChat();
+    }, [searchParams, navigate]); // Removed dependencies that might cause loops with setActiveTab if not careful, but activeTab is needed for logic. Actually, activeTab is internal state. Let's stick to searchParams and navigate.
 
     const [activeTab, setActiveTab] = useState('buying');
 
