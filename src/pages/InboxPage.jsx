@@ -550,7 +550,7 @@ export default function InboxPage() {
             <header className="bg-white border-b border-slate-200 h-16 sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center gap-3">
-                        <Link to="/" className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <Link to="/explorar" className="text-slate-400 hover:text-slate-600 transition-colors">
                             <ArrowLeft size={24} />
                         </Link>
                         <h1 className="text-xl font-bold text-slate-900">Bandeja de Entrada</h1>

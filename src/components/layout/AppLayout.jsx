@@ -40,9 +40,7 @@ export function AppLayout() {
 
     return (
         <div className="flex min-h-screen flex-col overflow-x-hidden">
-            <div className={(hideBranding || hideBrandingOnMobile) ? 'hidden' : ''}>
-                <Navbar />
-            </div>
+            <Navbar isLandingMode={hideBranding || hideBrandingOnMobile} />
             <main className="flex-1">
                 <Outlet />
             </main>

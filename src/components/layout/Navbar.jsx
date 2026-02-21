@@ -9,7 +9,7 @@ import { NotificationCenter } from '../notifications/NotificationCenter';
 import { cn } from '../../utils';
 import { COMPANIES } from '../../data/mock';
 
-export function Navbar() {
+export function Navbar({ isLandingMode = false }) {
     const [isOpen, setIsOpen] = useState(false);
     const { carts } = useCart();
     const { user, company, signOut, profile, unreadNotifications, refreshUnreadNotifications } = useAuth();
@@ -131,23 +131,28 @@ export function Navbar() {
                 { name: 'Restaurante', path: '/catalogo/restaurante-delicias' }
             ]
         },
+        { name: 'Ayuda', path: '/ayuda' },
     ];
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
-                    <Link to="/" className="flex items-center">
-                        <img
-                            src="/logo-transparente.png"
-                            alt="ktaloog"
-                            className="h-10 w-auto"
-                        />
-                    </Link>
+                    {!isLandingMode ? (
+                        <Link to="/" className="flex items-center">
+                            <img
+                                src="/logo-transparente.png"
+                                alt="ktaloog"
+                                className="h-10 w-auto"
+                            />
+                        </Link>
+                    ) : (
+                        <div className="flex items-center w-10 h-10" /> // Spacer to maintain layout or just empty
+                    )}
 
                     {/* Desktop Nav */}
                     <div className="hidden md:flex items-center space-x-8">
-                        {navLinks.map((link) => (
+                        {!isLandingMode && navLinks.map((link) => (
                             <div key={link.name} className="relative group">
                                 {link.submenu ? (
                                     <>
@@ -270,11 +275,13 @@ export function Navbar() {
                                 <Link to="/registro" className="hidden md:block">
                                     <Button size="sm">Regístrate Gratis</Button>
                                 </Link>
-                                <Link to="/precios" className="hidden md:block ml-2">
-                                    <Button size="sm" className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold border-none shadow-md shadow-amber-200">
-                                        Precios
-                                    </Button>
-                                </Link>
+                                {!isLandingMode && (
+                                    <Link to="/precios" className="hidden md:block ml-2">
+                                        <Button size="sm" className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold border-none shadow-md shadow-amber-200">
+                                            Precios
+                                        </Button>
+                                    </Link>
+                                )}
                             </>
                         )}
 
@@ -292,7 +299,7 @@ export function Navbar() {
             {isOpen && (
                 <div className="md:hidden border-t border-slate-100 bg-white transition-all">
                     <div className="space-y-1 px-4 py-4">
-                        {navLinks.map((link) => (
+                        {!isLandingMode && navLinks.map((link) => (
                             <div key={link.name}>
                                 {link.submenu ? (
                                     <div className="space-y-1">
@@ -341,7 +348,9 @@ export function Navbar() {
                                             <Store size={20} />
                                         </div>
                                         <div>
-                                            {company?.slug ? (
+                                            {profile?.role === 'admin' || profile?.role === 'super_admin' ? (
+                                                <p className="font-bold text-slate-900">Admin Ktaloog</p>
+                                            ) : company?.slug ? (
                                                 <Link
                                                     to={`/catalogo/${company.slug}`}
                                                     onClick={() => setIsOpen(false)}
@@ -377,9 +386,11 @@ export function Navbar() {
                                     <Link to="/registro" onClick={() => setIsOpen(false)}>
                                         <Button className="w-full">Regístrate Gratis</Button>
                                     </Link>
-                                    <Link to="/precios" onClick={() => setIsOpen(false)}>
-                                        <Button variant="ghost" className="w-full">Precios</Button>
-                                    </Link>
+                                    {!isLandingMode && (
+                                        <Link to="/precios" onClick={() => setIsOpen(false)}>
+                                            <Button variant="ghost" className="w-full">Precios</Button>
+                                        </Link>
+                                    )}
                                 </>
                             )}
                         </div>

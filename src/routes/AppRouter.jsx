@@ -40,6 +40,7 @@ import AdminExplorer from '../pages/admin/AdminExplorer';
 
 import PublicExplorer from '../pages/PublicExplorer';
 import InboxPage from '../pages/InboxPage';
+import AdminTickets from '../pages/admin/AdminTickets';
 
 export function AppRouter() {
     return (
@@ -103,6 +104,7 @@ export function AppRouter() {
                 <Route index element={<AdminOverview />} />
                 <Route path="explorador" element={<AdminExplorer />} />
                 <Route path="usuarios" element={<AdminUsers />} />
+                <Route path="tickets" element={<AdminTickets />} />
                 <Route path="configuracion" element={<AdminSettings />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>

@@ -74,7 +74,9 @@ export function DashboardLayout() {
                         </div>
                         <div className="min-w-0">
                             <h2 className="text-sm font-bold text-slate-900 truncate">
-                                {company?.name || 'Mi Tienda'}
+                                {profile?.role === 'admin' || profile?.role === 'super_admin'
+                                    ? 'Admin Ktaloog'
+                                    : (company?.name || 'Mi Tienda')}
                             </h2>
                             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
                                 {company ? 'Tienda Verificada' : 'Configurando...'}
@@ -195,7 +197,9 @@ export function DashboardLayout() {
                             )}
                         </div>
                         <span className="font-bold text-slate-900 text-sm truncate max-w-[150px]">
-                            {company?.name || 'Mi Tienda'}
+                            {profile?.role === 'admin' || profile?.role === 'super_admin'
+                                ? 'Admin Ktaloog'
+                                : (company?.name || 'Mi Tienda')}
                         </span>
                     </div>
                     <div className="flex items-center gap-1">
