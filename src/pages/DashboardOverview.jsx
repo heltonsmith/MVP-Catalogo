@@ -1,4 +1,4 @@
-import { Zap, Check, Loader2, AlertCircle, User, Mail, Building2, CreditCard, Sparkles, Store, Package, Eye, DollarSign, TrendingUp, Plus, MessageCircle, ArrowUpRight, ArrowDownRight, CheckCircle2, Link2, Copy, ExternalLink, Clock, ChevronDown, FileText } from 'lucide-react';
+import { Zap, Check, Loader2, AlertTriangle, AlertCircle, User, Mail, Building2, CreditCard, Sparkles, Store, Package, Eye, DollarSign, TrendingUp, Plus, MessageCircle, ArrowUpRight, ArrowDownRight, CheckCircle2, Link2, Copy, ExternalLink, Clock, Calendar, ChevronDown, FileText, Camera } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -129,6 +129,27 @@ export default function DashboardOverview() {
     const { getSetting } = useSettings();
 
     const [topProducts, setTopProducts] = useState({ viewed: [], quoted: [] });
+
+    const isExpired = (date) => {
+        if (!date) return false;
+        const renewal = new Date(date);
+        const now = new Date();
+        const renewalDay = new Date(renewal.getFullYear(), renewal.getMonth(), renewal.getDate());
+        const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return nowDay >= renewalDay;
+    };
+
+    const isExpiringSoon = (date) => {
+        if (!date) return false;
+        const now = new Date();
+        const renewal = new Date(date);
+        const renewalDay = new Date(renewal.getFullYear(), renewal.getMonth(), renewal.getDate());
+        const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const diffDays = Math.ceil((renewalDay - nowDay) / (1000 * 60 * 60 * 24));
+        return diffDays > 0 && diffDays <= 3;
+    };
+
+    const isQuotesEnabled = getSetting(`${company?.plan}_plan_quotes_enabled`, company?.plan !== 'free' ? 'true' : 'false') === 'true';
 
     // Fetch product count once
     useEffect(() => {
@@ -353,18 +374,40 @@ export default function DashboardOverview() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Demo Banner */}
-            {isDemo && (
-                <div className="bg-amber-500 text-white px-6 py-3 rounded-2xl flex items-center justify-between shadow-lg shadow-amber-200 animate-bounce-subtle">
-                    <div className="flex items-center gap-3">
-                        <Sparkles size={20} />
-                        <span className="font-black uppercase tracking-widest text-sm">Modo Demostración Activo</span>
+            {/* Renewal Alerts */}
+            {!isDemo && displayCompany.plan !== 'free' && displayCompany.renewal_date && (
+                <>
+                    {/* Expired / Grace Period */}
+                    {isExpired(displayCompany.renewal_date) && (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex items-center gap-4 text-red-800 animate-pulse">
+                            <div className="h-10 w-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                                <AlertTriangle className="text-red-600" size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-sm font-black uppercase tracking-wider">Suscripción Vencida</h4>
+                                <p className="text-xs font-medium opacity-90">Tu suscripción venció el {new Date(displayCompany.renewal_date).toLocaleDateString()}. Tienes hasta {(() => {
+                                    const d = new Date(displayCompany.renewal_date);
+                                    d.setDate(d.getDate() + 3);
+                                    return d.toLocaleDateString();
+                                })()} (3 días de gracia) para renovar antes de bajar al plan Gratis.</p>
+                            </div>
+                            <Button size="sm" variant="error" className="font-black text-[10px]" onClick={() => setShowUpgradeModal(true)}>RENOVAR AHORA</Button>
+                        </div>
+                    )}
+
+                </>
+            )}
+
+            {/* Downgraded Notification (if plan is free and was previously higher - simplified check for now) */}
+            {!isDemo && displayCompany.plan === 'free' && (
+                <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 flex items-center gap-4 text-slate-700">
+                    <div className="h-10 w-10 bg-slate-200 rounded-full flex items-center justify-center shrink-0">
+                        <Zap className="text-slate-400" size={20} />
                     </div>
-                    <Link to="/registro">
-                        <Button variant="outline" className="bg-white/10 border-white text-white hover:bg-white hover:text-amber-600 font-bold border-2">
-                            Crear mi cuenta real
-                        </Button>
-                    </Link>
+                    <div className="flex-1">
+                        <h4 className="text-sm font-black uppercase tracking-wider">Plan Gratis Activo</h4>
+                        <p className="text-xs font-medium opacity-75">Tu cuenta es gratuita de por vida. Si tenías más productos activos, han sido ocultados para cumplir con el límite del plan.</p>
+                    </div>
                 </div>
             )}
 
@@ -419,16 +462,38 @@ export default function DashboardOverview() {
                                         <Package size={14} className="text-slate-400" />
                                         <span className="text-xs font-bold text-slate-600">
                                             Límite: <span className="text-slate-900">
-                                                {displayCompany.plan === 'free' ? '10' :
-                                                    displayCompany.plan === 'plus' ? getSetting('plus_plan_product_limit', '100') :
-                                                        getSetting('pro_plan_product_limit', '500')} productos
+                                                {displayCompany.plan === 'custom' ? 'Ilimitado' :
+                                                    getSetting(`${displayCompany.plan}_plan_product_limit`,
+                                                        displayCompany.plan === 'free' ? '5' :
+                                                            displayCompany.plan === 'plus' ? '100' : '500'
+                                                    )} productos
                                             </span>
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl">
-                                        <CheckCircle2 size={14} className="text-emerald-500" />
-                                        <span className="text-xs font-bold text-slate-600">Catálogo Activo</span>
+                                        <Camera size={14} className="text-slate-400" />
+                                        <span className="text-xs font-bold text-slate-600">
+                                            Fotos: <span className="text-slate-900">
+                                                {displayCompany.plan === 'custom' ? 'Ilimitadas' :
+                                                    getSetting(`${displayCompany.plan}_plan_image_limit`,
+                                                        displayCompany.plan === 'free' ? '1' : '5'
+                                                    )} por producto
+                                            </span>
+                                        </span>
                                     </div>
+                                    {displayCompany.plan !== 'free' && displayCompany.renewal_date && (
+                                        <div className={cn(
+                                            "flex items-center gap-2 px-3 py-1.5 rounded-xl",
+                                            isExpired(displayCompany.renewal_date) ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+                                        )}>
+                                            <Calendar size={14} className="opacity-70" />
+                                            <span className="text-xs font-bold">
+                                                Renovación: <span className="font-black">
+                                                    {new Date(displayCompany.renewal_date).toLocaleDateString()}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -451,8 +516,8 @@ export default function DashboardOverview() {
                                             MEJORAR MI PLAN
                                         </Button>
                                     )}
-                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest text-center lg:text-right">
-                                        {displayCompany.plan === 'pro' ? 'TIENES EL PLAN MÁXIMO' : 'DESBLOQUEA TODO EL POTENCIAL'}
+                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest text-center w-full">
+                                        {displayCompany.plan === 'pro' ? 'Tienes el plan máximo' : 'Desbloquea todo el potencial'}
                                     </p>
                                 </>
                             )}
@@ -507,12 +572,12 @@ export default function DashboardOverview() {
                             </div>
                             <PeriodSelector value={quotesPeriod} onChange={setQuotesPeriod} />
                         </div>
-                        <div className={cn("mt-4", company.plan === 'free' && "blur-[3px] select-none pointer-events-none opacity-50")}>
+                        <div className={cn("mt-4", !isQuotesEnabled && "blur-[3px] select-none pointer-events-none opacity-50")}>
                             <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest">Cotizaciones</h3>
                             <p className="text-3xl font-bold text-slate-900 mt-1">{quotesCount}</p>
                         </div>
 
-                        {company.plan === 'free' && (
+                        {!isQuotesEnabled && (
                             <div className="mt-4 pt-4 border-t border-slate-50">
                                 <div className="mb-3 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
                                     <h5 className="text-[10px] font-black text-purple-900 uppercase tracking-wider mb-1.5">Gestión de Cotizaciones</h5>
@@ -587,7 +652,8 @@ export default function DashboardOverview() {
                             </Button>
                             <Button
                                 onClick={() => {
-                                    window.open(`/catalogo/${displayCompany.slug}`, '_blank');
+                                    const url = isDemo ? `/demo/catalogo/${displayCompany.slug}` : `/catalogo/${displayCompany.slug}`;
+                                    window.open(url, '_blank');
                                 }}
                                 className="w-full sm:w-auto font-bold h-12 gap-3 shadow-lg shadow-primary-100"
                             >
@@ -635,7 +701,7 @@ export default function DashboardOverview() {
                                 Más Cotizados
                             </div>
                             <div className="p-4 space-y-4 relative">
-                                <div className={cn("space-y-4 transition-all duration-500", company.plan === 'free' && "blur-[4px] grayscale opacity-40 select-none pointer-events-none")}>
+                                <div className={cn("space-y-4 transition-all duration-500", !isQuotesEnabled && "blur-[4px] grayscale opacity-40 select-none pointer-events-none")}>
                                     {topQuoted.length > 0 ? topQuoted.map(product => (
                                         <div key={product.id} className="flex items-center justify-between group cursor-pointer">
                                             <div className="flex items-center gap-3">
@@ -657,7 +723,7 @@ export default function DashboardOverview() {
                                     )}
                                 </div>
 
-                                {company.plan === 'free' && (
+                                {!isQuotesEnabled && (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-white/10 backdrop-blur-[1px] z-10">
                                         <div className="h-10 w-10 bg-purple-50 rounded-xl flex items-center justify-center mb-3">
                                             <DollarSign className="text-purple-500 fill-purple-500/20" size={20} />
@@ -689,7 +755,7 @@ export default function DashboardOverview() {
                             Actividad Reciente (WhatsApp)
                         </div>
                         <div className="p-0 overflow-hidden divide-y divide-slate-50 relative min-h-[200px]">
-                            <div className={cn("transition-all duration-500", company.plan === 'free' && "blur-[5px] grayscale opacity-30 select-none pointer-events-none")}>
+                            <div className={cn("transition-all duration-500", !isQuotesEnabled && "blur-[5px] grayscale opacity-30 select-none pointer-events-none")}>
                                 {isDemo && recentActivity.length > 0 ? (
                                     recentActivity.map(act => (
                                         <div key={act.id} className="p-4 hover:bg-slate-50/50 transition-all cursor-pointer group">
@@ -756,7 +822,7 @@ export default function DashboardOverview() {
                                 )}
                             </div>
 
-                            {company.plan === 'free' && (
+                            {!isQuotesEnabled && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-white/10 backdrop-blur-[1px]">
                                     <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
                                         <MessageCircle className="text-emerald-500 fill-emerald-500/20" size={20} />
@@ -777,7 +843,7 @@ export default function DashboardOverview() {
                                     onClick={() => {
                                         if (isDemo) {
                                             navigate('/demo/tienda/dashboard/cotizaciones');
-                                        } else if (company.plan === 'free') {
+                                        } else if (!isQuotesEnabled) {
                                             setShowUpgradeModal(true);
                                         } else {
                                             navigate('/dashboard/cotizaciones');

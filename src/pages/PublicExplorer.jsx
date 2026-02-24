@@ -50,27 +50,42 @@ export default function PublicExplorer() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Smart Search: Always search companies as the primary discovery entity
+            let matchedCompanyIds = [];
+
+            // 1. If searching, first check products for matches
+            if (search) {
+                const { data: productMatches } = await supabase
+                    .from('products')
+                    .select('company_id')
+                    .or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+
+                if (productMatches?.length > 0) {
+                    matchedCompanyIds = [...new Set(productMatches.map(p => p.company_id))];
+                }
+            }
+
+            // 2. Build Company Query
             let query = supabase.from('companies').select('*');
 
             if (search) {
-                query = query.ilike('name', `%${search}%`);
+                // Search in name, description, or matched products
+                const searchConditions = [
+                    `name.ilike.%${search}%`,
+                    `description.ilike.%${search}%`
+                ];
+
+                if (matchedCompanyIds.length > 0) {
+                    searchConditions.push(`id.in.(${matchedCompanyIds.join(',')})`);
+                }
+
+                query = query.or(searchConditions.join(','));
             }
 
             if (location && location !== 'Todas las regiones') {
                 const city = location.split(',')[0].trim();
-                // If it's a specific city (contains comma) or just a region name, handle logic
-                // For simplicity, if it's "Todas las regiones", we skip this filter.
-
-                // If it's a region without city selected (e.g. "Metropolitana"), we filter by region
-                // If it has a comma, it's "City, Region"
-
                 if (location.includes(',')) {
-                    // "City, Region" -> Filter by City or Commune
-                    // REMOVED .eq('is_online', false) to allow online stores with registered addresses to appear
                     query = query.or(`region.ilike.%${city}%,city.ilike.%${city}%,commune.ilike.%${city}%`);
                 } else {
-                    // Just Region selected
                     query = query.ilike('region', `%${location}%`);
                 }
             }
@@ -312,36 +327,54 @@ export default function PublicExplorer() {
                     ) : results.length > 0 ? (
                         results.map(store => (
                             <Link key={store.id} to={`/catalogo/${store.slug}`}>
-                                <Card className="group border-none shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden bg-white h-full rounded-[2.5rem]">
+                                <Card className="group border-none shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 overflow-hidden bg-white h-full rounded-[2.5rem]">
                                     <CardContent className="p-0 flex flex-col h-full">
-                                        <div className="h-32 bg-white relative m-3 rounded-[2rem] overflow-hidden group/img flex items-center justify-center border border-slate-100">
-                                            {/* Logo Only - Centered with margins */}
-                                            <div className="h-24 w-24 rounded-full bg-white p-1 ring-2 ring-slate-200 shadow-md flex-shrink-0 overflow-hidden transition-transform duration-500 group-hover:scale-105">
+                                        <div className="h-32 bg-slate-50 relative group/img">
+                                            {/* Banner Wrapper - Contains overflow for zoom effect */}
+                                            <div className="absolute inset-0 overflow-hidden">
+                                                <div className="absolute inset-0 transition-transform duration-700 group-hover/img:scale-110">
+                                                    {store.banner ? (
+                                                        <img
+                                                            src={store.banner}
+                                                            alt=""
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center opacity-50">
+                                                            <Store className="text-slate-300 w-12 h-12" />
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                                </div>
+                                            </div>
+
+                                            {/* Store Logo - Now outside overflow-hidden, overlaps content below */}
+                                            <div className="absolute -bottom-6 left-6 h-16 w-16 rounded-2xl bg-white shadow-xl flex items-center justify-center p-1.5 overflow-hidden ring-4 ring-white z-10 transition-transform duration-500 group-hover:scale-105">
                                                 {store.logo ? (
                                                     <img
                                                         src={store.logo}
                                                         alt={store.name}
-                                                        className="w-full h-full object-cover"
+                                                        className="w-full h-full object-cover rounded-xl"
                                                         style={{
                                                             objectPosition: `${store.branding_settings?.logo?.x ?? 50}% ${store.branding_settings?.logo?.y ?? 50}%`,
                                                             transform: `scale(${(store.branding_settings?.logo?.zoom ?? 100) / 100})`,
                                                         }}
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                                                        <span className="text-slate-900 font-bold text-2xl">{getInitials(store.name)}</span>
+                                                    <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-xl">
+                                                        <span className="text-slate-900 font-bold text-xl">{getInitials(store.name)}</span>
                                                     </div>
                                                 )}
                                             </div>
 
-                                            <div className="absolute top-4 right-4 flex gap-2">
+                                            <div className="absolute top-4 right-4 flex gap-2 z-10">
                                                 <button
                                                     onClick={(e) => toggleFavorite(e, store)}
                                                     className={cn(
-                                                        "h-8 w-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-lg",
+                                                        "h-8 w-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-lg backdrop-blur-md",
                                                         userFavorites.has(store.id)
                                                             ? "bg-rose-500 text-white"
-                                                            : "bg-white/80 text-rose-500 hover:bg-white"
+                                                            : "bg-white/90 text-rose-500 hover:bg-white"
                                                     )}
                                                 >
                                                     <Heart size={16} className={userFavorites.has(store.id) ? "fill-current" : ""} />
@@ -359,9 +392,9 @@ export default function PublicExplorer() {
                                             </div>
                                         </div>
 
-                                        <div className="px-5 pt-4 pb-2 flex-1">
+                                        <div className="px-5 pt-10 pb-2 flex-1">
                                             <div className="flex items-start justify-between">
-                                                <h3 className="font-black text-slate-900 text-base leading-tight group-hover:text-primary-600 transition-colors">
+                                                <h3 className="font-black text-slate-900 text-lg leading-tight group-hover:text-primary-600 transition-colors">
                                                     {store.name}
                                                 </h3>
                                             </div>
@@ -383,11 +416,11 @@ export default function PublicExplorer() {
                                                 </div>
                                             </div>
 
-                                            <p className="text-sm text-slate-500 mb-2 line-clamp-2 min-h-[40px] leading-relaxed">
+                                            <p className="text-sm text-slate-500 mb-2 line-clamp-2 min-h-[40px] leading-relaxed font-medium">
                                                 {store.description || `Bienvenidos a ${store.name}`}
                                             </p>
 
-                                            <div className="mt-auto pt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-50">
+                                            <div className="mt-auto pt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-50">
                                                 <div className="flex items-center gap-1.5 text-slate-400 font-bold text-xs">
                                                     {!store.is_online ? (
                                                         <>

@@ -19,6 +19,7 @@ export function useTickets(userId) {
                 .from('support_tickets')
                 .select('*')
                 .eq('user_id', userId)
+                .eq('is_deleted_by_user', false)
                 .order('created_at', { ascending: false });
 
             if (ticketErr) throw ticketErr;
@@ -35,18 +36,23 @@ export function useTickets(userId) {
                 if (!msgErr) messages = msgData || [];
             }
 
+            console.log(`[useTickets] Raw messages for ${ticketIds.length} tickets:`, messages.length, messages);
+
             // Merge messages into tickets
-            const merged = (ticketData || []).map(ticket => ({
-                ...ticket,
-                messages: messages
-                    .filter(m => m.ticket_id === ticket.id)
-                    .map(m => ({
+            const merged = (ticketData || []).map(ticket => {
+                const ticketMessages = messages.filter(m => m.ticket_id === ticket.id);
+                console.log(`[useTickets] Ticket ${ticket.id} (${ticket.subject}) has ${ticketMessages.length} messages.`);
+
+                return {
+                    ...ticket,
+                    messages: ticketMessages.map(m => ({
                         id: m.id,
                         sender: m.sender_role,
                         text: m.text,
                         timestamp: m.created_at
                     }))
-            }));
+                };
+            });
 
             setTickets(merged);
         } catch (err) {
@@ -56,6 +62,40 @@ export function useTickets(userId) {
         }
     }, [userId]);
 
+    const fetchMessagesForTicket = useCallback(async (ticketId) => {
+        if (!ticketId) return;
+        try {
+            const { data: msgData, error: msgErr } = await supabase
+                .from('ticket_messages')
+                .select('*')
+                .eq('ticket_id', ticketId)
+                .order('created_at', { ascending: true });
+
+            if (msgErr) {
+                console.error('[User] Error fetching messages for ticket:', ticketId, msgErr);
+                return;
+            }
+
+            console.log(`[User] fetchMessagesForTicket result for ${ticketId}:`, msgData?.length || 0, msgData);
+
+            const formattedMessages = (msgData || []).map(m => ({
+                id: m.id,
+                sender: m.sender_role,
+                text: m.text,
+                timestamp: m.created_at
+            }));
+
+            // Merge into tickets state
+            setTickets(prev => prev.map(t =>
+                t.id === ticketId
+                    ? { ...t, messages: formattedMessages }
+                    : t
+            ));
+        } catch (err) {
+            console.error('[User] fetchMessagesForTicket error:', err);
+        }
+    }, []);
+
     useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
     // Realtime subscription
@@ -64,7 +104,7 @@ export function useTickets(userId) {
         const channel = supabase
             .channel(`tickets-user-${userId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets', filter: `user_id=eq.${userId}` }, () => fetchTickets())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ticket_messages' }, () => fetchTickets())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_messages' }, () => fetchTickets())
             .subscribe();
         return () => supabase.removeChannel(channel);
     }, [userId, fetchTickets]);
@@ -105,14 +145,14 @@ export function useTickets(userId) {
     const deleteTicket = useCallback(async (ticketId) => {
         const { error } = await supabase
             .from('support_tickets')
-            .delete()
+            .update({ is_deleted_by_user: true })
             .eq('id', ticketId)
             .eq('user_id', userId);
         if (error) throw error;
         setTickets(prev => prev.filter(t => t.id !== ticketId));
     }, [userId]);
 
-    return { tickets, loading, fetchTickets, createTicket, sendMessage, deleteTicket, scrollRef };
+    return { tickets, loading, fetchTickets, fetchMessagesForTicket, createTicket, sendMessage, deleteTicket, scrollRef };
 }
 
 /**
@@ -126,7 +166,7 @@ export function useAdminTickets() {
     const fetchTickets = useCallback(async () => {
         setLoading(true);
         try {
-            // Get all tickets + profile join for customer info
+            // 1. Get all tickets + joins
             const { data: ticketData, error: ticketErr } = await supabase
                 .from('support_tickets')
                 .select(`
@@ -149,20 +189,23 @@ export function useAdminTickets() {
 
             if (ticketErr) throw ticketErr;
 
+            // 2. Get ALL messages for these tickets in one go
             const ticketIds = (ticketData || []).map(t => t.id);
-            let messages = [];
+            let allMessages = [];
             if (ticketIds.length > 0) {
                 const { data: msgData, error: msgErr } = await supabase
                     .from('ticket_messages')
                     .select('*')
                     .in('ticket_id', ticketIds)
                     .order('created_at', { ascending: true });
-                if (!msgErr) messages = msgData || [];
+                if (!msgErr) allMessages = msgData || [];
             }
 
+            // 3. Merge
             const merged = (ticketData || []).map(ticket => {
                 const profile = ticket.profiles;
                 const company = ticket.companies;
+                const ticketMessages = allMessages.filter(m => m.ticket_id === ticket.id);
 
                 return {
                     ...ticket,
@@ -180,14 +223,12 @@ export function useAdminTickets() {
                     display_name: company?.name || profile?.full_name || 'Sin nombre',
                     display_whatsapp: company?.whatsapp || profile?.whatsapp || '',
 
-                    messages: messages
-                        .filter(m => m.ticket_id === ticket.id)
-                        .map(m => ({
-                            id: m.id,
-                            sender: m.sender_role,
-                            text: m.text,
-                            timestamp: m.created_at
-                        }))
+                    messages: ticketMessages.map(m => ({
+                        id: m.id,
+                        sender: m.sender_role,
+                        text: m.text,
+                        timestamp: m.created_at
+                    }))
                 };
             });
 
@@ -199,17 +240,60 @@ export function useAdminTickets() {
         }
     }, []);
 
+    // Fetch messages for a specific ticket and merge into state
+    const fetchMessagesForTicket = useCallback(async (ticketId) => {
+        if (!ticketId) return;
+        try {
+            const { data: msgData, error: msgErr } = await supabase
+                .from('ticket_messages')
+                .select('*')
+                .eq('ticket_id', ticketId)
+                .order('created_at', { ascending: true });
+
+            if (msgErr) {
+                console.error('[Admin] Error fetching messages for ticket:', ticketId, msgErr);
+                return;
+            }
+
+            const formattedMessages = (msgData || []).map(m => ({
+                id: m.id,
+                sender: m.sender_role,
+                text: m.text,
+                timestamp: m.created_at
+            }));
+
+            // Merge into tickets state
+            setTickets(prev => prev.map(t =>
+                t.id === ticketId
+                    ? { ...t, messages: formattedMessages }
+                    : t
+            ));
+        } catch (err) {
+            console.error('[Admin] fetchMessagesForTicket error:', err);
+        }
+    }, []);
+
     useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
     // Realtime
     useEffect(() => {
         const channel = supabase
-            .channel('admin-tickets-all')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => fetchTickets())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ticket_messages' }, () => fetchTickets())
+            .channel('admin-tickets-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
+                setTimeout(() => fetchTickets(), 500);
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_messages' }, (payload) => {
+                // When a message event arrives, refresh that specific ticket's messages
+                const ticketId = payload?.new?.ticket_id || payload?.old?.ticket_id;
+                if (ticketId) {
+                    setTimeout(() => fetchMessagesForTicket(ticketId), 300);
+                }
+                // Also do a full refresh for ticket list ordering/counts
+                setTimeout(() => fetchTickets(), 800);
+            })
             .subscribe();
         return () => supabase.removeChannel(channel);
-    }, [fetchTickets]);
+    }, [fetchTickets, fetchMessagesForTicket]);
 
     const updateStatus = useCallback(async (ticketId, status) => {
         const { error } = await supabase
@@ -258,13 +342,49 @@ export function useAdminTickets() {
     }, []);
 
     const deleteTicket = useCallback(async (ticketId) => {
-        const { error } = await supabase
-            .from('support_tickets')
-            .delete()
-            .eq('id', ticketId);
-        if (error) throw error;
-        setTickets(prev => prev.filter(t => t.id !== ticketId));
+        try {
+            // 1. Get ticket data to extract photo URLs
+            const { data: ticket, error: fetchErr } = await supabase
+                .from('support_tickets')
+                .select('photos')
+                .eq('id', ticketId)
+                .single();
+
+            if (fetchErr) throw fetchErr;
+
+            // 2. Delete photos from storage if they exist
+            if (ticket?.photos && ticket.photos.length > 0) {
+                const pathsToDelete = ticket.photos
+                    .map(url => {
+                        try {
+                            // Extract path from public URL: https://.../storage/v1/object/public/support-attachments/tickets/USER_ID/FILENAME.ext
+                            const parts = url.split('/support-attachments/');
+                            return parts.length > 1 ? parts[1] : null;
+                        } catch (e) { return null; }
+                    })
+                    .filter(path => path !== null);
+
+                if (pathsToDelete.length > 0) {
+                    await supabase.storage
+                        .from('support-attachments')
+                        .remove(pathsToDelete);
+                }
+            }
+
+            // 3. Delete the ticket record (cascading messages)
+            const { error: deleteErr } = await supabase
+                .from('support_tickets')
+                .delete()
+                .eq('id', ticketId);
+
+            if (deleteErr) throw deleteErr;
+
+            setTickets(prev => prev.filter(t => t.id !== ticketId));
+        } catch (err) {
+            console.error('Error hard-deleting ticket:', err);
+            throw err;
+        }
     }, []);
 
-    return { tickets, loading, fetchTickets, updateStatus, sendAdminMessage, deleteTicket, scrollRef };
+    return { tickets, loading, fetchTickets, fetchMessagesForTicket, updateStatus, sendAdminMessage, deleteTicket, scrollRef };
 }

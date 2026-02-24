@@ -8,9 +8,10 @@ export function useNotifications() {
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    const fetchNotifications = useCallback(async () => {
+    const fetchNotifications = useCallback(async (silent = false) => {
         if (!user) return;
 
+        if (!silent) setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('notifications')
@@ -20,6 +21,7 @@ export function useNotifications() {
 
             if (error) throw error;
             const fetchedNotifications = data || [];
+            console.log(`[useNotifications] Fetched ${fetchedNotifications.length} notifications`);
             setNotifications(fetchedNotifications);
 
             const count = fetchedNotifications.filter(n => n.is_read === false || n.is_read === 'f').length;
@@ -31,7 +33,7 @@ export function useNotifications() {
         } catch (error) {
             console.error('Error fetching notifications:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [user, setUnreadNotifications]);
 
@@ -41,16 +43,53 @@ export function useNotifications() {
         fetchNotifications();
     }, [user, fetchNotifications]);
 
-    // Re-fetch the full list whenever AuthContext detects a realtime change
-    // AuthContext's realtime subscription is reliable and updates unreadNotifications count.
-    // We piggyback on that to keep the notification list in sync.
+    // Re-fetch when global count changes (essential for cross-component sync)
+    // We fetch silently to avoid UI "blinking" while ensuring list stays fresh.
+    useEffect(() => {
+        if (!user || loading) return;
+        fetchNotifications(true);
+    }, [unreadNotifications]);
+
+    // Direct Realtime subscription for instant local updates
     useEffect(() => {
         if (!user) return;
-        // Only re-fetch if we already loaded once (avoid double-fetch on mount)
-        if (!loading) {
-            fetchNotifications();
-        }
-    }, [unreadNotifications]);
+
+        const channel = supabase
+            .channel(`notifications-hook-${user.id}-${Math.random().toString(36).slice(2, 9)}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${user.id}`
+            }, (payload) => {
+                console.log('[useNotifications] Realtime event captured:', payload.eventType);
+
+                if (payload.eventType === 'INSERT') {
+                    fetchNotifications(true);
+                } else if (payload.eventType === 'UPDATE') {
+                    // Gradual update for single item
+                    setNotifications(prev => {
+                        const newList = prev.map(n => n.id === payload.new.id ? { ...n, ...payload.new } : n);
+                        // Sync derived counts
+                        const newCount = newList.filter(n => n.is_read === false || n.is_read === 'f').length;
+                        setUnreadCount(newCount);
+                        // We DON'T setUnreadNotifications here to avoid immediate double-triggering 
+                        // the unreadNotifications effect, although AuthContext will catch it anyway.
+                        return newList;
+                    });
+                } else if (payload.eventType === 'DELETE') {
+                    setNotifications(prev => {
+                        const newList = prev.filter(n => n.id !== payload.old.id);
+                        const newCount = newList.filter(n => n.is_read === false || n.is_read === 'f').length;
+                        setUnreadCount(newCount);
+                        return newList;
+                    });
+                }
+            })
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, [user, fetchNotifications]);
 
     const markAsRead = async (id) => {
         // Optimistic update
@@ -166,12 +205,57 @@ export function useNotifications() {
         }
     };
 
+    const unreadTicketsCount = [...new Set(
+        notifications
+            .filter(n => (n.is_read === false || n.is_read === 'f') && n.metadata?.ticket_id)
+            .map(n => n.metadata.ticket_id)
+    )].length;
+
+    const unreadSystemCount = notifications.filter(n =>
+        (n.is_read === false || n.is_read === 'f') &&
+        (n.type === 'system' || n.type === 'message' || n.type === 'grace_period')
+    ).length;
+
+    const markTicketNotificationsAsRead = async (ticketId) => {
+        if (!user || !ticketId) return;
+
+        // Find relevant notification IDs
+        const relevantIds = notifications
+            .filter(n => n.metadata?.ticket_id === ticketId && (n.is_read === false || n.is_read === 'f'))
+            .map(n => n.id);
+
+        if (relevantIds.length === 0) return;
+
+        // Optimistic update
+        setNotifications(prev => prev.map(n => relevantIds.includes(n.id) ? { ...n, is_read: true } : n));
+        const countReduced = relevantIds.length;
+        setUnreadCount(prev => Math.max(0, prev - countReduced));
+        if (setUnreadNotifications) setUnreadNotifications(prev => Math.max(0, prev - countReduced));
+
+        try {
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .in('id', relevantIds);
+
+            if (error) {
+                fetchNotifications();
+                throw error;
+            }
+        } catch (error) {
+            console.error('Error marking ticket notifications as read:', error);
+        }
+    };
+
     return {
         notifications,
         loading,
         unreadCount,
+        unreadTicketsCount,
+        unreadSystemCount,
         markAsRead,
         markAsUnread,
+        markTicketNotificationsAsRead,
         deleteNotification,
         markAllAsRead,
         clearAll,

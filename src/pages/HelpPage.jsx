@@ -35,7 +35,10 @@ import { useSettings } from '../hooks/useSettings';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../utils';
 import { useTickets } from '../hooks/useTickets';
+import { useNotifications } from '../hooks/useNotifications';
 import { supabase } from '../lib/supabase';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export default function HelpPage() {
     const { getSetting, loading: settingsLoading } = useSettings();
@@ -49,6 +52,11 @@ export default function HelpPage() {
     const [showDetails, setShowDetails] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [selectedImage, setSelectedImage] = useState(null);
+    const [ticketToDelete, setTicketToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const { notifications, markTicketNotificationsAsRead } = useNotifications();
 
     // Form state for new ticket
     const [newTicket, setNewTicket] = useState({
@@ -61,7 +69,7 @@ export default function HelpPage() {
     const proProductLimit = getSetting('pro_plan_product_limit', '500');
     const proImageLimit = getSetting('pro_plan_image_limit', '5');
 
-    const { tickets: userTickets, loading: ticketsLoading, createTicket, sendMessage, deleteTicket, scrollRef } = useTickets(user?.id);
+    const { tickets: userTickets, loading: ticketsLoading, fetchTickets, fetchMessagesForTicket, createTicket, sendMessage, deleteTicket, scrollRef } = useTickets(user?.id);
 
     const faqs = [
         { q: '¿Cómo subo mis productos?', a: 'Desde tu Panel Admin, ve a "Productos" y haz clic en "Nuevo Producto". Solo necesitas nombre, precio y fotos. El proceso es instantáneo.' },
@@ -80,9 +88,67 @@ export default function HelpPage() {
         }
     }, [selectedTicket?.messages]);
 
+    // Handle deep linking ?ticket=ID
+    useEffect(() => {
+        const ticketId = searchParams.get('ticket');
+        if (ticketId) {
+            // Force a refresh from DB to ensure we have the latest messages
+            fetchTickets();
+
+            if (userTickets.length > 0) {
+                const ticket = userTickets.find(t => t.id === ticketId);
+                if (ticket) {
+                    setSelectedTicket(ticket);
+                    setActiveTab('tickets');
+                    // Clear param after use
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('ticket');
+                    setSearchParams(newParams, { replace: true });
+                }
+            }
+        }
+    }, [searchParams, userTickets.length > 0, fetchTickets]);
+
+    // When new notifications arrive for the selected ticket, refresh messages
+    useEffect(() => {
+        if (!selectedTicket?.id) return;
+        const unreadForTicket = notifications.filter(
+            n => n.metadata?.ticket_id === selectedTicket.id && (n.is_read === false || n.is_read === 'f')
+        );
+        if (unreadForTicket.length > 0) {
+            fetchMessagesForTicket(selectedTicket.id);
+            markTicketNotificationsAsRead(selectedTicket.id);
+        }
+    }, [notifications.length, selectedTicket?.id, fetchMessagesForTicket]);
+
+    // When a ticket is selected, immediately fetch its latest messages
+    useEffect(() => {
+        if (selectedTicket?.id) {
+            fetchMessagesForTicket(selectedTicket.id);
+            markTicketNotificationsAsRead(selectedTicket.id);
+        }
+    }, [selectedTicket?.id, fetchMessagesForTicket]);
+
+    // Keep selectedTicket in sync with userTickets for real-time updates
+    useEffect(() => {
+        if (selectedTicket) {
+            const updated = userTickets.find(t => t.id === selectedTicket.id);
+            if (updated) {
+                // Only update if there's an actual change to avoid loops
+                if (JSON.stringify(updated) !== JSON.stringify(selectedTicket)) {
+                    setSelectedTicket(updated);
+                }
+            }
+        }
+    }, [userTickets, selectedTicket]);
+
     const handleCreateTicketClick = () => {
         if (!user) {
             showToast('Solo usuarios registrados pueden generar ticket', 'error');
+            return;
+        }
+        if (profile?.role === 'admin') {
+            showToast('Los administradores deben gestionar tickets desde el Panel Admin', 'info');
             return;
         }
         setIsCreateModalOpen(true);
@@ -144,17 +210,25 @@ export default function HelpPage() {
         }
     };
 
-    const handleDeleteTicket = async (ticketId) => {
-        if (!window.confirm('¿Seguro que deseas eliminar este ticket?')) return;
+    const handleDeleteTicket = (ticketId) => {
+        setTicketToDelete(ticketId);
+    };
+
+    const confirmDelete = async () => {
+        if (!ticketToDelete) return;
+        setIsDeleting(true);
         try {
-            await deleteTicket(ticketId);
-            if (selectedTicket?.id === ticketId) {
+            await deleteTicket(ticketToDelete);
+            if (selectedTicket?.id === ticketToDelete) {
                 setSelectedTicket(null);
                 setShowDetails(false);
             }
-            showToast('Ticket eliminado', 'success');
+            showToast('Ticket removido de tu historial', 'success');
+            setTicketToDelete(null);
         } catch (err) {
             showToast('Error al eliminar ticket', 'error');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -294,7 +368,24 @@ export default function HelpPage() {
                             </Button>
                         </div>
 
-                        {userTickets.length === 0 ? (
+                        {profile?.role === 'admin' ? (
+                            <div className="bg-white p-12 rounded-[2.5rem] border border-slate-100 text-center max-w-2xl mx-auto shadow-sm">
+                                <div className="h-20 w-20 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mx-auto mb-6">
+                                    <AlertCircle size={40} />
+                                </div>
+                                <h3 className="text-2xl font-bold text-slate-900 mb-3">Panel de Administración</h3>
+                                <p className="text-slate-500 text-sm leading-relaxed mb-8 px-4">
+                                    Como administrador, no generas tickets de soporte personales en esta sección.
+                                    Para ver, responder y gestionar todos los tickets de la plataforma, por favor dirígete al Panel de Administración.
+                                </p>
+                                <Button
+                                    onClick={() => navigate('/admin/tickets')}
+                                    className="bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl h-14 px-10 shadow-lg shadow-primary-100"
+                                >
+                                    Ir al Panel de Tickets
+                                </Button>
+                            </div>
+                        ) : userTickets.length === 0 ? (
                             <div className="bg-white p-12 rounded-[2.5rem] border border-slate-100 text-center">
                                 <MessageCircle size={48} className="mx-auto text-slate-200 mb-4" />
                                 <h3 className="text-lg font-bold text-slate-800 mb-1">No tienes tickets aún</h3>
@@ -305,7 +396,10 @@ export default function HelpPage() {
                                 {userTickets.map(ticket => (
                                     <div
                                         key={ticket.id}
-                                        onClick={() => setSelectedTicket(ticket)}
+                                        onClick={() => {
+                                            setSelectedTicket(ticket);
+                                            markTicketNotificationsAsRead(ticket.id);
+                                        }}
                                         className="bg-white border border-slate-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-primary-200 hover:shadow-md transition-all cursor-pointer group gap-4 sm:gap-0"
                                     >
                                         <div className="flex items-center gap-4 min-w-0">
@@ -322,6 +416,16 @@ export default function HelpPage() {
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ticket.id}</span>
                                                     <span className="text-slate-300 hidden sm:inline">•</span>
                                                     <span className="text-xs font-bold text-slate-700 truncate block sm:inline w-full sm:w-auto">{ticket.subject}</span>
+                                                    {(() => {
+                                                        const unread = notifications.filter(
+                                                            n => n.metadata?.ticket_id === ticket.id && (n.is_read === false || n.is_read === 'f')
+                                                        ).length;
+                                                        return unread > 0 ? (
+                                                            <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold animate-pulse">
+                                                                {unread}
+                                                            </span>
+                                                        ) : null;
+                                                    })()}
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                                                     <p className="text-xs text-slate-500 truncate max-w-full sm:max-w-[300px]">{ticket.description}</p>
@@ -441,6 +545,13 @@ export default function HelpPage() {
                                             </p>
                                         </div>
                                     </div>
+                                    <button
+                                        onClick={() => console.log('DEBUG: Selected Ticket Raw Data:', selectedTicket)}
+                                        className="hidden md:block p-3 text-slate-100 hover:text-slate-200 transition-colors"
+                                        title="Debug Data"
+                                    >
+                                        <Filter size={14} />
+                                    </button>
                                     <button
                                         onClick={() => {
                                             setSelectedTicket(null);
@@ -573,34 +684,46 @@ export default function HelpPage() {
                             {/* Reply Area */}
                             <footer className="p-3 md:p-8 bg-white border-t border-slate-100 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.05)] shrink-0">
                                 <div className="max-w-4xl mx-auto flex flex-col gap-2 md:gap-4">
-                                    <div className="relative group">
-                                        <TextArea
-                                            placeholder="Escribe tu respuesta aquí..."
-                                            value={replyText}
-                                            onChange={(e) => setReplyText(e.target.value)}
-                                            className="min-h-[56px] md:min-h-[120px] rounded-xl md:rounded-3xl border-slate-200 focus:ring-primary-500 pr-10 text-sm md:text-base shadow-sm group-hover:border-slate-300 transition-all resize-none p-3 md:p-6"
-                                        />
-                                        <div className="absolute top-3 right-3 text-slate-200 group-focus-within:text-primary-200 transition-colors">
-                                            <MessageCircle size={18} className="md:w-7 md:h-7" />
+                                    {selectedTicket.status === 'finalizada' ? (
+                                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="h-12 w-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                                                <CheckCircle2 size={24} />
+                                            </div>
+                                            <p className="text-slate-600 font-bold mb-1">Este ticket ha sido finalizado</p>
+                                            <p className="text-slate-400 text-xs text-balance">Nuestro equipo de soporte ha cerrado este caso. Si tienes más dudas, por favor genera un nuevo ticket.</p>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button
-                                            variant="outline"
-                                            className="h-9 px-4 text-xs border-slate-200 text-slate-600 font-bold rounded-xl md:hidden"
-                                            onClick={() => { setSelectedTicket(null); setShowDetails(false); }}
-                                        >
-                                            Cerrar
-                                        </Button>
-                                        <Button
-                                            onClick={handleReply}
-                                            disabled={!replyText.trim()}
-                                            className="h-9 md:h-12 px-5 md:px-8 bg-primary-600 hover:bg-primary-700 text-white text-xs md:text-sm font-bold rounded-xl md:rounded-2xl shadow-md shadow-primary-100 flex items-center gap-1.5 group transition-all transform active:scale-95"
-                                        >
-                                            <Send size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                                            Enviar
-                                        </Button>
-                                    </div>
+                                    ) : (
+                                        <>
+                                            <div className="relative group">
+                                                <TextArea
+                                                    placeholder="Escribe tu respuesta aquí..."
+                                                    value={replyText}
+                                                    onChange={(e) => setReplyText(e.target.value)}
+                                                    className="min-h-[56px] md:min-h-[120px] rounded-xl md:rounded-3xl border-slate-200 focus:ring-primary-500 pr-10 text-sm md:text-base shadow-sm group-hover:border-slate-300 transition-all resize-none p-3 md:p-6"
+                                                />
+                                                <div className="absolute top-3 right-3 text-slate-200 group-focus-within:text-primary-200 transition-colors">
+                                                    <MessageCircle size={18} className="md:w-7 md:h-7" />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    className="h-9 px-4 text-xs border-slate-200 text-slate-600 font-bold rounded-xl md:hidden"
+                                                    onClick={() => { setSelectedTicket(null); setShowDetails(false); }}
+                                                >
+                                                    Cerrar
+                                                </Button>
+                                                <Button
+                                                    onClick={handleReply}
+                                                    disabled={!replyText.trim()}
+                                                    className="h-9 md:h-12 px-5 md:px-8 bg-primary-600 hover:bg-primary-700 text-white text-xs md:text-sm font-bold rounded-xl md:rounded-2xl shadow-md shadow-primary-100 flex items-center gap-1.5 group transition-all transform active:scale-95"
+                                                >
+                                                    <Send size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                                                    Enviar
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </footer>
                         </div>
@@ -740,6 +863,17 @@ export default function HelpPage() {
                     />
                 </div>
             )}
-        </div >
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={!!ticketToDelete}
+                onClose={() => setTicketToDelete(null)}
+                onConfirm={confirmDelete}
+                loading={isDeleting}
+                title="¿Eliminar ticket del historial?"
+                description="Tú ya no verás este ticket, pero seguirá registrado en nuestro sistema de soporte."
+                confirmText="Eliminar de mi vista"
+                cancelText="Mantener ticket"
+            />
+        </div>
     );
 }

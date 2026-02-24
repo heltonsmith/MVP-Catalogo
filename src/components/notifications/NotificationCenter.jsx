@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Check, X, Quote, Package, MessageCircle, AlertCircle, Trash2, Mail, MailOpen, Sparkles, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Check, X, Quote, Package, MessageCircle, AlertCircle, Trash2, Mail, MailOpen, Sparkles, ChevronRight, CheckCircle2, XCircle, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { cn } from '../../utils';
 
 export function NotificationCenter() {
-    const { unreadNotifications: globalUnreadCount } = useAuth();
+    const { unreadNotifications: globalUnreadCount, profile } = useAuth();
+    const navigate = useNavigate();
     const {
         notifications,
         loading,
@@ -112,6 +114,12 @@ export function NotificationCenter() {
                             ? `/catalogo/${companySlug}/producto/${productSlug}#reviews`
                             : `/catalogo/${companySlug}#reviews`;
                         window.open(url, '_blank');
+                    }
+                } else if (n.metadata?.ticket_id) {
+                    if (profile?.role === 'admin') {
+                        navigate(`/admin/tickets?ticket=${n.metadata.ticket_id}`);
+                    } else {
+                        navigate(`/ayuda?ticket=${n.metadata.ticket_id}`);
                     }
                 }
             }
@@ -245,7 +253,7 @@ export function NotificationCenter() {
                                                             {formatTime(notification.created_at)}
                                                         </span>
                                                     </div>
-                                                    <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">
+                                                    <p className="text-[11px] text-slate-500 leading-relaxed">
                                                         {notification.metadata?.comment || notification.content}
                                                     </p>
 
@@ -295,6 +303,21 @@ export function NotificationCenter() {
                                                             >
                                                                 <MessageCircle size={12} />
                                                                 Responder Mensaje
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {notification.metadata?.ticket_id && (
+                                                        <div className="mt-2 flex">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleSelect(notification.id);
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 border border-primary-100 text-[10px] font-bold text-primary-600 hover:bg-primary-100 transition-all shadow-sm"
+                                                            >
+                                                                <LifeBuoy size={12} />
+                                                                Ver Ticket
                                                             </button>
                                                         </div>
                                                     )}

@@ -21,13 +21,14 @@ import NotFoundPage from './NotFoundPage';
 export default function CatalogPage() {
     const { showToast } = useToast();
     const { user, profile, refreshCompany } = useAuth();
-    const { cart, setCompanyInfo } = useCart();
+    const { getCart, setCompanyInfo } = useCart();
     const [searchParams] = useSearchParams();
     const { companySlug } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
 
     const [company, setCompany] = useState(null);
+    const currentCart = company?.id ? getCart(company.id) : [];
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -94,7 +95,7 @@ export default function CatalogPage() {
                         wholesale_prices
                     `)
                     .eq('company_id', companyData.id)
-                    .eq('available', true);
+                    .eq('active', true);
 
                 if (productsError) throw productsError;
 
@@ -1084,6 +1085,23 @@ export default function CatalogPage() {
                                         <Share2 size={16} className="sm:size-18" />
                                     </button>
 
+                                    {/* Cart Button Floating - Hide if menu mode */}
+                                    {!isOwner && currentCart.length > 0 && !company?.menu_mode && (
+                                        <Link
+                                            to={`/catalogo/${companySlug}/carrito`}
+                                            className="fixed bottom-6 right-6 z-50 bg-primary-600 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 hover:bg-primary-700 transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-8"
+                                        >
+                                            <div className="bg-white/20 p-2 rounded-xl">
+                                                <MessageCircle size={24} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Ver Carrito</p>
+                                                <p className="font-black text-lg">
+                                                    {currentCart.length} {currentCart.length === 1 ? 'producto' : 'productos'}
+                                                </p>
+                                            </div>
+                                        </Link>
+                                    )}
                                     {company.plan && company.plan !== 'free' && (
                                         <button
                                             onClick={() => setIsQROpen(true)}
@@ -1141,12 +1159,15 @@ export default function CatalogPage() {
 
                 {/* Product Grid or Grouped List */}
                 <div className="mt-8 space-y-12">
-                    {company.slug === 'restaurante-delicias' ? (
+                    {company?.menu_mode ? (
                         // Restaurant Layout: Grouped by Category, View Only, No Cart
-                        // NOW USING GRID LAYOUT LIKE STORE per user request
                         <div className="space-y-16">
                             {categories.map(category => {
-                                const categoryProducts = filteredProducts.filter(p => p.categories.id === category.id);
+                                const categoryProducts = filteredProducts.filter(p =>
+                                    p.product_categories?.some(pc =>
+                                        pc.category_id === category.id || pc.categories?.id === category.id
+                                    )
+                                );
                                 if (categoryProducts.length === 0) return null;
 
                                 return (
@@ -1165,8 +1186,8 @@ export default function CatalogPage() {
                                                     key={product.id}
                                                     product={product}
                                                     companySlug={company.slug}
-                                                    isDemo={isDemo}
-                                                    cartEnabled={false} // Store logic, but no cart
+                                                    isDemo={company.slug?.includes('demo')}
+                                                    cartEnabled={false} // Force cart disabled in menu mode
                                                     onReviewClick={() => handleOpenProductReviews(product)}
                                                     isOwner={isOwner}
                                                 />
@@ -1192,7 +1213,7 @@ export default function CatalogPage() {
                                             key={product.id}
                                             product={product}
                                             companySlug={company.slug}
-                                            cartEnabled={true}
+                                            cartEnabled={!company?.menu_mode} // Use company setting
                                             onReviewClick={() => handleOpenProductReviews(product)}
                                             isOwner={isOwner}
                                         />

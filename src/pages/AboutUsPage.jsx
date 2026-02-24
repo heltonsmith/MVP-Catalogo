@@ -59,9 +59,9 @@ export default function AboutUsPage() {
                             </div>
                         ))}
                         <div className="p-8 bg-primary-600 rounded-3xl text-white flex flex-col justify-center text-center">
-                            <Heart className="mx-auto mb-2 text-primary-200" fill="currentColor" />
+                            <Heart className="mx-auto mb-2 text-white/50" fill="currentColor" />
                             <p className="font-bold text-xl">+1,000</p>
-                            <p className="text-primary-100 text-sm">Emprendedores confiando en nosotros</p>
+                            <p className="text-white/90 text-sm">Emprendedores confiando en nosotros</p>
                         </div>
                     </div>
                 </div>

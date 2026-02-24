@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS public.support_tickets (
     description TEXT NOT NULL,
     photos      TEXT[] DEFAULT '{}',                     -- URLs de imágenes adjuntas
     status      ticket_status NOT NULL DEFAULT 'pendiente',
+    is_deleted_by_user BOOLEAN DEFAULT false,
     created_at  TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
     updated_at  TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
 
@@ -118,6 +119,10 @@ CREATE POLICY "ticket_owner_insert" ON public.support_tickets
 
 CREATE POLICY "ticket_owner_delete" ON public.support_tickets
     FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "ticket_owner_update" ON public.support_tickets
+    FOR UPDATE USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 -- Admin puede ver/actualizar/eliminar todos los tickets
 CREATE POLICY "admin_all_tickets" ON public.support_tickets

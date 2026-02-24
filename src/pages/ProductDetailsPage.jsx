@@ -356,7 +356,7 @@ export default function ProductDetailsPage() {
     };
 
     const isOwner = user?.id === company?.user_id;
-    const isRestaurant = company.slug === 'restaurante-delicias';
+    const isRestaurant = company?.menu_mode;
 
     return (
         <div className="bg-white min-h-screen pb-20">
@@ -398,23 +398,23 @@ export default function ProductDetailsPage() {
                             ))}
 
                             {isRestaurant ? (
-                                <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
-                                    {product.stock > 0 ? `Disponible (Stock: ${product.stock})` : 'No disponible'}
+                                <Badge variant={product.available ? 'success' : 'destructive'}>
+                                    {product.available ? 'Disponible Hoy' : 'Agotado'}
                                 </Badge>
                             ) : company.features?.cartEnabled !== false ? (
                                 <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
                                     {product.stock > 0 ? `En stock: ${product.stock}` : 'Sin stock'}
                                 </Badge>
                             ) : (
-                                <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
-                                    {product.stock > 0 ? `Disponible: ${product.stock}` : 'No disponible'}
+                                <Badge variant={product.available ? 'success' : 'destructive'}>
+                                    {product.available ? 'Disponible' : 'No disponible'}
                                 </Badge>
                             )}
 
-                            {product.rating > 0 && (
+                            {(product.rating > 0 || isRestaurant) && (
                                 <StarRating
-                                    rating={product.rating}
-                                    count={product.reviews?.length}
+                                    rating={product.rating || 0}
+                                    count={product.reviews?.length || 0}
                                     size={14}
                                     onClick={() => setIsReviewsOpen(true)}
                                 />
@@ -463,33 +463,21 @@ export default function ProductDetailsPage() {
                             {/* Specs */}
                             <div className="grid grid-cols-2 gap-4 py-6 border-y border-slate-100">
                                 <div className="flex items-center space-x-3 text-slate-600">
-                                    {isRestaurant ? (
-                                        <Utensils className="h-5 w-5 text-slate-400" />
-                                    ) : company.features?.cartEnabled !== false ? (
-                                        <Package className="h-5 w-5 text-slate-400" />
-                                    ) : (
-                                        <Utensils className="h-5 w-5 text-slate-400" />
-                                    )}
+                                    <Utensils className="h-5 w-5 text-slate-400" />
                                     <div>
                                         <p className="text-xs font-medium uppercase text-slate-400">
-                                            {isRestaurant ? 'Tipo' : company.features?.cartEnabled !== false ? 'Tamaño' : 'Tipo'}
+                                            {isRestaurant ? 'Tipo' : 'Tamaño'}
                                         </p>
-                                        <p className="text-sm font-semibold">{product.size}</p>
+                                        <p className="text-sm font-semibold">{isRestaurant ? product.weight : product.size}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-3 text-slate-600">
-                                    {isRestaurant ? (
-                                        <Package className="h-5 w-5 text-slate-400" />
-                                    ) : company.features?.cartEnabled !== false ? (
-                                        <Truck className="h-5 w-5 text-slate-400" />
-                                    ) : (
-                                        <Package className="h-5 w-5 text-slate-400" />
-                                    )}
+                                    <Package className="h-5 w-5 text-slate-400" />
                                     <div>
                                         <p className="text-xs font-medium uppercase text-slate-400">
-                                            {isRestaurant ? 'Porción' : company.features?.cartEnabled !== false ? 'Peso' : 'Porción'}
+                                            {isRestaurant ? 'Porción' : 'Peso'}
                                         </p>
-                                        <p className="text-sm font-semibold">{product.weight}</p>
+                                        <p className="text-sm font-semibold">{isRestaurant ? product.size : product.weight}</p>
                                     </div>
                                 </div>
                             </div>
@@ -507,7 +495,7 @@ export default function ProductDetailsPage() {
                                         </div>
                                     </div>
                                 </div>
-                            ) : company.features?.cartEnabled !== false ? (
+                            ) : (company.features?.cartEnabled !== false && !company?.menu_mode) ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center space-x-4">
                                         <div className="flex h-12 items-center rounded-xl border border-slate-200 px-2">
@@ -693,54 +681,114 @@ export default function ProductDetailsPage() {
                     </div>
 
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                        {product.reviews?.map(review => (
-                            <div key={review.id} className="border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
-                                            {review.avatar ? (
-                                                <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <User size={18} className="text-slate-400" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <span className="font-bold text-slate-800 text-sm block">{review.user}</span>
-                                            <span className="text-[10px] text-slate-400 font-medium">{review.date}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {user && review.user_id === user.id && (
-                                            <div className="flex items-center gap-1 mr-1">
-                                                <button
-                                                    onClick={() => {
-                                                        setIsReviewsOpen(false);
-                                                        setEditingReview(review);
-                                                        setTempReview({ rating: review.rating, comment: review.comment });
-                                                        // Scroll to form automatically
-                                                        document.getElementById('write-review')?.scrollIntoView({ behavior: 'smooth' });
-                                                    }}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteReview(review.id)}
-                                                    className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                        {product.reviews && product.reviews.length > 0 ? (
+                            product.reviews.map(review => (
+                                <div key={review.id} className="border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                                {review.avatar ? (
+                                                    <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <User size={18} className="text-slate-400" />
+                                                )}
                                             </div>
-                                        )}
-                                        <StarRating rating={review.rating} size={12} />
+                                            <div>
+                                                <span className="font-bold text-slate-800 text-sm block">{review.user}</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{review.date}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {user && review.user_id === user.id && (
+                                                <div className="flex items-center gap-1 mr-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsReviewsOpen(false);
+                                                            setEditingReview(review);
+                                                            setTempReview({ rating: review.rating, comment: review.comment });
+                                                            // Scroll to form automatically
+                                                            document.getElementById('write-review')?.scrollIntoView({ behavior: 'smooth' });
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteReview(review.id)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <StarRating rating={review.rating} size={12} />
+                                        </div>
                                     </div>
+                                    <p className="text-slate-600 text-sm italic leading-relaxed pl-12">"{review.comment}"</p>
                                 </div>
-                                <p className="text-slate-600 text-sm italic leading-relaxed pl-12">"{review.comment}"</p>
+                            ))
+                        ) : (
+                            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center text-slate-400">
+                                <p className="font-bold uppercase tracking-widest text-xs">Este producto aún no tiene reseñas</p>
+                                <p className="text-[10px] mt-1">¡Sé el primero en compartir tu experiencia!</p>
                             </div>
-                        ))}
+                        )}
                     </div>
+
+                    {/* Quick Review Form inside Modal for Clients */}
+                    {user && !isOwner && (!hasReviewed || editingReview) && (
+                        <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-2">
+                            <h4 className="text-sm font-bold text-slate-800 mb-4">
+                                {editingReview ? 'Actualiza tu opinión' : 'Comparte tu opinión'}
+                            </h4>
+                            <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                <div className="flex justify-center">
+                                    <StarRating
+                                        interactive
+                                        rating={tempReview.rating}
+                                        size={28}
+                                        onRate={(val) => setTempReview(prev => ({ ...prev, rating: val }))}
+                                    />
+                                </div>
+                                <textarea
+                                    value={tempReview.comment}
+                                    onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value }))}
+                                    className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 text-sm min-h-[80px]"
+                                    placeholder="¿Qué te pareció?"
+                                />
+                                <Button
+                                    onClick={async () => {
+                                        if (editingReview) await handleUpdateReview();
+                                        else await handleSubmitReview();
+                                        // Option to close modal after success could be added here
+                                    }}
+                                    disabled={tempReview.rating === 0}
+                                    className="w-full h-10 text-sm font-bold"
+                                >
+                                    {editingReview ? 'Actualizar' : 'Publicar'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!user && (
+                        <div className="pt-4 border-t border-slate-100 text-center">
+                            <p className="text-xs text-slate-500 mb-3">Inicia sesión para dejar tu opinión</p>
+                            <Button onClick={() => navigate('/login')} variant="secondary" size="sm" className="w-full">
+                                Iniciar Sesión
+                            </Button>
+                        </div>
+                    )}
+
+                    {isOwner && (
+                        <div className="pt-4 border-t border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 italic font-medium">
+                                Vista de dueño (Lectura)
+                            </p>
+                        </div>
+                    )}
 
                     <div className="pt-2">
                         <Button

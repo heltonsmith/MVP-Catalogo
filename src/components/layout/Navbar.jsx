@@ -131,7 +131,7 @@ export function Navbar({ isLandingMode = false }) {
                 { name: 'Restaurante', path: '/catalogo/restaurante-delicias' }
             ]
         },
-        { name: 'Ayuda', path: '/ayuda' },
+        // { name: 'Ayuda', path: '/ayuda' },
     ];
 
     return (

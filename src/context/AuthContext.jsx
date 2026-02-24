@@ -23,37 +23,40 @@ export const AuthProvider = ({ children }) => {
     const [company, setCompany] = useState(null);
     const [profile, setProfile] = useState(null);
     const [pendingUpgrade, setPendingUpgrade] = useState(null);
+    const isCheckingRenewalRef = useRef(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+    // Observer Mode / Impersonation
+    const [isObserving, setIsObserving] = useState(false);
+    const [observerData, setObserverData] = useState(null); // Stores original admin profile/user
 
     // Ref to prevent multiple simultaneous loads for the same user
     const loadingForUserId = useRef(null);
 
     const refreshUnreadNotifications = useCallback(async (overrideUserId) => {
         const targetId = overrideUserId || user?.id;
-        if (!targetId) {
-            console.log('Auth: Skip refresh, no targetId');
-            return;
-        }
+        if (!targetId) return;
 
         console.log('Auth: Refreshing unread notifications for:', targetId);
-        const { data, count, error } = await supabase
-            .from('notifications')
-            .select('id, is_read', { count: 'exact' })
-            .eq('user_id', targetId)
-            .eq('is_read', false);
+        try {
+            const { data, error } = await supabase
+                .from('notifications')
+                .select('id, is_read')
+                .eq('user_id', targetId)
+                .eq('is_read', false);
 
-        if (error) {
-            console.error('Auth: Error refreshing unread notifications:', error);
-            return;
+            if (error) {
+                console.error('Auth: Error refreshing unread notifications:', error);
+                return;
+            }
+
+            // Use data length directly - most reliable method
+            const newCount = data?.length || 0;
+            console.log('Auth: Unread count for', targetId, '=', newCount);
+            setUnreadNotifications(newCount);
+        } catch (err) {
+            console.error('Auth: Exception refreshing notifications:', err);
         }
-
-        console.log('Auth: Raw data returned:', data?.length || 0, 'rows. Count header:', count);
-        // Robust boolean filtering
-        const unreadRows = (data || []).filter(n => n.is_read === false || n.is_read === 'f');
-        const newCount = count !== null ? count : unreadRows.length;
-
-        console.log('Auth: New count for', targetId, 'is', newCount);
-        setUnreadNotifications(newCount);
     }, [user]);
 
     const loadUserData = async (userId, force = false) => {
@@ -66,6 +69,12 @@ export const AuthProvider = ({ children }) => {
                 const query = supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
                 const { data } = await withTimeout(query, 4000, { data: null });
                 if (data) {
+                    // Blocking Check
+                    if (data.status === 'blocked' && !isObserving) {
+                        console.warn('Auth: User is blocked. Signing out.');
+                        await signOut();
+                        return;
+                    }
                     setProfile(data);
                 } else {
                     setProfile(null);
@@ -77,7 +86,78 @@ export const AuthProvider = ({ children }) => {
                 const { data } = await withTimeout(query, 4000, { data: null });
                 if (data) {
                     console.log('Auth: Company loaded');
-                    setCompany(data);
+
+                    // Auto-Downgrade Logic (3-day grace period)
+                    if (data.plan !== 'free' && data.renewal_date) {
+                        const renewalDate = new Date(data.renewal_date);
+                        const gracePeriodEnd = new Date(renewalDate);
+                        gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 3);
+
+                        const now = new Date();
+                        const isExpired = now >= new Date(renewalDate.getFullYear(), renewalDate.getMonth(), renewalDate.getDate());
+
+                        if (now > gracePeriodEnd) {
+                            console.warn('Auth: Renewal interval exceeded. Downgrading to FREE');
+                            await handleAutoDowngrade(data);
+                            // Refresh company data after downgrade
+                            const { data: updatedCompany } = await supabase.from('companies').select('*').eq('id', data.id).single();
+                            setCompany(updatedCompany);
+                        } else if (isExpired) {
+                            // In grace period - create notification if not already sent for this date
+                            console.log('Auth: User is in grace period. renewal_date:', data.renewal_date);
+                            setCompany(data);
+
+                            // Simple, reliable deduplication: check if we already notified for this renewal date
+                            const renewalDateStr = new Date(data.renewal_date).toISOString().split('T')[0];
+                            const lastNotified = data.last_notified_renewal_date
+                                ? new Date(data.last_notified_renewal_date).toISOString().split('T')[0]
+                                : null;
+
+                            if (lastNotified !== renewalDateStr) {
+                                console.log('Auth: New grace period detected — creating notification');
+
+                                // 1. Mark as notified FIRST to prevent duplicates
+                                const { error: updateErr } = await supabase
+                                    .from('companies')
+                                    .update({ last_notified_renewal_date: data.renewal_date })
+                                    .eq('id', data.id);
+
+                                if (!updateErr) {
+                                    // 2. Create the notification
+                                    const { error: insertErr } = await supabase.from('notifications').insert({
+                                        user_id: userId,
+                                        type: 'grace_period',
+                                        title: 'Suscripción por regularizar',
+                                        content: `Tu suscripción venció el ${renewalDate.toLocaleDateString()}. Tienes 3 días para regularizar tu cuenta antes de que baje automáticamente al plan Gratis.`
+                                    });
+
+                                    if (!insertErr) {
+                                        console.log('Auth: Grace period notification created successfully');
+                                        // Refresh count after a short delay for DB consistency
+                                        setTimeout(() => refreshUnreadNotifications(userId), 500);
+                                    } else {
+                                        console.error('Auth: Failed to insert notification:', insertErr);
+                                    }
+                                } else {
+                                    console.error('Auth: Failed to update last_notified_renewal_date:', updateErr);
+                                }
+                            } else {
+                                console.log('Auth: Already notified for this renewal date:', renewalDateStr);
+                            }
+                        } else {
+                            // Store is active (renewal_date in the future)
+                            // Reset notification tracker so it re-arms for the next cycle
+                            if (data.last_notified_renewal_date) {
+                                await supabase.from('companies')
+                                    .update({ last_notified_renewal_date: null })
+                                    .eq('id', data.id);
+                                console.log('Auth: Notification tracker reset for active store');
+                            }
+                            setCompany(data);
+                        }
+                    } else {
+                        setCompany(data);
+                    }
                 } else {
                     console.log('Auth: No company found for this user');
                     setCompany(null);
@@ -179,6 +259,43 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
+    // Dedicated effect for real-time company status synchronization
+    useEffect(() => {
+        if (!user) return;
+
+        console.log('Auth: Setting up company realtime sync for:', user.id);
+
+        // Listen to ALL company updates — Supabase Realtime does NOT support UUID filters.
+        // We filter in JavaScript instead.
+        const channel = supabase
+            .channel(`company-sync-${user.id}-${Date.now()}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'companies'
+                },
+                (payload) => {
+                    // JS-side filter: only react to changes for THIS user's company
+                    if (payload.new?.user_id !== user.id) return;
+
+                    console.log('Auth: Company change detected! renewal_date:', payload.new.renewal_date);
+                    setCompany(payload.new);
+                    // Reload with delay for DB consistency
+                    setTimeout(() => loadUserData(user.id, true), 500);
+                }
+            )
+            .subscribe((status) => {
+                console.log('Auth: Company realtime channel status:', status);
+            });
+
+        return () => {
+            console.log('Auth: Cleaning up company realtime sync');
+            supabase.removeChannel(channel);
+        };
+    }, [user]);
+
     // Dedicated effect for real-time notifications with auto-reconnect + polling fallback
     useEffect(() => {
         if (!user) return;
@@ -207,7 +324,8 @@ export const AuthProvider = ({ children }) => {
                     filter: `user_id=eq.${user.id}`
                 }, (payload) => {
                     console.log('Auth: Notification event captured!', payload.eventType, payload.new?.id);
-                    refreshUnreadNotifications(user.id);
+                    // Add a tiny delay to ensure DB consistency across nodes before fetching count
+                    setTimeout(() => refreshUnreadNotifications(user.id), 300);
                 })
                 .subscribe((status) => {
                     console.log('Auth: Notification channel status:', status);
@@ -258,12 +376,100 @@ export const AuthProvider = ({ children }) => {
     };
 
     const signOut = async () => {
+        setIsObserving(false);
+        setObserverData(null);
         loadingForUserId.current = null;
         await supabase.auth.signOut();
         setProfile(null);
         setCompany(null);
         setPendingUpgrade(null);
         setUnreadNotifications(0);
+    };
+
+    const handleAutoDowngrade = async (companyData) => {
+        try {
+            // 1. Update company plan
+            await supabase.from('companies').update({ plan: 'free' }).eq('id', companyData.id);
+
+            // 2. Hide excess products
+            const { data: products } = await supabase
+                .from('products')
+                .select('id, active')
+                .eq('company_id', companyData.id)
+                .order('created_at', { ascending: true }); // Keep oldest active? Or based on order?
+
+            // Hardcoded free limit or fetch from settings? 
+            // Better to fetch from settings but if not available use 10 as safe default
+            const freeLimit = 10; // Safe default for MVP
+
+            if (products && products.length > freeLimit) {
+                const excessIds = products.slice(freeLimit).map(p => p.id);
+                await supabase.from('products').update({ active: false }).in('id', excessIds);
+            }
+
+            // 3. Create Notification (if not already notified for this event)
+            if (!companyData.last_downgrade_notified_at) {
+                await supabase.from('notifications').insert({
+                    user_id: companyData.user_id,
+                    type: 'downgrade',
+                    title: 'Plan expirado',
+                    content: 'Tu suscripción ha vencido y tu cuenta ha bajado a plan Gratis. Tus productos excedentes han sido ocultados temporalmente.'
+                });
+
+                // Update tracking column
+                await supabase.from('companies')
+                    .update({ last_downgrade_notified_at: new Date().toISOString() })
+                    .eq('id', companyData.id);
+            }
+
+        } catch (err) {
+            console.error('Auth: Error in auto-downgrade:', err);
+        }
+    };
+
+    const startObserving = async (targetCompany) => {
+        if (profile?.role !== 'admin') return;
+
+        console.log('Auth: Starting observer mode for:', targetCompany.name);
+        setObserverData({
+            adminProfile: profile,
+            adminUser: user
+        });
+
+        const { data: targetProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', targetCompany.user_id)
+            .single();
+
+        setProfile(targetProfile);
+        setCompany(targetCompany);
+        setIsObserving(true);
+    };
+
+    // Observe any user (client or owner) — sets the admin to impersonate their profile
+    const startObservingUser = async (targetProfile, targetCompany = null) => {
+        if (profile?.role !== 'admin') return;
+
+        console.log('Auth: Starting observer mode for user:', targetProfile.full_name || targetProfile.email);
+        setObserverData({
+            adminProfile: profile,
+            adminUser: user
+        });
+
+        setProfile(targetProfile);
+        setCompany(targetCompany);
+        setIsObserving(true);
+    };
+
+    const stopObserving = () => {
+        if (!isObserving || !observerData) return;
+        console.log('Auth: Stopping observer mode');
+        setProfile(observerData.adminProfile);
+        // Refresh original admin company (though admins usually don't have one)
+        refreshCompany();
+        setIsObserving(false);
+        setObserverData(null);
     };
 
 
@@ -301,8 +507,13 @@ export const AuthProvider = ({ children }) => {
         setUnreadNotifications, // Exposed for optimistic updates
         refreshUnreadNotifications,
         refreshUpgradeStatus,
+        startObserving,
+        startObservingUser,
+        stopObserving,
+        isObserving,
+        observerData,
         loading
-    }), [user, session, company, profile, pendingUpgrade, unreadNotifications, loading]);
+    }), [user, session, company, profile, pendingUpgrade, unreadNotifications, loading, isObserving, observerData]);
 
     return (
         <AuthContext.Provider value={value}>

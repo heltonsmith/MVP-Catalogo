@@ -491,7 +491,10 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                 </div>
 
                                 {/* Price, Stock, Weight, Size */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className={cn(
+                                    "grid gap-4",
+                                    company?.menu_mode ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"
+                                )}>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Precio *</label>
                                         <div className="relative">
@@ -507,28 +510,32 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Stock *</label>
-                                        <div className="relative">
-                                            <Archive className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                            <Input
-                                                required
-                                                type="number"
-                                                name="stock"
-                                                placeholder="0"
-                                                value={formData.stock}
-                                                onChange={handleChange}
-                                                className="pl-9"
-                                            />
+                                    {!company?.menu_mode && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Stock *</label>
+                                            <div className="relative">
+                                                <Archive className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                                                <Input
+                                                    required
+                                                    type="number"
+                                                    name="stock"
+                                                    placeholder="0"
+                                                    value={formData.stock}
+                                                    onChange={handleChange}
+                                                    className="pl-9"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Peso</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                                            {company?.menu_mode ? 'Tipo (Menú)' : 'Peso'}
+                                        </label>
                                         <div className="relative">
                                             <Weight className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 name="weight"
-                                                placeholder="500g"
+                                                placeholder={company?.menu_mode ? "Ej: Entrada, Plato Fondo" : "Ej: 500g"}
                                                 value={formData.weight}
                                                 onChange={handleChange}
                                                 className="pl-9"
@@ -536,12 +543,14 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tamaño</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                                            {company?.menu_mode ? 'Porción' : 'Tamaño'}
+                                        </label>
                                         <div className="relative">
                                             <Ruler className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 name="size"
-                                                placeholder="M"
+                                                placeholder={company?.menu_mode ? "Ej: Para 2 personas" : "Ej: M, L, XL"}
                                                 value={formData.size}
                                                 onChange={handleChange}
                                                 className="pl-9"
@@ -655,19 +664,47 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                     </div>
                                 )}
 
-                                {/* Available Checkbox */}
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="available"
-                                        name="available"
-                                        checked={formData.available}
-                                        onChange={handleChange}
-                                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
-                                    />
-                                    <label htmlFor="available" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
-                                        Producto disponible para la venta
-                                    </label>
+                                {/* Availability Radio Group */}
+                                <div className="space-y-2 pt-2 border-t border-slate-100">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Disponibilidad del Producto</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, available: true }))}
+                                            className={cn(
+                                                "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
+                                                formData.available
+                                                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm"
+                                                    : "bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "h-4 w-4 rounded-full border-2 flex items-center justify-center",
+                                                formData.available ? "border-emerald-500" : "border-slate-300"
+                                            )}>
+                                                {formData.available && <div className="h-2 w-2 bg-emerald-500 rounded-full" />}
+                                            </div>
+                                            <span className="text-sm font-bold">Disponible</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, available: false }))}
+                                            className={cn(
+                                                "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
+                                                !formData.available
+                                                    ? "bg-rose-50 border-rose-500 text-rose-700 shadow-sm"
+                                                    : "bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "h-4 w-4 rounded-full border-2 flex items-center justify-center",
+                                                !formData.available ? "border-rose-500" : "border-slate-300"
+                                            )}>
+                                                {!formData.available && <div className="h-2 w-2 bg-rose-500 rounded-full" />}
+                                            </div>
+                                            <span className="text-sm font-bold">No Disponible</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </div>

@@ -252,7 +252,7 @@ export default function LandingPage() {
             <section className="bg-primary-600 py-16 overflow-x-hidden">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
                     <h2 className="text-3xl font-bold text-white sm:text-4xl">¿Listo para subir tus productos?</h2>
-                    <p className="mt-4 text-primary-100 italic font-medium">Únete a cientos de emprendedores que ya están vendiendo más.</p>
+                    <p className="mt-4 text-white/90 italic font-medium">Únete a cientos de emprendedores que ya están vendiendo más.</p>
                     <div className="mt-10">
                         <Link to="/registro">
                             <Button variant="secondary" size="lg" className="bg-white text-primary-600 hover:bg-slate-50 font-black px-10 h-14 rounded-2xl shadow-xl shadow-black/10 transition-all hover:scale-105 active:scale-95">

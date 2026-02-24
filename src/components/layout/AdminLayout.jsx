@@ -4,12 +4,16 @@ import { LayoutDashboard, Users, LogOut, Settings, Search, Home, MessageSquare, 
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
+import { useNotifications } from '../../hooks/useNotifications';
+
+import { NotificationCenter } from '../notifications/NotificationCenter';
 
 export function AdminLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
     const { user, profile, loading, signOut } = useAuth();
+    const { unreadTicketsCount } = useNotifications();
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -66,7 +70,12 @@ export function AdminLayout() {
                                 )}
                             >
                                 <item.icon size={18} />
-                                {item.name}
+                                <span className="flex-1">{item.name}</span>
+                                {item.name === 'Sistema de Tickets' && unreadTicketsCount > 0 && (
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-slate-900">
+                                        {unreadTicketsCount > 9 ? '9+' : unreadTicketsCount}
+                                    </span>
+                                )}
                             </Link>
                         );
                     })}
@@ -93,6 +102,7 @@ export function AdminLayout() {
                 </div>
             </aside>
 
+
             {/* Mobile Header */}
             <header className="md:hidden fixed top-0 w-full h-16 bg-slate-900 text-white z-50 px-4 flex items-center justify-between border-b border-slate-800">
                 <div className="flex items-center gap-3">
@@ -106,22 +116,23 @@ export function AdminLayout() {
                         <span className="font-bold tracking-tight">Admin<span className="text-primary-400">Panel</span></span>
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
-                    <Link to="/">
-                        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white h-9 w-9">
-                            <Home size={20} />
-                        </Button>
-                    </Link>
-                </div>
+                {/* Bell removed as per request */}
+                <Link to="/">
+                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white h-9 w-9">
+                        <Home size={20} />
+                    </Button>
+                </Link>
             </header>
 
             {/* Mobile Sidebar Overlay */}
-            {isMobileMenuOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-[55] md:hidden backdrop-blur-sm animate-in fade-in duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                />
-            )}
+            {
+                isMobileMenuOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-[55] md:hidden backdrop-blur-sm animate-in fade-in duration-300"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                )
+            }
 
             {/* Mobile Menu Drawer */}
             <aside className={cn(
@@ -143,7 +154,12 @@ export function AdminLayout() {
                                 )}
                             >
                                 <item.icon size={20} />
-                                {item.name}
+                                <span className="flex-1">{item.name}</span>
+                                {item.name === 'Sistema de Tickets' && unreadTicketsCount > 0 && (
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-[11px] font-bold text-white shadow-md ring-2 ring-slate-900">
+                                        {unreadTicketsCount > 9 ? '9+' : unreadTicketsCount}
+                                    </span>
+                                )}
                             </Link>
                         );
                     })}
@@ -171,12 +187,12 @@ export function AdminLayout() {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 pb-24 md:pt-8 md:pb-8 min-w-0">
+            <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 pb-24 md:pb-8 min-w-0">
                 <div className="w-full max-w-6xl mx-auto">
                     <Outlet />
                 </div>
             </main>
 
-        </div>
+        </div >
     );
 }

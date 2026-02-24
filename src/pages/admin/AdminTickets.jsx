@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     MessageSquare,
     User,
@@ -20,7 +20,8 @@ import {
     Maximize2,
     MessageCircle,
     Store,
-    Trash2
+    Trash2,
+    EyeOff
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -30,7 +31,10 @@ import { TextArea } from '../../components/ui/TextArea';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useAdminTickets } from '../../hooks/useTickets';
+import { useNotifications } from '../../hooks/useNotifications';
+import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 import { cn } from '../../utils';
+import { useSearchParams } from 'react-router-dom';
 
 export default function AdminTickets() {
     const { showToast } = useToast();
@@ -38,18 +42,72 @@ export default function AdminTickets() {
     const {
         tickets,
         loading,
+        fetchTickets,
+        fetchMessagesForTicket,
         updateStatus,
         sendAdminMessage,
         deleteTicket,
         scrollRef
     } = useAdminTickets();
+    const { notifications, markTicketNotificationsAsRead } = useNotifications();
+
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [ticketToDelete, setTicketToDelete] = useState(null);
+    const [selectedTicketId, setSelectedTicketId] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [selectedImage, setSelectedImage] = useState(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const selectedTicket = tickets.find(t => t.id === selectedTicketId);
+
+    // Ref to avoid infinite loops when marking notifications as read
+    const lastMarkedRef = useRef(null);
+
+    // When a ticket is selected, fetch its latest messages once
+    useEffect(() => {
+        if (selectedTicketId) {
+            fetchMessagesForTicket(selectedTicketId);
+            markTicketNotificationsAsRead(selectedTicketId);
+            lastMarkedRef.current = selectedTicketId;
+        }
+    }, [selectedTicketId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // When new notifications arrive for the selected ticket, refresh messages
+    useEffect(() => {
+        if (!selectedTicketId) return;
+        const unreadForTicket = notifications.filter(
+            n => n.metadata?.ticket_id === selectedTicketId && (n.is_read === false || n.is_read === 'f')
+        );
+        if (unreadForTicket.length > 0) {
+            fetchMessagesForTicket(selectedTicketId);
+            markTicketNotificationsAsRead(selectedTicketId);
+        }
+    }, [notifications.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Unified deep linking handler
+    useEffect(() => {
+        const ticketId = searchParams.get('ticket');
+        if (!ticketId) return;
+
+        // Fetch data if needed
+        fetchTickets();
+
+        // If we have tickets, try to select and clean up
+        const ticketData = tickets.find(t => t.id === ticketId);
+        if (ticketData) {
+            setSelectedTicketId(ticketId);
+            markTicketNotificationsAsRead(ticketId);
+
+            // Clear URL param
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('ticket');
+            setSearchParams(newParams, { replace: true });
+        }
+    }, [searchParams, tickets, fetchTickets, markTicketNotificationsAsRead, setSearchParams]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -63,21 +121,6 @@ export default function AdminTickets() {
         setReplyText('');
 
         try {
-            // Optimistic update for the open modal
-            setSelectedTicket(prev => ({
-                ...prev,
-                status: prev.status === 'pendiente' ? 'en_proceso' : prev.status,
-                messages: [
-                    ...prev.messages,
-                    {
-                        id: crypto.randomUUID(),
-                        sender: 'admin',
-                        text,
-                        timestamp: new Date().toISOString()
-                    }
-                ]
-            }));
-
             await sendAdminMessage(selectedTicket.id, text, user.id);
             showToast('Respuesta enviada', 'success');
         } catch (err) {
@@ -88,9 +131,6 @@ export default function AdminTickets() {
     const updateTicketStatus = async (ticketId, newStatus) => {
         try {
             await updateStatus(ticketId, newStatus);
-            if (selectedTicket?.id === ticketId) {
-                setSelectedTicket(prev => ({ ...prev, status: newStatus }));
-            }
             showToast('Estado actualizado', 'success');
         } catch (err) {
             showToast('Error al actualizar estado', 'error');
@@ -98,13 +138,21 @@ export default function AdminTickets() {
     };
 
     const handleDeleteTicket = async (ticketId) => {
-        if (!window.confirm('¿Seguro que deseas eliminar este ticket?')) return;
+        setTicketToDelete(ticketId);
+    };
+
+    const confirmDelete = async () => {
+        if (!ticketToDelete) return;
+        setIsDeleting(true);
         try {
-            await deleteTicket(ticketId);
-            if (selectedTicket?.id === ticketId) setSelectedTicket(null);
+            await deleteTicket(ticketToDelete);
+            if (selectedTicketId === ticketToDelete) setSelectedTicketId(null);
             showToast('Ticket eliminado', 'success');
+            setTicketToDelete(null);
         } catch (err) {
             showToast('Error al eliminar ticket', 'error');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -124,7 +172,20 @@ export default function AdminTickets() {
         }
     };
 
-    const groupedTickets = tickets.reduce((groups, ticket) => {
+    const filteredTickets = tickets.filter(ticket => {
+        const matchesSearch =
+            ticket.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ticket.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ticket.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ticket.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ticket.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    const groupedTickets = filteredTickets.reduce((groups, ticket) => {
         const key = ticket.company_name || 'Sin Tienda';
         if (!groups[key]) groups[key] = [];
         groups[key].push(ticket);
@@ -186,7 +247,10 @@ export default function AdminTickets() {
                             {groupedTickets[groupName].map(ticket => (
                                 <div
                                     key={ticket.id}
-                                    onClick={() => setSelectedTicket(ticket)}
+                                    onClick={() => {
+                                        setSelectedTicketId(ticket.id);
+                                        markTicketNotificationsAsRead(ticket.id);
+                                    }}
                                     className="bg-white border border-slate-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-primary-200 hover:shadow-md transition-all cursor-pointer group gap-4 sm:gap-0"
                                 >
                                     <div className="flex items-center gap-4 min-w-0">
@@ -203,6 +267,14 @@ export default function AdminTickets() {
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ticket.id}</span>
                                                 <span className="text-slate-300 hidden sm:inline">•</span>
                                                 <span className="text-xs font-bold text-slate-700 truncate block sm:inline w-full sm:w-auto">{ticket.subject}</span>
+                                                {(() => {
+                                                    const unreadCount = notifications.filter(n => n.metadata?.ticket_id === ticket.id && (n.is_read === false || n.is_read === 'f')).length;
+                                                    return unreadCount > 0 && (
+                                                        <span className="bg-rose-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 rounded-full flex items-center justify-center shadow-sm shadow-rose-200 animate-in zoom-in duration-200 shrink-0">
+                                                            {unreadCount}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </div>
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                                                 <p className="text-xs text-slate-500 truncate max-w-full sm:max-w-[300px]">{ticket.description}</p>
@@ -214,6 +286,12 @@ export default function AdminTickets() {
                                     <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 w-full sm:w-auto">
                                         <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado:</div>
                                         <div className="flex items-center gap-3">
+                                            {ticket.is_deleted_by_user && (
+                                                <Badge className="bg-rose-50 text-rose-600 border-rose-100 flex items-center gap-1">
+                                                    <EyeOff size={10} />
+                                                    Oculto por cliente
+                                                </Badge>
+                                            )}
                                             {getStatusBadge(ticket.status)}
                                             <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity text-primary-500">
                                                 <Maximize2 size={18} />
@@ -326,7 +404,7 @@ export default function AdminTickets() {
                                     <div className="flex items-center gap-3 min-w-0">
                                         <button
                                             onClick={() => {
-                                                setSelectedTicket(null);
+                                                setSelectedTicketId(null);
                                                 setShowDetails(false);
                                             }}
                                             className="p-1.5 hover:bg-slate-50 rounded-full transition-colors md:hidden shrink-0"
@@ -343,7 +421,7 @@ export default function AdminTickets() {
                                     </div>
                                     <button
                                         onClick={() => {
-                                            setSelectedTicket(null);
+                                            setSelectedTicketId(null);
                                             setShowDetails(false);
                                         }}
                                         className="hidden md:flex p-3 hover:bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition-all"
@@ -508,34 +586,46 @@ export default function AdminTickets() {
                             {/* Reply Area */}
                             <footer className="p-3 md:p-8 bg-white border-t border-slate-100 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.05)] shrink-0">
                                 <div className="max-w-4xl mx-auto flex flex-col gap-2 md:gap-4">
-                                    <div className="relative group">
-                                        <TextArea
-                                            placeholder="Escribe tu respuesta aquí..."
-                                            value={replyText}
-                                            onChange={(e) => setReplyText(e.target.value)}
-                                            className="min-h-[56px] md:min-h-[120px] rounded-xl md:rounded-3xl border-slate-200 focus:ring-primary-500 pr-10 text-sm md:text-base shadow-sm group-hover:border-slate-300 transition-all resize-none p-3 md:p-6"
-                                        />
-                                        <div className="absolute top-3 right-3 text-slate-200 group-focus-within:text-primary-200 transition-colors">
-                                            <MessageCircle size={18} className="md:w-7 md:h-7" />
+                                    {selectedTicket.status === 'finalizada' ? (
+                                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="h-12 w-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                                                <CheckCircle2 size={24} />
+                                            </div>
+                                            <p className="text-slate-600 font-bold mb-1">Este ticket ha sido finalizado</p>
+                                            <p className="text-slate-400 text-xs text-balance">No se pueden enviar más respuestas a una conversación cerrada.</p>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                        <Button
-                                            variant="outline"
-                                            className="h-9 px-4 text-xs border-slate-200 text-slate-600 font-bold rounded-xl md:hidden"
-                                            onClick={() => setSelectedTicket(null)}
-                                        >
-                                            Cerrar
-                                        </Button>
-                                        <Button
-                                            onClick={handleReply}
-                                            disabled={!replyText.trim()}
-                                            className="h-9 md:h-12 px-5 md:px-8 bg-primary-600 hover:bg-primary-700 text-white text-xs md:text-sm font-bold rounded-xl md:rounded-2xl shadow-md shadow-primary-100 flex items-center gap-1.5 group transition-all transform active:scale-95"
-                                        >
-                                            <Send size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                                            Enviar
-                                        </Button>
-                                    </div>
+                                    ) : (
+                                        <>
+                                            <div className="relative group">
+                                                <TextArea
+                                                    placeholder="Escribe tu respuesta aquí..."
+                                                    value={replyText}
+                                                    onChange={(e) => setReplyText(e.target.value)}
+                                                    className="min-h-[56px] md:min-h-[120px] rounded-xl md:rounded-3xl border-slate-200 focus:ring-primary-500 pr-10 text-sm md:text-base shadow-sm group-hover:border-slate-300 transition-all resize-none p-3 md:p-6"
+                                                />
+                                                <div className="absolute top-3 right-3 text-slate-200 group-focus-within:text-primary-200 transition-colors">
+                                                    <MessageCircle size={18} className="md:w-7 md:h-7" />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    className="h-9 px-4 text-xs border-slate-200 text-slate-600 font-bold rounded-xl md:hidden"
+                                                    onClick={() => setSelectedTicketId(null)}
+                                                >
+                                                    Cerrar
+                                                </Button>
+                                                <Button
+                                                    onClick={handleReply}
+                                                    disabled={!replyText.trim()}
+                                                    className="h-9 md:h-12 px-5 md:px-8 bg-primary-600 hover:bg-primary-700 text-white text-xs md:text-sm font-bold rounded-xl md:rounded-2xl shadow-md shadow-primary-100 flex items-center gap-1.5 group transition-all transform active:scale-95"
+                                                >
+                                                    <Send size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                                                    Enviar
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </footer>
                         </div>
@@ -562,6 +652,16 @@ export default function AdminTickets() {
                     />
                 </div>
             )}
+            <ConfirmationModal
+                isOpen={!!ticketToDelete}
+                onClose={() => setTicketToDelete(null)}
+                onConfirm={confirmDelete}
+                loading={isDeleting}
+                title="¿Eliminar este ticket?"
+                description="Esta acción es permanente y no se podrá recuperar la conversación ni los archivos adjuntos."
+                confirmText="Eliminar permanentemente"
+                cancelText="Mantener ticket"
+            />
         </div>
     );
 }

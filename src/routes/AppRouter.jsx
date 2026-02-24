@@ -30,6 +30,7 @@ import CustomerQuotes from '../pages/customer/CustomerQuotes';
 import PricingPage from '../pages/PricingPage';
 import TermsPage from '../pages/TermsPage';
 import AboutUsPage from '../pages/AboutUsPage';
+import PrivacyPage from '../pages/PrivacyPage';
 import HelpPage from '../pages/HelpPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -70,6 +71,7 @@ export function AppRouter() {
                 <Route path="/mensajes" element={<Navigate to="/inbox" replace />} />
                 <Route path="/precios" element={<PricingPage />} />
                 <Route path="/terminos" element={<TermsPage />} />
+                <Route path="/privacidad" element={<PrivacyPage />} />
                 <Route path="/nosotros" element={<AboutUsPage />} />
                 <Route path="/ayuda" element={<HelpPage />} />
                 <Route path="/login" element={<LoginPage />} />

@@ -45,8 +45,8 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                         {cartEnabled ? (
                             <Badge variant="success">Stock: {product.stock}</Badge>
                         ) : (
-                            <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
-                                {product.stock > 0 ? 'Disponible' : 'No disponible'}
+                            <Badge variant={product.available ? 'success' : 'destructive'}>
+                                {product.available ? 'Disponible' : 'No disponible'}
                             </Badge>
                         )}
                         {product.rating !== undefined && (

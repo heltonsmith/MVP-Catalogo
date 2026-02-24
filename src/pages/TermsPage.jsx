@@ -7,9 +7,9 @@ export default function TermsPage() {
                 <div className="bg-primary-600 p-8 text-white">
                     <div className="flex items-center gap-3 mb-4">
                         <Scale size={32} />
-                        <h1 className="text-3xl font-bold">Aspectos Legales</h1>
+                        <h1 className="text-3xl font-bold text-white">Aspectos Legales</h1>
                     </div>
-                    <p className="text-primary-100">Última actualización: 12 de Febrero, 2026</p>
+                    <p className="text-white/80 font-medium tracking-wide">Última actualización: 12 de Febrero, 2026</p>
                 </div>
 
                 <div className="p-8 sm:p-12 space-y-8 text-slate-600 leading-relaxed">

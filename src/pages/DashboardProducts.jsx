@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, ExternalLink, Copy, Clock, Zap, X } from 'lucide-react';
+import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, ExternalLink, Copy, Clock, Zap, X, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -136,6 +136,37 @@ export default function DashboardProducts() {
         fetchProducts();
         fetchCategories();
     }, [company?.id, isDemo, demoCompany.id]);
+
+    const toggleProductVisibility = async (productId, currentStatus) => {
+        if (isDemo) {
+            handleDemoAction('Cambiar visibilidad');
+            setProducts(prev => prev.map(p =>
+                p.id === productId ? { ...p, active: !currentStatus } : p
+            ));
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('products')
+                .update({ active: !currentStatus })
+                .eq('id', productId);
+
+            if (error) throw error;
+
+            setProducts(prev => prev.map(p =>
+                p.id === productId ? { ...p, active: !currentStatus } : p
+            ));
+
+            showToast(
+                !currentStatus ? "Producto visible en el catálogo" : "Producto oculto del catálogo",
+                "success"
+            );
+        } catch (error) {
+            console.error('Error toggling visibility:', error);
+            showToast("Error al cambiar visibilidad", "error");
+        }
+    };
 
     const handleDeleteProduct = async (id) => {
         if (!window.confirm("¿Estás seguro de que deseas eliminar este producto?")) return;
@@ -431,7 +462,10 @@ export default function DashboardProducts() {
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">SKU</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Categoría</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Precio</th>
-                                <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">{isDemoRestaurant ? 'Disponibilidad' : 'Stock'}</th>
+                                <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">
+                                    {company?.menu_mode ? 'Disponibilidad' : 'Stock'}
+                                </th>
+                                <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px] text-center">Visible</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px] text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -496,12 +530,12 @@ export default function DashboardProducts() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        {isDemoRestaurant ? (
+                                        {company?.menu_mode ? (
                                             <span className={cn(
                                                 "font-bold px-2 py-0.5 rounded-md text-[10px] uppercase",
-                                                product.stock > 0 ? "bg-emerald-50 text-emerald-500 border border-emerald-100" : "bg-red-50 text-red-500 border border-red-100"
+                                                product.available ? "bg-emerald-50 text-emerald-500 border border-emerald-100" : "bg-red-50 text-red-500 border border-red-100"
                                             )}>
-                                                {product.stock > 0 ? 'Disponible' : 'No disponible'}
+                                                {product.available ? 'Disponible' : 'Agotado'}
                                             </span>
                                         ) : (
                                             <span className={cn(
@@ -511,6 +545,20 @@ export default function DashboardProducts() {
                                                 {product.available ? `Stock: ${product.stock}` : 'No disponible'}
                                             </span>
                                         )}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <button
+                                            onClick={() => toggleProductVisibility(product.id, product.active !== false)}
+                                            className={cn(
+                                                "p-2 rounded-lg transition-all",
+                                                product.active !== false
+                                                    ? "text-primary-600 hover:bg-primary-50"
+                                                    : "text-slate-300 hover:bg-slate-100"
+                                            )}
+                                            title={product.active !== false ? "Visible en catálogo" : "Oculto en catálogo"}
+                                        >
+                                            {product.active !== false ? <Eye size={18} /> : <EyeOff size={18} />}
+                                        </button>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end space-x-1">

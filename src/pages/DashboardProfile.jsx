@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2, Link as LinkIcon } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2, Link as LinkIcon, Utensils } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
@@ -49,6 +49,7 @@ export default function DashboardProfile() {
         markAsRead,
         markAsUnread,
         deleteNotification,
+        markAllAsRead,
         unreadCount
     } = useNotifications();
 
@@ -81,7 +82,7 @@ export default function DashboardProfile() {
     ];
 
     const systemNotifications = useMemo(() =>
-        isDemo ? DEMO_NOTIFICATIONS : notifications.filter(n => n.type === 'system' || n.type === 'message'),
+        isDemo ? DEMO_NOTIFICATIONS : notifications.filter(n => n.type === 'system' || n.type === 'message' || n.type === 'grace_period'),
         [notifications, isDemo]
     );
 
@@ -98,7 +99,8 @@ export default function DashboardProfile() {
         businessType: 'retail',
         instagram: '',
         tiktok: '',
-        website: ''
+        website: '',
+        menuMode: false
     });
     const [passwords, setPasswords] = useState({
         current: '',
@@ -116,7 +118,8 @@ export default function DashboardProfile() {
                 businessType: company.business_type || 'retail',
                 instagram: company.socials?.instagram || '',
                 tiktok: company.socials?.tiktok || '',
-                website: company.socials?.website || company.website || ''
+                website: company.socials?.website || company.website || '',
+                menuMode: company.menu_mode || false
             });
         }
     }, [company?.id, demoCompany.id]);
@@ -197,7 +200,8 @@ export default function DashboardProfile() {
                         instagram: formData.instagram,
                         tiktok: formData.tiktok,
                         website: formData.website
-                    }
+                    },
+                    menu_mode: formData.menuMode
                 })
                 .eq('id', company.id);
 
@@ -309,9 +313,22 @@ export default function DashboardProfile() {
                 return (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <Card className="border-none shadow-sm bg-white overflow-hidden">
-                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center gap-2">
-                                <MessageSquare size={18} className="text-primary-500" />
-                                Mensajes del Sistema
+                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare size={18} className="text-primary-500" />
+                                    Mensajes del Sistema
+                                </div>
+                                {unreadSystemCount > 0 && !isDemo && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={markAllAsRead}
+                                        className="text-[10px] font-bold text-primary-600 hover:text-primary-700 hover:bg-primary-50 px-2 h-7"
+                                    >
+                                        <CheckCircle2 size={14} className="mr-1" />
+                                        Marcar todo como leído
+                                    </Button>
+                                )}
                             </div>
                             <CardContent className="p-6">
                                 {(loadingNotifs && !isDemo) ? (
@@ -327,10 +344,11 @@ export default function DashboardProfile() {
                                             return (
                                                 <div
                                                     key={notif.id}
+                                                    onClick={() => !notif.is_read && !isDemo && markAsRead(notif.id)}
                                                     className={cn(
-                                                        "p-5 rounded-2xl border transition-all duration-300",
+                                                        "p-5 rounded-2xl border transition-all duration-300 cursor-pointer group/card",
                                                         !notif.is_read
-                                                            ? (isRejected ? "bg-rose-50/50 border-rose-100 shadow-md shadow-rose-50" : "bg-white border-primary-100 shadow-md shadow-primary-50")
+                                                            ? (isRejected ? "bg-rose-50/50 border-rose-100 shadow-md shadow-rose-50 hover:bg-rose-50" : "bg-white border-primary-100 shadow-md shadow-primary-50 hover:border-primary-200")
                                                             : "bg-slate-50 border-slate-100 opacity-80"
                                                     )}
                                                 >
@@ -408,8 +426,8 @@ export default function DashboardProfile() {
                                     </div>
                                 )}
                             </CardContent>
-                        </Card>
-                    </div>
+                        </Card >
+                    </div >
                 );
             case 'notifications':
                 const notifPrefs = company?.notification_prefs || { notify_follow: true, notify_favorite: true, notify_quote: true };
@@ -869,6 +887,36 @@ export default function DashboardProfile() {
                                                 </label>
                                             ))}
                                         </div>
+
+                                        {/* Restaurant Menu Mode Toggle */}
+                                        {formData.businessType === 'restaurant' && (
+                                            <div className="pt-4 border-t border-slate-50 animate-in fade-in slide-in-from-top-2">
+                                                <div className="flex items-center justify-between p-4 bg-primary-50/30 rounded-2xl border border-primary-100/50">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-primary-600 border border-primary-100 shadow-sm">
+                                                            <Utensils size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-slate-900 text-sm">Modo CARTA (Menú)</h4>
+                                                            <p className="text-[10px] text-slate-500 font-medium">Desactiva el carrito y usa términos gastronómicos (Tipo/Porción).</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, menuMode: !formData.menuMode })}
+                                                        className={cn(
+                                                            "h-6 w-11 rounded-full relative transition-colors duration-200 shrink-0",
+                                                            formData.menuMode ? "bg-primary-500" : "bg-slate-200"
+                                                        )}
+                                                    >
+                                                        <div className={cn(
+                                                            "absolute top-1 h-4 w-4 bg-white rounded-full shadow-sm transition-all duration-200",
+                                                            formData.menuMode ? "right-1" : "left-1"
+                                                        )} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="pt-4 border-t border-slate-50 flex justify-end">

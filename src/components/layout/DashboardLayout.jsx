@@ -17,11 +17,13 @@ import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
 import { TooltipCard } from '../ui/Tooltip';
 
+import { NotificationCenter } from '../notifications/NotificationCenter';
+import { useNotifications } from '../../hooks/useNotifications';
 
 export function DashboardLayout() {
     const navigate = useNavigate();
-    const { user, profile, company, loading, signOut, unreadNotifications } = useAuth();
-
+    const { user, profile, company, loading, signOut, unreadNotifications: globalUnread } = useAuth();
+    const { unreadSystemCount } = useNotifications();
 
     useEffect(() => {
         if (!loading) {
@@ -51,7 +53,8 @@ export function DashboardLayout() {
         {
             name: 'Ajustes Perfil',
             icon: <Settings size={20} />,
-            path: '/dashboard/perfil'
+            path: '/dashboard/perfil',
+            badge: unreadSystemCount > 0 ? unreadSystemCount : null
         },
     ];
 
@@ -182,6 +185,7 @@ export function DashboardLayout() {
 
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col overflow-hidden relative">
+
                 {/* Mobile Header */}
                 <header className="flex-none h-16 flex items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden z-30">
                     <div className="flex items-center space-x-3">
@@ -264,7 +268,7 @@ export function DashboardLayout() {
                         );
                     })}
                 </nav>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
