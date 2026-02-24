@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2, Link as LinkIcon, Utensils } from 'lucide-react';
+import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2, Link as LinkIcon, Utensils, Megaphone, Users, Send } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
@@ -108,6 +108,11 @@ export default function DashboardProfile() {
         confirm: ''
     });
 
+    // Broadcast Channel States
+    const [broadcastMsg, setBroadcastMsg] = useState('');
+    const [sendingBroadcast, setSendingBroadcast] = useState(false);
+    const [followerCount, setFollowerCount] = useState(0);
+
     useEffect(() => {
         if (company) {
             setFormData({
@@ -148,6 +153,90 @@ export default function DashboardProfile() {
             fetchHistory();
         }
     }, [activeTab, company?.id, isDemo]);
+
+    useEffect(() => {
+        const fetchFollowers = async () => {
+            if (!company?.id) return;
+            if (isDemo) {
+                setFollowerCount(1250);
+                return;
+            }
+            try {
+                const { count } = await supabase
+                    .from('store_follows')
+                    .select('id', { count: 'exact' })
+                    .eq('company_id', company.id);
+                setFollowerCount(count || 0);
+            } catch (err) {
+                console.error('Error fetching follower count:', err);
+            }
+        };
+
+        if (activeTab === 'broadcast') {
+            fetchFollowers();
+        }
+    }, [activeTab, company?.id, isDemo]);
+
+    const handleSendBroadcast = async () => {
+        if (!broadcastMsg.trim()) {
+            showToast("Escribe un mensaje primero", "error");
+            return;
+        }
+
+        if (isDemo) {
+            handleDemoAction("Enviar difusión a seguidores");
+            setBroadcastMsg('');
+            return;
+        }
+
+        setSendingBroadcast(true);
+        try {
+            // 1. Get all followers
+            const { data: followers, error: fetchErr } = await supabase
+                .from('store_follows')
+                .select('user_id')
+                .eq('company_id', company.id);
+
+            if (fetchErr) throw fetchErr;
+
+            if (!followers || followers.length === 0) {
+                showToast("No tienes seguidores a los cuales notificar", "info");
+                setSendingBroadcast(false);
+                return;
+            }
+
+            // 2. Prepare bulk notifications
+            const notifications = followers.map(f => ({
+                user_id: f.user_id,
+                type: 'broadcast',
+                title: `Mensaje de ${company.name}`,
+                content: broadcastMsg,
+                metadata: {
+                    company_id: company.id,
+                    company_slug: company.slug,
+                    company_name: company.name
+                }
+            }));
+
+            // 3. Send in batches of 100 to avoid limits
+            const batchSize = 100;
+            for (let i = 0; i < notifications.length; i += batchSize) {
+                const batch = notifications.slice(i, i + batchSize);
+                const { error: sendErr } = await supabase
+                    .from('notifications')
+                    .insert(batch);
+                if (sendErr) throw sendErr;
+            }
+
+            showToast("¡Difusión enviada con éxito!", "success");
+            setBroadcastMsg('');
+        } catch (error) {
+            console.error('Error sending broadcast:', error);
+            showToast("Error al enviar la difusión", "error");
+        } finally {
+            setSendingBroadcast(false);
+        }
+    };
 
     if (!company && !isDemo) return null;
     if (!company && isDemo) return <div className="p-8 text-center">Cargando datos de demostración...</div>;
@@ -428,6 +517,81 @@ export default function DashboardProfile() {
                             </CardContent>
                         </Card >
                     </div >
+                );
+            case 'broadcast':
+                return (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <Card className="border-none shadow-xl bg-white overflow-hidden">
+                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center gap-2">
+                                <Megaphone size={18} className="text-primary-500" />
+                                Canal de Difusión Seguidores
+                            </div>
+                            <CardContent className="p-8">
+                                <div className="max-w-xl mx-auto text-center space-y-6">
+                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm font-black shadow-sm ring-1 ring-primary-100">
+                                        <Users size={16} />
+                                        <span>{followerCount.toLocaleString()} Seguidores Activos</span>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h3 className="text-xl font-black text-slate-900 leading-tight">Envía novedades a tus clientes</h3>
+                                        <p className="text-sm text-slate-500 font-bold leading-relaxed">
+                                            Tus seguidores recibirán una notificación inmediata con el mensaje que escribas abajo.
+                                            ¡Úsalo para ofertas relámpago, nuevos ingresos o anuncios importantes!
+                                        </p>
+                                    </div>
+
+                                    <div className="relative group">
+                                        <textarea
+                                            value={broadcastMsg}
+                                            onChange={(e) => setBroadcastMsg(e.target.value)}
+                                            placeholder="Ej: ¡Hola! Tenemos 10 productos nuevos en oferta por tiempo limitado. ¡No te los pierdas! 🚀"
+                                            rows={5}
+                                            className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-5 text-sm font-bold text-slate-700 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all resize-none shadow-inner"
+                                        />
+                                        <div className="absolute bottom-4 right-4 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                                            {broadcastMsg.length} caracteres
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        onClick={handleSendBroadcast}
+                                        disabled={sendingBroadcast || !broadcastMsg.trim()}
+                                        className="w-full h-14 rounded-2xl text-base font-black shadow-xl shadow-primary-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                    >
+                                        {sendingBroadcast ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                Enviando a {followerCount} seguidores...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Send className="mr-2 h-5 w-5" />
+                                                Enviar Notificación de Difusión
+                                            </>
+                                        )}
+                                    </Button>
+
+                                    <div className="pt-4 flex items-center justify-center gap-6 border-t border-slate-100">
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Alcance</span>
+                                            <span className="text-xs font-bold text-slate-700">Inmediato</span>
+                                        </div>
+                                        <div className="h-4 w-px bg-slate-200" />
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Tipo</span>
+                                            <span className="text-xs font-bold text-slate-700">Directo</span>
+                                        </div>
+                                        <div className="h-4 w-px bg-slate-200" />
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Botón CTA</span>
+                                            <span className="text-xs font-bold text-slate-700">Ir a Tienda</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 );
             case 'notifications':
                 const notifPrefs = company?.notification_prefs || { notify_follow: true, notify_favorite: true, notify_quote: true };
@@ -1159,6 +1323,12 @@ export default function DashboardProfile() {
                     <div className="bg-white rounded-3xl border border-slate-100 p-2 shadow-sm flex lg:flex-col overflow-x-auto no-scrollbar lg:overflow-x-visible gap-1 lg:gap-0 sticky top-0 md:relative z-20">
                         {[
                             { id: 'profile', name: 'Perfil', fullName: 'Perfil de Tienda', icon: <User size={18} /> },
+                            {
+                                id: 'broadcast',
+                                name: 'Difusión',
+                                fullName: 'Canal de Difusión',
+                                icon: <Megaphone size={18} />
+                            },
                             {
                                 id: 'messages',
                                 name: 'Mensajes',

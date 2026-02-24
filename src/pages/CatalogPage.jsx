@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, MessageCircle, User, Users, Globe, Instagram, Music2, Share2, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X, Heart, Pencil, Trash2 } from 'lucide-react';
+import { Search, ShoppingCart, MessageCircle, User, Users, Globe, Instagram, Music2, Share2, QrCode, BadgeCheck, Loader2, LayoutDashboard, Eye, Move, Maximize, Save, X, Heart, Pencil, Trash2 } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
 import { COMPANIES, PRODUCTS, CATEGORIES } from '../data/mock';
@@ -1088,17 +1088,15 @@ export default function CatalogPage() {
                                     {/* Cart Button Floating - Hide if menu mode */}
                                     {!isOwner && currentCart.length > 0 && !company?.menu_mode && (
                                         <Link
-                                            to={`/catalogo/${companySlug}/carrito`}
-                                            className="fixed bottom-6 right-6 z-50 bg-primary-600 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 hover:bg-primary-700 transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-8"
+                                            to="/carrito"
+                                            className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white rounded-xl shadow-[0_10px_30px_rgba(5,145,100,0.3)] p-2 pr-4 flex items-center gap-3 hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-12"
                                         >
-                                            <div className="bg-white/20 p-2 rounded-xl">
-                                                <MessageCircle size={24} />
+                                            <div className="bg-rose-500 text-white text-xs font-black h-7 w-7 rounded-lg flex items-center justify-center shadow-sm shrink-0 border border-white/20">
+                                                {currentCart.length}
                                             </div>
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Ver Carrito</p>
-                                                <p className="font-black text-lg">
-                                                    {currentCart.length} {currentCart.length === 1 ? 'producto' : 'productos'}
-                                                </p>
+                                            <div className="flex flex-col">
+                                                <p className="text-[9px] font-bold uppercase tracking-wider opacity-80 leading-tight mb-0.5">Ver Carrito</p>
+                                                <p className="font-black text-xs uppercase tracking-tight leading-tight">Cotizar Ahora</p>
                                             </div>
                                         </Link>
                                     )}

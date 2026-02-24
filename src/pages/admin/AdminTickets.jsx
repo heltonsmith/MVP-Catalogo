@@ -186,7 +186,7 @@ export default function AdminTickets() {
     });
 
     const groupedTickets = filteredTickets.reduce((groups, ticket) => {
-        const key = ticket.company_name || 'Sin Tienda';
+        const key = ticket.company_name || `Cliente: ${ticket.display_name}`;
         if (!groups[key]) groups[key] = [];
         groups[key].push(ticket);
         return groups;
@@ -232,86 +232,89 @@ export default function AdminTickets() {
 
             {/* Compact Ticket List */}
             <div className="space-y-8">
-                {sortedGroupNames.map(groupName => (
-                    <div key={groupName} className="space-y-3">
-                        <div className="flex items-center gap-3 px-1">
-                            <Store size={18} className="text-slate-400" />
-                            <h3 className="font-bold text-slate-800">{groupName}</h3>
-                            <span className="h-px bg-slate-100 flex-1 ml-2" />
-                            <Badge variant="outline" className="text-[10px] font-bold text-slate-400 border-slate-200">
-                                {groupedTickets[groupName].length} TICKETS
-                            </Badge>
-                        </div>
+                {sortedGroupNames.map(groupName => {
+                    const isClientGroup = groupName.startsWith('Cliente:');
+                    return (
+                        <div key={groupName} className="space-y-3">
+                            <div className="flex items-center gap-3 px-1">
+                                {isClientGroup ? <User size={18} className="text-emerald-500" /> : <Store size={18} className="text-slate-400" />}
+                                <h3 className="font-bold text-slate-800">{groupName}</h3>
+                                <span className="h-px bg-slate-100 flex-1 ml-2" />
+                                <Badge variant="outline" className="text-[10px] font-bold text-slate-400 border-slate-200 uppercase">
+                                    {groupedTickets[groupName].length} TICKETS
+                                </Badge>
+                            </div>
 
-                        <div className="grid grid-cols-1 gap-2">
-                            {groupedTickets[groupName].map(ticket => (
-                                <div
-                                    key={ticket.id}
-                                    onClick={() => {
-                                        setSelectedTicketId(ticket.id);
-                                        markTicketNotificationsAsRead(ticket.id);
-                                    }}
-                                    className="bg-white border border-slate-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-primary-200 hover:shadow-md transition-all cursor-pointer group gap-4 sm:gap-0"
-                                >
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        <div className={cn(
-                                            "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
-                                            ticket.status === 'pendiente' ? "bg-amber-50 text-amber-500" :
-                                                ticket.status === 'en_proceso' ? "bg-blue-50 text-blue-500" :
-                                                    "bg-slate-50 text-slate-400"
-                                        )}>
-                                            <MessageSquare size={20} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center flex-wrap gap-2 mb-0.5">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ticket.id}</span>
-                                                <span className="text-slate-300 hidden sm:inline">•</span>
-                                                <span className="text-xs font-bold text-slate-700 truncate block sm:inline w-full sm:w-auto">{ticket.subject}</span>
-                                                {(() => {
-                                                    const unreadCount = notifications.filter(n => n.metadata?.ticket_id === ticket.id && (n.is_read === false || n.is_read === 'f')).length;
-                                                    return unreadCount > 0 && (
-                                                        <span className="bg-rose-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 rounded-full flex items-center justify-center shadow-sm shadow-rose-200 animate-in zoom-in duration-200 shrink-0">
-                                                            {unreadCount}
-                                                        </span>
-                                                    );
-                                                })()}
+                            <div className="grid grid-cols-1 gap-2">
+                                {groupedTickets[groupName].map(ticket => (
+                                    <div
+                                        key={ticket.id}
+                                        onClick={() => {
+                                            setSelectedTicketId(ticket.id);
+                                            markTicketNotificationsAsRead(ticket.id);
+                                        }}
+                                        className="bg-white border border-slate-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-primary-200 hover:shadow-md transition-all cursor-pointer group gap-4 sm:gap-0"
+                                    >
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className={cn(
+                                                "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
+                                                ticket.status === 'pendiente' ? "bg-amber-50 text-amber-500" :
+                                                    ticket.status === 'en_proceso' ? "bg-blue-50 text-blue-500" :
+                                                        "bg-slate-50 text-slate-400"
+                                            )}>
+                                                <MessageSquare size={20} />
                                             </div>
-                                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                                                <p className="text-xs text-slate-500 truncate max-w-full sm:max-w-[300px]">{ticket.description}</p>
-                                                <span className="text-slate-200 hidden sm:inline">|</span>
-                                                <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{new Date(ticket.created_at).toLocaleDateString()}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{ticket.id}</span>
+                                                    <span className="text-slate-300 hidden sm:inline">•</span>
+                                                    <span className="text-xs font-bold text-slate-700 truncate block sm:inline w-full sm:w-auto">{ticket.subject}</span>
+                                                    {(() => {
+                                                        const unreadCount = notifications.filter(n => n.metadata?.ticket_id === ticket.id && (n.is_read === false || n.is_read === 'f')).length;
+                                                        return unreadCount > 0 && (
+                                                            <span className="bg-rose-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 rounded-full flex items-center justify-center shadow-sm shadow-rose-200 animate-in zoom-in duration-200 shrink-0">
+                                                                {unreadCount}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                                    <p className="text-xs text-slate-500 truncate max-w-full sm:max-w-[300px]">{ticket.description}</p>
+                                                    <span className="text-slate-200 hidden sm:inline">|</span>
+                                                    <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{new Date(ticket.created_at).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 w-full sm:w-auto">
+                                            <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado:</div>
+                                            <div className="flex items-center gap-3">
+                                                {ticket.is_deleted_by_user && (
+                                                    <Badge className="bg-rose-50 text-rose-600 border-rose-100 flex items-center gap-1">
+                                                        <EyeOff size={10} />
+                                                        Oculto por cliente
+                                                    </Badge>
+                                                )}
+                                                {getStatusBadge(ticket.status)}
+                                                <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity text-primary-500">
+                                                    <Maximize2 size={18} />
+                                                </div>
+                                                {ticket.status === 'finalizada' && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteTicket(ticket.id); }}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"
+                                                        title="Eliminar ticket"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 w-full sm:w-auto">
-                                        <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado:</div>
-                                        <div className="flex items-center gap-3">
-                                            {ticket.is_deleted_by_user && (
-                                                <Badge className="bg-rose-50 text-rose-600 border-rose-100 flex items-center gap-1">
-                                                    <EyeOff size={10} />
-                                                    Oculto por cliente
-                                                </Badge>
-                                            )}
-                                            {getStatusBadge(ticket.status)}
-                                            <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity text-primary-500">
-                                                <Maximize2 size={18} />
-                                            </div>
-                                            {ticket.status === 'finalizada' && (
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTicket(ticket.id); }}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"
-                                                    title="Eliminar ticket"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Modal Conversation with Margins */}
@@ -324,31 +327,40 @@ export default function AdminTickets() {
                                 <div>
                                     <h2 className="font-bold text-slate-900 mb-8">Información del Cliente</h2>
                                     <div className="flex flex-col items-center text-center">
-                                        <div className="h-20 w-20 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-300 border border-slate-100 mb-4 overflow-hidden">
-                                            {selectedTicket.display_avatar ? (
-                                                <img src={selectedTicket.display_avatar} alt={selectedTicket.display_name} className="h-full w-full object-cover" />
-                                            ) : (
-                                                <User size={40} />
-                                            )}
-                                        </div>
-                                        <h3 className="font-bold text-slate-900 text-xl">{selectedTicket.display_name}</h3>
-                                        {selectedTicket.company_id && selectedTicket.customer_name && (
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                                Contacto: {selectedTicket.customer_name}
-                                            </p>
-                                        )}
-                                        {!selectedTicket.company_id && (
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">CLIENTE REGISTRADO</p>
+                                        {selectedTicket.display_avatar ? (
+                                            <img src={selectedTicket.display_avatar} alt={selectedTicket.display_name} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <User size={40} />
                                         )}
                                     </div>
+                                    <h3 className="font-bold text-slate-900 text-xl">{selectedTicket.display_name}</h3>
+                                    {selectedTicket.company_id && selectedTicket.customer_name && (
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                            Contacto: {selectedTicket.customer_name}
+                                        </p>
+                                    )}
+                                    {!selectedTicket.company_id && (
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">CLIENTE REGISTRADO</p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-4 pt-4 border-t border-slate-200/50">
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tienda Relacionada</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                            {selectedTicket.company_id ? 'Tienda Relacionada' : 'Estado del Cliente'}
+                                        </p>
                                         <div className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-white p-3 rounded-xl border border-slate-100">
-                                            <Store size={16} className="text-primary-500" />
-                                            {selectedTicket.company_name}
+                                            {selectedTicket.company_id ? (
+                                                <>
+                                                    <Store size={16} className="text-primary-500" />
+                                                    {selectedTicket.company_name}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle2 size={16} className="text-emerald-500" />
+                                                    Cliente Activo
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
@@ -466,8 +478,8 @@ export default function AdminTickets() {
 
                                             <div className="grid grid-cols-1 gap-2 border-t border-slate-50 pt-3">
                                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                                                    <Store size={14} className="text-primary-500" />
-                                                    {selectedTicket.company_name}
+                                                    {selectedTicket.company_id ? <Store size={14} className="text-primary-500" /> : <CheckCircle2 size={14} className="text-emerald-500" />}
+                                                    {selectedTicket.company_name || 'Cliente Activo'}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-xs text-slate-600">
                                                     <Mail size={14} className="text-slate-400" />
@@ -631,27 +643,30 @@ export default function AdminTickets() {
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Image Lightbox */}
-            {selectedImage && (
-                <div
-                    className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200 cursor-zoom-out"
-                    onClick={() => setSelectedImage(null)}
-                >
-                    <button
-                        className="absolute top-6 right-6 p-3 text-white/50 hover:text-white transition-colors"
+            {
+                selectedImage && (
+                    <div
+                        className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200 cursor-zoom-out"
                         onClick={() => setSelectedImage(null)}
                     >
-                        <X size={32} />
-                    </button>
-                    <img
-                        src={selectedImage}
-                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                </div>
-            )}
+                        <button
+                            className="absolute top-6 right-6 p-3 text-white/50 hover:text-white transition-colors"
+                            onClick={() => setSelectedImage(null)}
+                        >
+                            <X size={32} />
+                        </button>
+                        <img
+                            src={selectedImage}
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                )
+            }
             <ConfirmationModal
                 isOpen={!!ticketToDelete}
                 onClose={() => setTicketToDelete(null)}
@@ -662,6 +677,6 @@ export default function AdminTickets() {
                 confirmText="Eliminar permanentemente"
                 cancelText="Mantener ticket"
             />
-        </div>
+        </div >
     );
 }

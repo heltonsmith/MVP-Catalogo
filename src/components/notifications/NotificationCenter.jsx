@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, X, Quote, Package, MessageCircle, AlertCircle, Trash2, Mail, MailOpen, Sparkles, ChevronRight, CheckCircle2, XCircle, LifeBuoy } from 'lucide-react';
+import { Bell, Check, X, Quote, Package, MessageCircle, AlertCircle, Trash2, Mail, MailOpen, Sparkles, ChevronRight, CheckCircle2, XCircle, LifeBuoy, Megaphone } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { cn } from '../../utils';
@@ -273,6 +273,22 @@ export function NotificationCenter() {
                                                             >
                                                                 <Package size={12} />
                                                                 Ver Producto
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {notification.type === 'broadcast' && notification.metadata?.company_slug && (
+                                                        <div className="mt-2 flex">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const companySlug = notification.metadata.company_slug;
+                                                                    window.open(`/catalogo/${companySlug}`, '_blank');
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 border border-primary-100 text-[10px] font-bold text-primary-600 hover:bg-primary-100 transition-all shadow-sm"
+                                                            >
+                                                                <Megaphone size={12} />
+                                                                Ir a Tienda
                                                             </button>
                                                         </div>
                                                     )}
