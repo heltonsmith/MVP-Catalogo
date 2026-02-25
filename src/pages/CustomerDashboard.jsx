@@ -32,6 +32,7 @@ import { cn } from '../utils';
 
 export default function CustomerDashboard() {
     const { user, profile, refreshProfile } = useAuth();
+    const targetUserId = profile?.id || user?.id;
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
@@ -47,23 +48,23 @@ export default function CustomerDashboard() {
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
-        if (user) {
+        if (targetUserId) {
             loadDashboardData();
         }
-    }, [user]);
+    }, [targetUserId]);
 
     const loadDashboardData = async () => {
         setLoading(true);
         try {
             const [favs, qts, revs] = await Promise.all([
-                supabase.from('favorites').select('*, company:companies(*)').eq('user_id', user.id).limit(4),
-                supabase.from('whatsapp_quotes').select('*, company:companies(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1),
-                supabase.from('reviews').select('count', { count: 'exact' }).eq('user_id', user.id)
+                supabase.from('favorites').select('*, company:companies(*)').eq('user_id', targetUserId).limit(4),
+                supabase.from('whatsapp_quotes').select('*, company:companies(*)').eq('user_id', targetUserId).order('created_at', { ascending: false }).limit(1),
+                supabase.from('reviews').select('count', { count: 'exact' }).eq('user_id', targetUserId)
             ]);
 
             // For totals, we need separate count queries if we want absolute totals
-            const { count: totalFavs } = await supabase.from('favorites').select('id', { count: 'exact' }).eq('user_id', user.id);
-            const { count: totalQuotes } = await supabase.from('whatsapp_quotes').select('id', { count: 'exact' }).eq('user_id', user.id);
+            const { count: totalFavs } = await supabase.from('favorites').select('id', { count: 'exact' }).eq('user_id', targetUserId);
+            const { count: totalQuotes } = await supabase.from('whatsapp_quotes').select('id', { count: 'exact' }).eq('user_id', targetUserId);
 
             setFavorites(favs.data || []);
             setRecentQuotes(qts.data || []);
@@ -86,7 +87,7 @@ export default function CustomerDashboard() {
         setUploading(true);
         try {
             const fileExt = file.name.split('.').pop();
-            const filePath = `${user.id}/avatar.${fileExt}`;
+            const filePath = `${targetUserId}/avatar.${fileExt}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
@@ -101,7 +102,7 @@ export default function CustomerDashboard() {
             const { error: updateError } = await supabase
                 .from('profiles')
                 .upsert({
-                    id: user.id,
+                    id: targetUserId,
                     avatar_url: publicUrl,
                     email: user.email,
                     full_name: profile?.full_name || user?.user_metadata?.full_name || ''

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Shield, ShieldOff, Eye, ExternalLink, AlertTriangle, Calendar, Clock, Users, ChevronLeft, ChevronRight, Edit2, Loader2, Store, Zap, Sparkles, X, BadgeCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Shield, ShieldOff, Eye, ExternalLink, AlertTriangle, Calendar, Clock, Users, ChevronLeft, ChevronRight, Edit2, Loader2, Store, Zap, Sparkles, X, BadgeCheck, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -203,6 +204,7 @@ export default function AdminUsers() {
     const [actionId, setActionId] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
     const [editingRenewal, setEditingRenewal] = useState(null);
+    const [deletingItem, setDeletingItem] = useState(null);
 
     // ─── Data Fetching ──────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
@@ -327,6 +329,58 @@ export default function AdminUsers() {
         } catch { showToast("Error al cambiar estado", "error"); }
         finally { setActionId(null); }
     };
+
+    const deleteStorageFolder = async (bucket, folderPath) => {
+        try {
+            const { data: files, error: listError } = await supabase.storage
+                .from(bucket)
+                .list(folderPath);
+
+            if (listError) return; // Silent fail if no files
+            if (files && files.length > 0) {
+                const filesToDelete = files.map(file => `${folderPath}/${file.name}`);
+                await supabase.storage.from(bucket).remove(filesToDelete);
+            }
+        } catch (error) {
+            console.error(`Error deleting storage folder ${bucket}/${folderPath}:`, error);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!deletingItem) return;
+        const targetId = deletingItem.id;
+        const type = deletingItem.type; // 'store' or 'user'
+        setActionId(targetId);
+        try {
+            if (type === 'store') {
+                // 1. Cleanup storage
+                await deleteStorageFolder('product-images', targetId);
+                // 2. RPC Delete
+                const { error } = await supabase.rpc('admin_delete_company', { target_company_id: targetId });
+                if (error) throw error;
+                showToast("Tienda eliminada correctamente", "success");
+            } else {
+                // 1. Cleanup storage
+                await deleteStorageFolder('avatars', targetId);
+                await deleteStorageFolder('store-assets', targetId);
+                if (deletingItem.company?.id) {
+                    await deleteStorageFolder('product-images', deletingItem.company.id);
+                }
+                // 2. RPC Delete
+                const { error } = await supabase.rpc('admin_delete_user', { target_user_id: targetId });
+                if (error) throw error;
+                showToast("Usuario eliminado correctamente", "success");
+            }
+            fetchData();
+            setDeletingItem(null);
+        } catch (error) {
+            console.error('Delete error:', error);
+            showToast(error.message || "Error al eliminar", "error");
+        } finally {
+            setActionId(null);
+        }
+    };
+
 
     const updateRenewalDate = async (company, newDate) => {
         setActionId(company.id);
@@ -646,9 +700,6 @@ export default function AdminUsers() {
                                                         <Button size="icon" variant="ghost" title="Modo Observador" className="h-8 w-8 text-primary-500 hover:bg-primary-50" onClick={() => handleObserve(user)}>
                                                             <Eye size={16} />
                                                         </Button>
-                                                        <Button size="icon" variant="ghost" title="Editar" className="h-8 w-8 text-slate-400 hover:bg-slate-100" onClick={() => setEditingItem(user)}>
-                                                            <Edit2 size={16} />
-                                                        </Button>
                                                         <Button
                                                             size="icon" variant="ghost" disabled={actionId === user.user_id}
                                                             onClick={() => toggleBlockUser(user)}
@@ -657,6 +708,14 @@ export default function AdminUsers() {
                                                         >
                                                             {actionId === user.user_id ? <Loader2 size={16} className="animate-spin text-slate-400" /> :
                                                                 user.profiles?.status === 'active' ? <ShieldOff size={16} /> : <Shield size={16} />}
+                                                        </Button>
+                                                        <Button
+                                                            size="icon" variant="ghost" disabled={actionId === user.id}
+                                                            onClick={() => setDeletingItem({ id: user.id, name: user.name, type: 'store' })}
+                                                            title="Eliminar Tienda"
+                                                            className="h-8 w-8 text-slate-300 hover:text-red-600 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 size={16} />
                                                         </Button>
                                                     </div>
                                                 </td>
@@ -749,6 +808,11 @@ export default function AdminUsers() {
                                             {actionId === user.user_id ? <Loader2 size={16} className="animate-spin" /> :
                                                 user.profiles?.status === 'active' ? <ShieldOff size={18} /> : <Shield size={18} />}
                                         </Button>
+                                        <Button
+                                            size="icon" variant="ghost" className="h-10 w-10 bg-red-50 text-red-400 hover:text-red-600 rounded-xl"
+                                            disabled={actionId === user.id} onClick={() => setDeletingItem({ id: user.id, name: user.name, type: 'store' })}>
+                                            <Trash2 size={18} />
+                                        </Button>
                                     </div>
                                 </div>
                             </Card>
@@ -823,6 +887,14 @@ export default function AdminUsers() {
                                                             {actionId === user.id ? <Loader2 size={16} className="animate-spin text-slate-400" /> :
                                                                 user.status === 'active' ? <ShieldOff size={16} /> : <Shield size={16} />}
                                                         </Button>
+                                                        <Button
+                                                            size="icon" variant="ghost" disabled={actionId === user.id}
+                                                            onClick={() => setDeletingItem({ id: user.id, name: user.full_name || user.email, type: 'user', company: user.company })}
+                                                            title="Eliminar Usuario"
+                                                            className="h-8 w-8 text-slate-300 hover:text-red-600 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </Button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -882,6 +954,11 @@ export default function AdminUsers() {
                                             {actionId === user.id ? <Loader2 size={16} className="animate-spin" /> :
                                                 user.status === 'active' ? <ShieldOff size={18} /> : <Shield size={18} />}
                                         </Button>
+                                        <Button
+                                            size="icon" variant="ghost" className="h-10 w-10 bg-red-50 text-red-400 hover:text-red-600 rounded-xl"
+                                            disabled={actionId === user.id} onClick={() => setDeletingItem({ id: user.id, name: user.full_name || user.email, type: 'user', company: user.company })}>
+                                            <Trash2 size={18} />
+                                        </Button>
                                     </div>
                                 </div>
                             </Card>
@@ -914,6 +991,44 @@ export default function AdminUsers() {
                     onSave={() => { fetchData(); showToast("Cambios guardados exitosamente", "success"); }}
                 />
             )}
+
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deletingItem && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl"
+                        >
+                            <div className="p-8 text-center">
+                                <div className="h-20 w-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                    <AlertTriangle size={40} />
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900 mb-2">¿Eliminar {deletingItem.type === 'store' ? 'Tienda' : 'Usuario'}?</h2>
+                                <p className="text-slate-500 font-bold mb-8 leading-relaxed">
+                                    Estás a punto de eliminar permanentemente a <span className="text-red-500">"{deletingItem.name}"</span>.
+                                    Esta acción no se puede deshacer y borrará todos los datos asociados (productos, imágenes, etc).
+                                </p>
+
+                                <div className="flex gap-3">
+                                    <Button variant="ghost" onClick={() => setDeletingItem(null)} className="flex-1 h-14 rounded-2xl font-bold">
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        onClick={handleDelete}
+                                        disabled={actionId !== null}
+                                        className="flex-1 h-14 rounded-2xl font-black bg-red-600 text-white hover:bg-red-700 shadow-xl shadow-red-200"
+                                    >
+                                        {actionId !== null ? <Loader2 className="animate-spin" /> : 'Sí, Eliminar'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

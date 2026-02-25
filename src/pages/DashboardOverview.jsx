@@ -94,7 +94,7 @@ function PeriodSelector({ value, onChange }) {
 }
 
 export default function DashboardOverview() {
-    const { company: authCompany, user, loading: authLoading } = useAuth();
+    const { company: authCompany, user, profile, loading: authLoading } = useAuth();
     const { showToast } = useToast();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -335,7 +335,9 @@ export default function DashboardOverview() {
         </div>
     );
 
-    const displayName = isDemo ? (isDemoRestaurant ? 'Demo Restaurante' : 'Demo Tienda') : (user?.user_metadata?.full_name?.split(' ')[0] || 'Emprendedor');
+    const displayName = isDemo
+        ? (isDemoRestaurant ? 'Demo Restaurante' : 'Demo Tienda')
+        : (profile?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Emprendedor');
     const displayCompany = isDemo ? demoCompany : company;
 
     const handleDemoAction = () => {

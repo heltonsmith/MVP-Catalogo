@@ -58,7 +58,7 @@ export default function LoginPage() {
                 throw error;
             }
 
-            if (data?.user) {
+            if (data?.user && !error) {
                 console.log('LoginPage: Sign-in successful, waiting for profile...');
                 showToast("Sesión iniciada correctamente", "success");
 

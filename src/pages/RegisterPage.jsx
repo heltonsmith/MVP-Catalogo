@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Rocket, Instagram, Twitter, Linkedin, Globe, Phone, Loader2, BadgeCheck, TrendingUp, User, Search, Heart, Star, ShoppingBag } from 'lucide-react';
+import { Rocket, Instagram, Twitter, Linkedin, Globe, Phone, Loader2, BadgeCheck, TrendingUp, User, Search, Heart, Star, Smile, Cloud, Moon, Sun, Zap, Music, Camera, Coffee, ShoppingBag } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
@@ -9,7 +9,7 @@ import { LocationSelector } from '../components/ui/LocationSelector';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
-import { cn } from '../utils';
+import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl } from '../utils';
 
 const TikTokIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -17,12 +17,25 @@ const TikTokIcon = () => (
     </svg>
 );
 
+const CAPTCHA_ICONS = [
+    { id: 'heart', component: Heart, label: 'Corazón' },
+    { id: 'star', component: Star, label: 'Estrella' },
+    { id: 'smile', component: Smile, label: 'Cara Feliz' },
+    { id: 'cloud', component: Cloud, label: 'Nube' },
+    { id: 'moon', component: Moon, label: 'Luna' },
+    { id: 'sun', component: Sun, label: 'Sol' },
+    { id: 'zap', component: Zap, label: 'Rayo' },
+    { id: 'music', component: Music, label: 'Nota Musical' },
+    { id: 'camera', component: Camera, label: 'Cámara' },
+    { id: 'coffee', component: Coffee, label: 'Café' },
+];
+
 export default function RegisterPage() {
     const navigate = useNavigate();
     const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
-    const [captcha, setCaptcha] = useState({ q: '', a: null });
-    const [userCaptcha, setUserCaptcha] = useState('');
+    const [captcha, setCaptcha] = useState({ target: null, options: [] });
+    const [selectedIconId, setSelectedIconId] = useState(null);
     const { user, profile, signUp, loading: authLoading } = useAuth();
 
     // Handle redirection once we have the user and their profile
@@ -44,10 +57,14 @@ export default function RegisterPage() {
     }, [user, profile, authLoading, navigate]);
 
     const generateCaptcha = () => {
-        const n1 = Math.floor(Math.random() * 10) + 1;
-        const n2 = Math.floor(Math.random() * 10) + 1;
-        setCaptcha({ q: `${n1} + ${n2}`, a: n1 + n2 });
-        setUserCaptcha('');
+        // Shuffle and pick 5
+        const shuffled = [...CAPTCHA_ICONS].sort(() => 0.5 - Math.random());
+        const options = shuffled.slice(0, 5);
+        // Pick one as target
+        const target = options[Math.floor(Math.random() * options.length)];
+
+        setCaptcha({ target, options });
+        setSelectedIconId(null);
     };
 
     useEffect(() => {
@@ -81,43 +98,17 @@ export default function RegisterPage() {
         role: 'client' // Default to client as requested
     });
 
-    const validateRut = (rut) => {
-        if (!rut) return false;
-        let clean = rut.replace(/\./g, '').replace(/-/g, '').toUpperCase();
-        if (clean.length < 8) return false;
-
-        let dv = clean.slice(-1);
-        let num = clean.slice(0, -1);
-
-        let sum = 0;
-        let mul = 2;
-
-        for (let i = num.length - 1; i >= 0; i--) {
-            sum += parseInt(num.charAt(i)) * mul;
-            mul = mul === 7 ? 2 : mul + 1;
-        }
-
-        let res = 11 - (sum % 11);
-        let expectedDv = res === 11 ? '0' : res === 10 ? 'K' : res.toString();
-
-        return dv === expectedDv;
-    };
-
-    const formatRut = (rut) => {
-        let clean = rut.replace(/\./g, '').replace(/-/g, '').toUpperCase();
-        if (!clean) return '';
-
-        let dv = clean.slice(-1);
-        let num = clean.slice(0, -1);
-
-        return num.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + '-' + dv;
-    };
+    const validateRut = (rut) => sharedValidateRut(rut);
+    const formatRut = (rut) => sharedFormatRut(rut);
+    const validatePhone = (phone) => sharedValidatePhone(phone);
+    const formatPhone = (phone) => sharedFormatPhone(phone);
+    const isValidUrl = (url) => sharedIsValidUrl(url);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
 
         if (name === 'rut') {
-            const clean = value.replace(/\./g, '').replace(/-/g, '').toUpperCase();
+            const clean = value.replace(/[^0-9kK]/g, '').toUpperCase();
             if (clean.length <= 9) {
                 setFormData(prev => ({ ...prev, [name]: formatRut(value) }));
             }
@@ -125,10 +116,8 @@ export default function RegisterPage() {
         }
 
         if (name === 'whatsapp') {
-            if (!value.startsWith('+56')) {
-                setFormData(prev => ({ ...prev, [name]: '+56' }));
-                return;
-            }
+            setFormData(prev => ({ ...prev, [name]: formatPhone(value) }));
+            return;
         }
 
         if (name === 'isOnline') {
@@ -194,9 +183,38 @@ export default function RegisterPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        if (selectedIconId !== captcha.target?.id) {
+            showToast("Por favor selecciona la figura correcta.", "error");
+            return;
+        }
+
         if (formData.role === 'owner') {
             if (!validateRut(formData.rut)) {
-                showToast("RUT inválido. Por favor verifica los datos.", "error");
+                showToast("El RUT ingresado no es válido.", "error");
+                return;
+            }
+            if (!validatePhone(formData.whatsapp)) {
+                showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
+                return;
+            }
+            if (formData.website && !isValidUrl(formData.website)) {
+                showToast("El enlace de la web debe comenzar con https://", "error");
+                return;
+            }
+            if (formData.instagram && !isValidUrl(formData.instagram)) {
+                showToast("El enlace de Instagram debe comenzar con https://", "error");
+                return;
+            }
+            if (formData.tiktok && !isValidUrl(formData.tiktok)) {
+                showToast("El enlace de TikTok debe comenzar con https://", "error");
+                return;
+            }
+            if (formData.twitter && !isValidUrl(formData.twitter)) {
+                showToast("El enlace de Twitter debe comenzar con https://", "error");
+                return;
+            }
+            if (formData.linkedin && !isValidUrl(formData.linkedin)) {
+                showToast("El enlace de LinkedIn debe comenzar con https://", "error");
                 return;
             }
             if (!formData.location) {
@@ -222,12 +240,6 @@ export default function RegisterPage() {
 
             if (authError) throw authError;
 
-            if (parseInt(userCaptcha) !== captcha.a) {
-                showToast("Por favor resuelve el captcha correctamente.", "error");
-                setLoading(false);
-                return;
-            }
-
             if (authData?.user) {
                 // Check if this is the designated admin account
                 const isAdmin = formData.email.toLowerCase() === 'heltonsmith@hotmail.com';
@@ -250,7 +262,7 @@ export default function RegisterPage() {
                                 user_id: authData.user.id,
                                 name: formData.businessName,
                                 slug: slug,
-                                whatsapp: normalizePhone(formData.whatsapp),
+                                whatsapp: formData.whatsapp,
                                 business_type: formData.businessType,
                                 description: formData.description || `Bienvenidos a ${formData.businessName}`,
                                 features: {
@@ -387,6 +399,7 @@ export default function RegisterPage() {
                                         required
                                         value={formData.rut}
                                         onChange={handleChange}
+                                        error={formData.rut && !validateRut(formData.rut) ? "RUT inválido" : null}
                                         className="bg-white"
                                     />
                                 )}
@@ -514,10 +527,46 @@ export default function RegisterPage() {
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Presencia Digital</h3>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Input label="Web" name="website" placeholder="https://..." icon={<Globe size={16} />} value={formData.website} onChange={handleChange} className="bg-white" />
-                                    <Input label="Instagram" name="instagram" placeholder="@tu_cuenta" icon={<Instagram size={16} />} value={formData.instagram} onChange={handleChange} className="bg-white" />
-                                    <Input label="TikTok" name="tiktok" placeholder="@tu_cuenta" icon={<TikTokIcon />} value={formData.tiktok} onChange={handleChange} className="bg-white" />
-                                    <Input label="WhatsApp" name="whatsapp" placeholder="+569..." icon={<Phone size={16} />} value={formData.whatsapp} onChange={handleChange} className="bg-white" />
+                                    <Input
+                                        label="Web"
+                                        name="website"
+                                        placeholder="https://su-tienda.com"
+                                        icon={<Globe size={16} />}
+                                        value={formData.website}
+                                        onChange={handleChange}
+                                        error={formData.website && !isValidUrl(formData.website) ? "Debe usar https://" : null}
+                                        className="bg-white"
+                                    />
+                                    <Input
+                                        label="Instagram"
+                                        name="instagram"
+                                        placeholder="https://instagram.com/su-cuenta"
+                                        icon={<Instagram size={16} />}
+                                        value={formData.instagram}
+                                        onChange={handleChange}
+                                        error={formData.instagram && !isValidUrl(formData.instagram) ? "Debe usar https://" : null}
+                                        className="bg-white"
+                                    />
+                                    <Input
+                                        label="TikTok"
+                                        name="tiktok"
+                                        placeholder="https://tiktok.com/@su-cuenta"
+                                        icon={<TikTokIcon />}
+                                        value={formData.tiktok}
+                                        onChange={handleChange}
+                                        error={formData.tiktok && !isValidUrl(formData.tiktok) ? "Debe usar https://" : null}
+                                        className="bg-white"
+                                    />
+                                    <Input
+                                        label="WhatsApp"
+                                        name="whatsapp"
+                                        placeholder="+56..."
+                                        icon={<Phone size={16} />}
+                                        value={formData.whatsapp}
+                                        onChange={handleChange}
+                                        error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
+                                        className="bg-white"
+                                    />
                                 </div>
                             </div>
                         )}
@@ -559,21 +608,32 @@ export default function RegisterPage() {
                         {/* Bot Protection */}
                         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Protección</h3>
+                                <div className="space-y-1">
+                                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Protección</h3>
+                                    <p className="text-[10px] font-bold text-slate-400">Toca el/la <span className="text-primary-600 underline">{captcha.target?.label}</span></p>
+                                </div>
                                 <button type="button" onClick={generateCaptcha} className="text-[10px] font-black text-primary-600 hover:underline">REGENERAR</button>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex h-12 w-32 items-center justify-center rounded-xl bg-slate-50 border-2 border-slate-100 text-xl font-mono font-black text-primary-600 select-none shadow-inner">
-                                    {captcha.q} =
-                                </div>
-                                <Input
-                                    placeholder="?"
-                                    type="number"
-                                    required
-                                    value={userCaptcha}
-                                    onChange={(e) => setUserCaptcha(e.target.value)}
-                                    className="text-center font-black text-lg h-12"
-                                />
+
+                            <div className="grid grid-cols-5 gap-2">
+                                {captcha.options.map((item) => {
+                                    const Icon = item.component;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => setSelectedIconId(item.id)}
+                                            className={cn(
+                                                "h-14 flex items-center justify-center rounded-xl border-2 transition-all active:scale-95",
+                                                selectedIconId === item.id
+                                                    ? "bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-200"
+                                                    : "bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300"
+                                            )}
+                                        >
+                                            <Icon size={24} />
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 

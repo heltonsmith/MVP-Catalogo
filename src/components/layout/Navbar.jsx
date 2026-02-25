@@ -12,7 +12,7 @@ import { COMPANIES } from '../../data/mock';
 export function Navbar({ isLandingMode = false }) {
     const [isOpen, setIsOpen] = useState(false);
     const { carts } = useCart();
-    const { user, company, signOut, profile, unreadNotifications, refreshUnreadNotifications } = useAuth();
+    const { user, company, signOut, profile, unreadNotifications, refreshUnreadNotifications, isObserving } = useAuth();
     const [localCompany, setLocalCompany] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
@@ -361,7 +361,12 @@ export function Navbar({ isLandingMode = false }) {
                                             ) : (
                                                 <p className="font-bold text-slate-900">{company?.name || 'Mi Tienda'}</p>
                                             )}
-                                            <p className="text-xs text-slate-500">{user.email}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {profile?.role === 'admin' || profile?.role === 'super_admin'
+                                                    ? 'Admin Ktaloog'
+                                                    : (profile?.email || user?.email)
+                                                }
+                                            </p>
                                         </div>
                                     </div>
                                     <Link to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'} onClick={() => setIsOpen(false)}>

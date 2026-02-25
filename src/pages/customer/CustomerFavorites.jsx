@@ -18,7 +18,8 @@ import { useToast } from '../../components/ui/Toast';
 import { cn } from '../../utils';
 
 export default function CustomerFavorites() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const targetUserId = profile?.id || user?.id;
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [favorites, setFavorites] = useState([]);
@@ -29,10 +30,10 @@ export default function CustomerFavorites() {
     const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
-        if (user) {
+        if (targetUserId) {
             loadFavorites();
         }
-    }, [user]);
+    }, [targetUserId]);
 
     const loadFavorites = async () => {
         setLoading(true);
@@ -40,7 +41,7 @@ export default function CustomerFavorites() {
             const { data, error } = await supabase
                 .from('favorites')
                 .select('*, company:companies(*)')
-                .eq('user_id', user.id);
+                .eq('user_id', targetUserId);
 
             if (error) throw error;
 

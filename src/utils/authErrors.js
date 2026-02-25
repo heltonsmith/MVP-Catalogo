@@ -39,6 +39,9 @@ export const translateAuthError = (error) => {
     if (message.includes("Invalid format for email")) {
         return "El formato del correo electrónico no es válido.";
     }
+    if (message.includes("bloqueada por el administrador")) {
+        return message; // Already in Spanish from AuthContext
+    }
 
     // Default error mapping if no specific match
     console.warn("Untranslated auth error:", message);

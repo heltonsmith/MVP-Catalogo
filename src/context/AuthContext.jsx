@@ -144,20 +144,9 @@ export const AuthProvider = ({ children }) => {
                             } else {
                                 console.log('Auth: Already notified for this renewal date:', renewalDateStr);
                             }
-                        } else {
-                            // Store is active (renewal_date in the future)
-                            // Reset notification tracker so it re-arms for the next cycle
-                            if (data.last_notified_renewal_date) {
-                                await supabase.from('companies')
-                                    .update({ last_notified_renewal_date: null })
-                                    .eq('id', data.id);
-                                console.log('Auth: Notification tracker reset for active store');
-                            }
-                            setCompany(data);
                         }
-                    } else {
-                        setCompany(data);
                     }
+                    setCompany(data);
                 } else {
                     console.log('Auth: No company found for this user');
                     setCompany(null);
@@ -372,7 +361,39 @@ export const AuthProvider = ({ children }) => {
 
     const signIn = async (credentials) => {
         console.log('AuthContext: signIn called');
-        return await supabase.auth.signInWithPassword(credentials);
+        const { data, error } = await supabase.auth.signInWithPassword(credentials);
+
+        if (error) return { data, error };
+
+        // Verification: Check if user is blocked immediately
+        if (data?.user) {
+            try {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('status')
+                    .eq('id', data.user.id)
+                    .maybeSingle();
+
+                if (profileError) {
+                    console.error('Auth: Error checking profile status during sign-in:', profileError);
+                } else if (profileData?.status === 'blocked') {
+                    console.warn('Auth: Blocked user attempted login. Signing out.');
+                    await supabase.auth.signOut();
+                    return {
+                        data: null,
+                        error: {
+                            message: 'Tu cuenta ha sido bloqueada por el administrador. Contacta a soporte para más información.',
+                            isBlocked: true
+                        }
+                    };
+                }
+
+            } catch (err) {
+                console.error('Auth: Exception during sign-in check:', err);
+            }
+        }
+
+        return { data, error };
     };
 
     const signOut = async () => {

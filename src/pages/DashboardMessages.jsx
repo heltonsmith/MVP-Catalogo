@@ -76,7 +76,7 @@ export default function DashboardMessages() {
                     const customerIds = uniqueConversations.map(c => c.customer_id);
                     const { data: profiles } = await supabase
                         .from('profiles') // Assuming 'profiles' table exists and matches auth.users
-                        .select('id, full_name, email, avatar_url') // Adjust column names based on your schema
+                        .select('id, full_name, email, avatar_url, role') // Adjust column names based on your schema
                         .in('id', customerIds);
 
                     // Merge profile data
@@ -84,9 +84,9 @@ export default function DashboardMessages() {
                         const profile = profiles?.find(p => p.id === conv.customer_id);
                         return {
                             ...conv,
-                            customerName: profile?.full_name || profile?.email || 'Cliente',
-                            customerEmail: profile?.email,
-                            avatarUrl: profile?.avatar_url
+                            customerName: profile?.role === 'admin' ? 'Admin Ktalogoo' : (profile?.full_name || profile?.email || 'Cliente'),
+                            customerEmail: profile?.role === 'admin' ? 'admin@ktalogoo.com' : profile?.email,
+                            avatarUrl: profile?.role === 'admin' ? '/favicon-transparente.png' : profile?.avatar_url
                         };
                     });
                     setConversations(conversationsWithProfiles);
@@ -127,14 +127,14 @@ export default function DashboardMessages() {
                     if (newMessage.sender_type === 'customer') {
                         const { data: profile } = await supabase
                             .from('profiles')
-                            .select('full_name, email, avatar_url')
+                            .select('full_name, email, avatar_url, role')
                             .eq('id', newMessage.customer_id)
                             .single();
 
                         if (profile) {
-                            customerName = profile.full_name || profile.email;
-                            customerEmail = profile.email;
-                            customerAvatar = profile.avatar_url;
+                            customerName = profile.role === 'admin' ? 'Admin Ktalogoo' : (profile.full_name || profile.email);
+                            customerEmail = profile.role === 'admin' ? 'admin@ktalogoo.com' : profile.email;
+                            customerAvatar = profile.role === 'admin' ? '/favicon-transparente.png' : profile.avatar_url;
                         }
                     }
 
@@ -200,43 +200,7 @@ export default function DashboardMessages() {
         }
     };
 
-    if (authCompany?.plan === 'free') {
-        return (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-180px)] bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center relative overflow-hidden">
-                {/* Decorative Background */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-50 rounded-full -mr-32 -mt-32 blur-3xl opacity-50" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-50 rounded-full -ml-32 -mb-32 blur-3xl opacity-50" />
-
-                <div className="relative z-10 max-w-sm">
-                    <div className="h-20 w-20 bg-primary-100 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-primary-100/50">
-                        <MessageCircle size={40} className="text-primary-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-3">Mensajería PRO</h2>
-                    <p className="text-slate-500 mb-8 leading-relaxed">
-                        Chatea directamente con tus clientes desde tu panel y cierra más ventas. Esta función está disponible exclusivamente para usuarios <strong>PRO</strong>.
-                    </p>
-                    <div className="space-y-3">
-                        <Button
-                            className="w-full h-12 font-bold shadow-lg shadow-primary-100 bg-primary-600 hover:bg-primary-700"
-                            onClick={() => setShowUpgradeModal(true)}
-                        >
-                            <Zap size={18} className="mr-2 fill-current" />
-                            Mejorar a PRO ahora
-                        </Button>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                            Activación manual en menos de 24h
-                        </p>
-                    </div>
-                </div>
-
-                <PlanUpgradeModal
-                    isOpen={showUpgradeModal}
-                    onClose={() => setShowUpgradeModal(false)}
-                    companyId={authCompany.id}
-                />
-            </div>
-        );
-    }
+    const isFreePlan = (authCompany?.plan === 'free' || !authCompany?.plan);
 
     return (
         <div className="flex h-[calc(100vh-140px)] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden ring-1 ring-slate-100">
@@ -298,7 +262,7 @@ export default function DashboardMessages() {
                                         {new Date(conv.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 </div>
-                                <p className={cn("text-xs line-clamp-1", conv.is_read ? "text-slate-400" : "text-slate-600 font-semibold")}>
+                                <p className={cn("text-xs line-clamp-1", conv.is_read ? "text-slate-400" : "text-slate-600 font-semibold", isFreePlan && "blur-[3px] select-none")}>
                                     {conv.sender_type === 'store' ? 'Tú: ' : ''}{conv.content}
                                 </p>
                             </div>
@@ -356,35 +320,58 @@ export default function DashboardMessages() {
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 scroll-smooth">
-                            {messagesLoading ? (
-                                <div className="flex justify-center items-center h-full">
-                                    <Loader2 className="animate-spin text-primary-400" size={32} />
-                                </div>
-                            ) : messages.length === 0 ? (
-                                <div className="text-center text-slate-400 mt-10">No hay mensajes anteriores.</div>
-                            ) : (
-                                messages.map((msg) => (
-                                    <div key={msg.id} className={cn("flex flex-col max-w-[85%] md:max-w-[70%]", msg.sender_type === 'store' ? "ml-auto items-end" : "mr-auto items-start")}>
-                                        {msg.sender_type === 'store' && (
-                                            <span className="text-[10px] text-slate-400 mb-1 px-1">Tú</span>
-                                        )}
-                                        <div className={cn(
-                                            "px-5 py-3 shadow-sm text-sm relative group",
-                                            msg.sender_type === 'store'
-                                                ? "bg-primary-600 text-white rounded-2xl rounded-tr-sm"
-                                                : "bg-white text-slate-700 border border-slate-200 rounded-2xl rounded-tl-sm"
-                                        )}>
-                                            {msg.content}
-                                        </div>
-                                        <span className="text-[10px] text-slate-400 mt-1 px-1 font-medium flex items-center gap-1">
-                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            {msg.sender_type === 'store' && (
-                                                <Check size={12} className={cn(msg.is_read ? "text-blue-500" : "text-slate-300")} />
-                                            )}
-                                        </span>
+                        <div className="flex-1 overflow-hidden relative">
+                            <div className={cn("h-full overflow-y-auto p-6 space-y-6 bg-slate-50/50 scroll-smooth", isFreePlan && "blur-[8px] select-none pointer-events-none")}>
+                                {messagesLoading ? (
+                                    <div className="flex justify-center items-center h-full">
+                                        <Loader2 className="animate-spin text-primary-400" size={32} />
                                     </div>
-                                )))}
+                                ) : messages.length === 0 ? (
+                                    <div className="text-center text-slate-400 mt-10">No hay mensajes anteriores.</div>
+                                ) : (
+                                    messages.map((msg) => (
+                                        <div key={msg.id} className={cn("flex flex-col max-w-[85%] md:max-w-[70%]", msg.sender_type === 'store' ? "ml-auto items-end" : "mr-auto items-start")}>
+                                            {msg.sender_type === 'store' && (
+                                                <span className="text-[10px] text-slate-400 mb-1 px-1">Tú</span>
+                                            )}
+                                            <div className={cn(
+                                                "px-5 py-3 shadow-sm text-sm relative group",
+                                                msg.sender_type === 'store'
+                                                    ? "bg-primary-600 text-white rounded-2xl rounded-tr-sm"
+                                                    : "bg-white text-slate-700 border border-slate-200 rounded-2xl rounded-tl-sm"
+                                            )}>
+                                                {msg.content}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 mt-1 px-1 font-medium flex items-center gap-1">
+                                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {msg.sender_type === 'store' && (
+                                                    <Check size={12} className={cn(msg.is_read ? "text-blue-500" : "text-slate-300")} />
+                                                )}
+                                            </span>
+                                        </div>
+                                    )))}
+                            </div>
+
+                            {/* Paywall Overlay */}
+                            {isFreePlan && (
+                                <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-white/10 backdrop-blur-[2px]">
+                                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 max-w-sm text-center animate-in zoom-in-95 duration-300">
+                                        <div className="h-16 w-16 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                            <Zap size={32} className="fill-current" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-900 mb-3">Función Exclusiva</h3>
+                                        <p className="text-slate-500 font-bold text-sm mb-8 leading-relaxed">
+                                            Solo las tiendas con un plan de pago pueden ver los mensajes de sus potenciales clientes y cerrar ventas en tiempo real.
+                                        </p>
+                                        <Button
+                                            onClick={() => setShowUpgradeModal(true)}
+                                            className="w-full h-14 rounded-2xl font-black bg-primary-600 text-white hover:bg-primary-700 shadow-xl shadow-primary-200"
+                                        >
+                                            Ver planes de pago
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Input Area */}
@@ -394,22 +381,23 @@ export default function DashboardMessages() {
                                     <Input
                                         value={replyText}
                                         onChange={(e) => setReplyText(e.target.value)}
-                                        placeholder="Escribe un mensaje..."
-                                        className="border-none bg-transparent h-12 focus:ring-0 px-4 text-slate-700 placeholder:text-slate-400"
+                                        placeholder={isFreePlan ? "Mejora para chatear..." : "Escribe un mensaje..."}
+                                        disabled={isFreePlan}
+                                        className="border-none bg-transparent h-12 focus:ring-0 px-4 text-slate-700 placeholder:text-slate-400 disabled:opacity-50"
                                     />
                                 </div>
                                 <Button
                                     type="submit"
-                                    disabled={!replyText.trim()}
+                                    disabled={!replyText.trim() || isFreePlan}
                                     className={cn(
                                         "h-12 px-6 rounded-2xl font-bold shadow-lg transition-all flex items-center gap-2",
-                                        replyText.trim()
+                                        replyText.trim() && !isFreePlan
                                             ? "bg-primary-600 hover:bg-primary-700 shadow-primary-200 hover:scale-105 active:scale-95"
                                             : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
                                     )}
                                 >
                                     <span className="hidden md:inline">Enviar</span>
-                                    <Send size={18} className={cn(replyText.trim() && "fill-current")} />
+                                    <Send size={18} className={cn(replyText.trim() && !isFreePlan && "fill-current")} />
                                 </Button>
                             </form>
                         </div>
@@ -426,6 +414,12 @@ export default function DashboardMessages() {
                     </div>
                 )}
             </div>
+
+            <PlanUpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                companyId={authCompany?.id}
+            />
         </div>
     );
 }

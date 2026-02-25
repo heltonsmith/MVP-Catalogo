@@ -628,7 +628,7 @@ export default function HelpPage() {
                                             <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DESCRIPCIÓN ORIGINAL</span>
                                         </div>
-                                        <p className="text-slate-700 font-medium leading-relaxed">
+                                        <p className="text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
                                             {selectedTicket.description}
                                         </p>
 
@@ -665,7 +665,7 @@ export default function HelpPage() {
                                                 ? "bg-primary-600 text-white rounded-br-none"
                                                 : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"
                                         )}>
-                                            <p className="text-sm md:text-base leading-relaxed">{msg.text}</p>
+                                            <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                                             <div className={cn(
                                                 "mt-2 text-[10px] font-bold opacity-50 flex items-center gap-1",
                                                 msg.sender === 'client' ? "justify-end text-primary-100" : "text-slate-400"
@@ -780,16 +780,23 @@ export default function HelpPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] px-1">Descripción detallada</label>
-                                <TextArea
-                                    className="min-h-[150px] bg-slate-50 border-slate-100 rounded-3xl p-6 text-sm leading-relaxed"
-                                    placeholder="Explica detalladamente tu situación aquí..."
-                                    value={newTicket.description}
-                                    onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
-                                    required
-                                />
+                            <div className="flex items-center justify-between px-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Descripción detallada</label>
+                                <span className={cn(
+                                    "text-[10px] font-bold transition-colors",
+                                    (newTicket.description?.length || 0) >= 254 ? "text-rose-500" : "text-slate-300"
+                                )}>
+                                    {newTicket.description?.length || 0}/254
+                                </span>
                             </div>
+                            <TextArea
+                                className="min-h-[150px] bg-slate-50 border-slate-100 rounded-3xl p-6 text-sm leading-relaxed"
+                                placeholder="Explica detalladamente tu situación aquí..."
+                                value={newTicket.description}
+                                onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value.slice(0, 254) })}
+                                maxLength={254}
+                                required
+                            />
 
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between px-1">

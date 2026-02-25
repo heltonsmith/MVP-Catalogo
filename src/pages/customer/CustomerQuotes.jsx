@@ -11,7 +11,8 @@ import { formatCurrency } from '../../utils';
 import { Link } from 'react-router-dom';
 
 export default function CustomerQuotes() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const targetUserId = profile?.id || user?.id;
     const [loading, setLoading] = useState(true);
     const [quotes, setQuotes] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -75,7 +76,7 @@ export default function CustomerQuotes() {
             const { data, error } = await supabase
                 .from('whatsapp_quotes')
                 .select('*, company:companies(*)')
-                .eq('user_id', user.id)
+                .eq('user_id', targetUserId)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -90,10 +91,10 @@ export default function CustomerQuotes() {
 
 
     useEffect(() => {
-        if (user) {
+        if (targetUserId) {
             loadQuotes();
         }
-    }, [user]);
+    }, [targetUserId]);
 
     const confirmDelete = async () => {
         if (!quoteToDelete) return;

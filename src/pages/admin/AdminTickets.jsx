@@ -542,7 +542,7 @@ export default function AdminTickets() {
                                             <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DESCRIPCIÓN ORIGINAL</span>
                                         </div>
-                                        <p className="text-slate-700 font-medium leading-relaxed">
+                                        <p className="text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
                                             {selectedTicket.description}
                                         </p>
 
@@ -579,7 +579,7 @@ export default function AdminTickets() {
                                                 ? "bg-slate-900 text-white rounded-br-none"
                                                 : "bg-white text-slate-700 border border-slate-100 rounded-bl-none"
                                         )}>
-                                            <p className="text-sm md:text-base leading-relaxed">{msg.text}</p>
+                                            <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                                             <div className={cn(
                                                 "mt-2 text-[10px] font-bold opacity-50 flex items-center gap-1",
                                                 msg.sender === 'admin' ? "justify-end text-slate-300" : "text-slate-400"

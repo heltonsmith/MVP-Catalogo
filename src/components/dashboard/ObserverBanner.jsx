@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 
 export function ObserverBanner() {
-    const { isObserving, observerData, company, stopObserving } = useAuth();
+    const { isObserving, observerData, company, profile, stopObserving } = useAuth();
 
     if (!isObserving) return null;
 
@@ -16,7 +16,7 @@ export function ObserverBanner() {
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wider opacity-90">Modo Observador Activo</p>
                     <p className="text-sm font-black">
-                        Viendo como: <span className="underline decoration-2 underline-offset-2">{company?.name || 'Cargando...'}</span>
+                        Viendo como: <span className="underline decoration-2 underline-offset-2">{company?.name || profile?.full_name || 'Cargando...'}</span>
                     </p>
                 </div>
             </div>
@@ -24,7 +24,7 @@ export function ObserverBanner() {
             <div className="flex items-center gap-4">
                 <div className="hidden md:block text-right">
                     <p className="text-[10px] uppercase font-bold opacity-75">Sesión de Administrador</p>
-                    <p className="text-xs font-bold">{observerData?.adminProfile?.email}</p>
+                    <p className="text-xs font-bold">Admin Ktaloog</p>
                 </div>
                 <Button
                     onClick={stopObserving}

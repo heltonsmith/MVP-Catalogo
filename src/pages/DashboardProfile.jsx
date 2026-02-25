@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
-import { cn } from '../utils';
+import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl } from '../utils';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 
@@ -57,7 +57,7 @@ export default function DashboardProfile() {
         {
             id: 'demo-upgrade',
             title: '¡Plan Pro Activado! 🚀',
-            content: `Hola ${company.name}, nos complace informarte que tu solicitud de actualización al Plan Pro ha sido aprobada. Ya puedes disfrutar de todas las funciones avanzadas, incluyendo métricas detalladas e integración completa con WhatsApp.`,
+            content: `Hola ${company?.name || 'Tu Tienda'}, nos complace informarte que tu solicitud de actualización al Plan Pro ha sido aprobada. Ya puedes disfrutar de todas las funciones avanzadas, incluyendo métricas detalladas e integración completa con WhatsApp.`,
             type: 'system',
             created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
             is_read: false,
@@ -102,6 +102,9 @@ export default function DashboardProfile() {
         website: '',
         menuMode: false
     });
+
+    const validatePhone = (value) => sharedValidatePhone(value);
+    const isValidUrl = (url) => sharedIsValidUrl(url);
     const [passwords, setPasswords] = useState({
         current: '',
         new: '',
@@ -275,6 +278,25 @@ export default function DashboardProfile() {
             handleDemoAction("Guardar Información General");
             return;
         }
+
+        if (formData.whatsapp && !validatePhone(formData.whatsapp)) {
+            showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
+            return;
+        }
+
+        if (formData.website && !isValidUrl(formData.website)) {
+            showToast("El enlace de la web debe comenzar con https://", "error");
+            return;
+        }
+        if (formData.instagram && !isValidUrl(formData.instagram)) {
+            showToast("El enlace de Instagram debe comenzar con https://", "error");
+            return;
+        }
+        if (formData.tiktok && !isValidUrl(formData.tiktok)) {
+            showToast("El enlace de TikTok debe comenzar con https://", "error");
+            return;
+        }
+
         setLoading(true);
         try {
             const { error } = await supabase
@@ -737,10 +759,11 @@ export default function DashboardProfile() {
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Número de WhatsApp</label>
                                         <div className="flex gap-2">
                                             <Input
-                                                placeholder="Ej: +56912345678"
+                                                placeholder="Ej: +56XXXXXXXXX"
                                                 className="bg-slate-50 border-slate-100 flex-1 font-medium"
                                                 value={formData.whatsapp}
-                                                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                                                onChange={(e) => setFormData({ ...formData, whatsapp: formatPhone(e.target.value) })}
+                                                error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
                                             />
                                             <Button
                                                 size="sm"
@@ -748,6 +771,10 @@ export default function DashboardProfile() {
                                                 onClick={async () => {
                                                     if (isDemo) {
                                                         handleDemoAction("Guardar número de WhatsApp");
+                                                        return;
+                                                    }
+                                                    if (formData.whatsapp && !validatePhone(formData.whatsapp)) {
+                                                        showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
                                                         return;
                                                     }
                                                     try {
@@ -986,8 +1013,9 @@ export default function DashboardProfile() {
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">WhatsApp</label>
                                             <Input
                                                 value={formData.whatsapp}
-                                                onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                                                placeholder="+56 9 1234 5678"
+                                                onChange={(e) => setFormData({ ...formData, whatsapp: formatPhone(e.target.value) })}
+                                                placeholder="+56XXXXXXXXX"
+                                                error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1002,7 +1030,8 @@ export default function DashboardProfile() {
                                                 <Input
                                                     value={formData.instagram}
                                                     onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                                                    placeholder="@tu_cuenta"
+                                                    placeholder="https://instagram.com/su-cuenta"
+                                                    error={formData.instagram && !isValidUrl(formData.instagram) ? "Debe usar https://" : null}
                                                     className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                                 />
                                             </div>
@@ -1011,16 +1040,18 @@ export default function DashboardProfile() {
                                                 <Input
                                                     value={formData.tiktok}
                                                     onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
-                                                    placeholder="@tu_cuenta"
+                                                    placeholder="https://tiktok.com/@su-cuenta"
+                                                    error={formData.tiktok && !isValidUrl(formData.tiktok) ? "Debe usar https://" : null}
                                                     className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-medium text-slate-500 pl-1">Web</label>
+                                                <label className="text-[10px] font-medium text-slate-500 pl-1">Sitio Web</label>
                                                 <Input
                                                     value={formData.website}
                                                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                                                    placeholder="https://..."
+                                                    placeholder="https://su-tienda.com"
+                                                    error={formData.website && !isValidUrl(formData.website) ? "Debe usar https://" : null}
                                                     className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                                 />
                                             </div>

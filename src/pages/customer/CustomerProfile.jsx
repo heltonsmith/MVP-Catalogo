@@ -19,11 +19,12 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardContent } from '../../components/ui/Card';
 import { useToast } from '../../components/ui/Toast';
-import { cn } from '../../utils';
+import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone } from '../../utils';
 
 export default function CustomerProfile() {
     const navigate = useNavigate();
     const { user, profile, refreshProfile, signOut } = useAuth();
+    const targetUserId = profile?.id || user?.id;
     const { showToast } = useToast();
     const fileInputRef = useRef(null);
     const [loading, setLoading] = useState(false);
@@ -32,28 +33,17 @@ export default function CustomerProfile() {
 
     const [formData, setFormData] = useState({
         fullName: profile?.full_name || user?.user_metadata?.full_name || '',
-        email: user?.email || '',
+        email: profile?.email || user?.email || '',
         rut: profile?.rut || '',
         phone: profile?.phone || '',
         address: profile?.shipping_address || '',
         newPassword: ''
     });
 
-    const formatRUT = (value) => {
-        const clean = value.replace(/[^0-9kK]/g, '').substring(0, 9);
-        if (!clean) return '';
-        if (clean.length < 2) return clean.toUpperCase();
-
-        let rut = clean.substring(0, clean.length - 1);
-        let dv = clean.substring(clean.length - 1).toUpperCase();
-
-        let formatted = '';
-        while (rut.length > 3) {
-            formatted = '.' + rut.substring(rut.length - 3) + formatted;
-            rut = rut.substring(0, rut.length - 3);
-        }
-        return rut + formatted + '-' + dv;
-    };
+    const formatRUT = (value) => sharedFormatRut(value);
+    const validateRUT = (value) => sharedValidateRut(value);
+    const formatPhone = (value) => sharedFormatPhone(value);
+    const validatePhone = (value) => sharedValidatePhone(value);
 
     // Auto-populate when profile loads
     useEffect(() => {
@@ -75,7 +65,7 @@ export default function CustomerProfile() {
         setUploading(true);
         try {
             const fileExt = file.name.split('.').pop();
-            const filePath = `${user.id}/avatar.${fileExt}`;
+            const filePath = `${targetUserId}/avatar.${fileExt}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
@@ -90,9 +80,9 @@ export default function CustomerProfile() {
             const { error: updateError } = await supabase
                 .from('profiles')
                 .upsert({
-                    id: user.id,
+                    id: targetUserId,
                     avatar_url: publicUrl,
-                    email: user.email,
+                    email: profile?.email || user?.email,
                     full_name: profile?.full_name || user?.user_metadata?.full_name || ''
                 });
 
@@ -110,6 +100,17 @@ export default function CustomerProfile() {
 
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
+
+        if (formData.rut && !validateRUT(formData.rut)) {
+            showToast("El RUT ingresado no es válido", "error");
+            return;
+        }
+
+        if (formData.phone && !validatePhone(formData.phone)) {
+            showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -117,8 +118,8 @@ export default function CustomerProfile() {
             const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert({
-                    id: user.id,
-                    email: user.email,
+                    id: targetUserId,
+                    email: profile?.email || user?.email,
                     full_name: formData.fullName,
                     rut: formData.rut,
                     phone: formData.phone,
@@ -224,14 +225,16 @@ export default function CustomerProfile() {
                                             const formatted = formatRUT(e.target.value);
                                             setFormData(prev => ({ ...prev, rut: formatted }));
                                         }}
+                                        error={formData.rut && !validateRUT(formData.rut) ? "RUT inválido" : null}
                                         className="h-12 bg-slate-50 border-transparent focus:bg-white"
                                     />
                                     <Input
                                         label="Teléfono"
-                                        placeholder="+569..."
+                                        placeholder="+56..."
                                         type="tel"
                                         value={formData.phone}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+                                        error={formData.phone && formData.phone.length > 3 && !validatePhone(formData.phone) ? "WhatsApp inválido" : null}
                                         className="h-12 bg-slate-50 border-transparent focus:bg-white"
                                         icon={<Smartphone size={16} />}
                                     />

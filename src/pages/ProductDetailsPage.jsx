@@ -188,7 +188,7 @@ export default function ProductDetailsPage() {
                     company_id: company.id, // Store review also linked to company
                     product_id: product.id,
                     rating: tempReview.rating,
-                    comment: tempReview.comment,
+                    comment: tempReview.comment.slice(0, 150),
                     customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo'
                 }]);
 
@@ -207,7 +207,7 @@ export default function ProductDetailsPage() {
                         user_id: user.id,
                         date: new Date().toLocaleDateString(),
                         rating: tempReview.rating,
-                        comment: tempReview.comment
+                        comment: tempReview.comment.slice(0, 150)
                     },
                     ...(prev.reviews || [])
                 ];
@@ -230,15 +230,19 @@ export default function ProductDetailsPage() {
         if (!user || !editingReview) return;
 
         try {
-            const { error } = await supabase
-                .from('reviews')
-                .update({
-                    rating: tempReview.rating,
-                    comment: tempReview.comment,
-                    created_at: new Date().toISOString()
-                })
-                .eq('id', editingReview.id)
-                .eq('user_id', user.id);
+            let query = supabase.from('reviews').update({
+                rating: tempReview.rating,
+                comment: tempReview.comment.slice(0, 150),
+                customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
+                created_at: new Date().toISOString()
+            }).eq('id', editingReview.id);
+
+            // Admin bypass
+            if (profile?.role !== 'admin') {
+                query = query.eq('user_id', user.id);
+            }
+
+            const { error } = await query;
 
             if (error) throw error;
 
@@ -248,7 +252,7 @@ export default function ProductDetailsPage() {
             setProduct(prev => {
                 const updatedReviews = prev.reviews.map(r =>
                     r.id === editingReview.id
-                        ? { ...r, rating: tempReview.rating, comment: tempReview.comment }
+                        ? { ...r, rating: tempReview.rating, comment: tempReview.comment.slice(0, 150), user: profile?.full_name || user.user_metadata?.full_name || r.user }
                         : r
                 );
 
@@ -273,11 +277,13 @@ export default function ProductDetailsPage() {
         if (!confirm('¿Estás seguro de que quieres eliminar tu reseña?')) return;
 
         try {
-            const { error } = await supabase
-                .from('reviews')
-                .delete()
-                .eq('id', reviewId)
-                .eq('user_id', user.id);
+            let query = supabase.from('reviews').delete().eq('id', reviewId);
+
+            if (profile?.role !== 'admin') {
+                query = query.eq('user_id', user.id);
+            }
+
+            const { error } = await query;
 
             if (error) throw error;
 
@@ -575,8 +581,8 @@ export default function ProductDetailsPage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <StarRating rating={review.rating} size={12} />
-                                            {/* Edit/Delete Actions for Owner */}
-                                            {user && review.user_id === user.id && (
+                                            {/* Edit/Delete Actions for Owner or Admin */}
+                                            {user && (review.user_id === user.id || profile?.role === 'admin') && (
                                                 <div className="flex gap-1 ml-2">
                                                     <button
                                                         onClick={() => startEditReview(review)}
@@ -596,7 +602,7 @@ export default function ProductDetailsPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <p className="text-slate-600 text-sm italic leading-relaxed">"{review.comment}"</p>
+                                    <p className="text-slate-600 text-sm italic leading-relaxed break-words">"{review.comment}"</p>
                                 </div>
                             ))}
                         </div>
@@ -643,12 +649,18 @@ export default function ProductDetailsPage() {
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-slate-700">Tu comentario</label>
-                                <textarea
-                                    value={tempReview.comment}
-                                    onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value }))}
-                                    className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 min-h-[120px]"
-                                    placeholder="¿Qué te pareció el producto?"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        value={tempReview.comment}
+                                        onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
+                                        maxLength={150}
+                                        className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 min-h-[120px] resize-none"
+                                        placeholder="¿Qué te pareció el producto?"
+                                    />
+                                    <div className="absolute bottom-3 right-3 text-[10px] font-bold text-slate-400">
+                                        {tempReview.comment?.length || 0}/150
+                                    </div>
+                                </div>
                             </div>
 
                             <Button
@@ -699,7 +711,7 @@ export default function ProductDetailsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {user && review.user_id === user.id && (
+                                            {user && (review.user_id === user.id || profile?.role === 'admin') && (
                                                 <div className="flex items-center gap-1 mr-1">
                                                     <button
                                                         onClick={() => {
@@ -726,7 +738,7 @@ export default function ProductDetailsPage() {
                                             <StarRating rating={review.rating} size={12} />
                                         </div>
                                     </div>
-                                    <p className="text-slate-600 text-sm italic leading-relaxed pl-12">"{review.comment}"</p>
+                                    <p className="text-slate-600 text-sm italic leading-relaxed pl-12 break-words">"{review.comment}"</p>
                                 </div>
                             ))
                         ) : (
@@ -738,7 +750,7 @@ export default function ProductDetailsPage() {
                     </div>
 
                     {/* Quick Review Form inside Modal for Clients */}
-                    {user && !isOwner && (!hasReviewed || editingReview) && (
+                    {user && (profile?.role === 'admin' || (profile?.role !== 'owner' && (!hasReviewed || editingReview))) && (
                         <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-2">
                             <h4 className="text-sm font-bold text-slate-800 mb-4">
                                 {editingReview ? 'Actualiza tu opinión' : 'Comparte tu opinión'}
@@ -752,12 +764,18 @@ export default function ProductDetailsPage() {
                                         onRate={(val) => setTempReview(prev => ({ ...prev, rating: val }))}
                                     />
                                 </div>
-                                <textarea
-                                    value={tempReview.comment}
-                                    onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value }))}
-                                    className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 text-sm min-h-[80px]"
-                                    placeholder="¿Qué te pareció?"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        value={tempReview.comment}
+                                        onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
+                                        maxLength={150}
+                                        className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 text-sm min-h-[80px] resize-none"
+                                        placeholder="¿Qué te pareció?"
+                                    />
+                                    <div className="absolute bottom-3 right-3 text-[10px] font-bold text-slate-400">
+                                        {tempReview.comment?.length || 0}/150
+                                    </div>
+                                </div>
                                 <Button
                                     onClick={async () => {
                                         if (editingReview) await handleUpdateReview();

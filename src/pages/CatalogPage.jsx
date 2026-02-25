@@ -394,8 +394,8 @@ export default function CatalogPage() {
             return;
         }
 
-        if (isOwner) {
-            showToast("No puedes guardar tu propia tienda en favoritos", "warning");
+        if (isOwner || profile?.role === 'owner') {
+            showToast("No puedes guardar tiendas en favoritos si eres dueño de una tienda", "warning");
             return;
         }
 
@@ -483,10 +483,26 @@ export default function CatalogPage() {
         }
     };
 
-    const handleOpenProductReviews = (product) => {
+    const handleOpenProductReviews = async (product) => {
         setSelectedProductForReviews(product);
         setHasReviewedProduct(false);
         setTempProductReview({ rating: 0, comment: '' });
+
+        // Check if user already reviewed THIS product
+        if (user) {
+            try {
+                const { data } = await supabase
+                    .from('reviews')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('product_id', product.id)
+                    .maybeSingle();
+
+                if (data) setHasReviewedProduct(true);
+            } catch (e) {
+                console.error("Error checking product review", e);
+            }
+        }
     };
 
     const handleSubmitProductReview = async () => {
@@ -509,7 +525,7 @@ export default function CatalogPage() {
                     user_id: user.id,
                     customer_name: profile?.full_name || user.email.split('@')[0],
                     rating: tempProductReview.rating,
-                    comment: tempProductReview.comment
+                    comment: tempProductReview.comment.slice(0, 150)
                 });
 
             if (error) throw error;
@@ -556,15 +572,19 @@ export default function CatalogPage() {
         if (!user || !editingReview) return;
 
         try {
-            const { error } = await supabase
-                .from('reviews')
-                .update({
-                    rating: tempReview.rating,
-                    comment: tempReview.comment,
-                    created_at: new Date().toISOString() // Optional: update timestamp
-                })
-                .eq('id', editingReview.id)
-                .eq('user_id', user.id);
+            let query = supabase.from('reviews').update({
+                rating: tempReview.rating,
+                comment: tempReview.comment.slice(0, 150),
+                customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
+                created_at: new Date().toISOString()
+            }).eq('id', editingReview.id);
+
+            // Admin bypass of user_id check
+            if (profile?.role !== 'admin') {
+                query = query.eq('user_id', user.id);
+            }
+
+            const { error } = await query;
 
             if (error) throw error;
 
@@ -574,7 +594,7 @@ export default function CatalogPage() {
             setCompany(prev => {
                 const updatedReviews = prev.reviews.map(r =>
                     r.id === editingReview.id
-                        ? { ...r, rating: tempReview.rating, comment: tempReview.comment }
+                        ? { ...r, rating: tempReview.rating, comment: tempReview.comment.slice(0, 150), user: profile?.full_name || user.user_metadata?.full_name || r.user }
                         : r
                 );
 
@@ -600,11 +620,14 @@ export default function CatalogPage() {
         if (!confirm('¿Estás seguro de que quieres eliminar tu reseña?')) return;
 
         try {
-            const { error } = await supabase
-                .from('reviews')
-                .delete()
-                .eq('id', reviewId)
-                .eq('user_id', user.id);
+            let query = supabase.from('reviews').delete().eq('id', reviewId);
+
+            // Admin bypass of user_id check
+            if (profile?.role !== 'admin') {
+                query = query.eq('user_id', user.id);
+            }
+
+            const { error } = await query;
 
             if (error) throw error;
 
@@ -949,26 +972,28 @@ export default function CatalogPage() {
                                         </span>
                                     </div>
 
-                                    <div className="flex flex-col items-center gap-1">
-                                        <button
-                                            onClick={toggleFavorite}
-                                            className={cn(
-                                                "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
-                                                isFavorite
-                                                    ? "bg-rose-600/30 border-rose-500/50 text-white shadow-rose-500/20"
-                                                    : "bg-white/10 border-white/10 text-white hover:bg-white/20"
-                                            )}
-                                            title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                                        >
-                                            <Heart size={14} className={cn("transition-colors", isFavorite ? "text-rose-400 fill-rose-400" : "text-white/70")} />
-                                            <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
-                                                {favoriteCount.toLocaleString()} <span className="hidden lg:inline">{favoriteCount === 1 ? 'Favorito' : 'Favoritos'}</span>
+                                    {(!isOwner && profile?.role !== 'owner') && (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <button
+                                                onClick={toggleFavorite}
+                                                className={cn(
+                                                    "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
+                                                    isFavorite
+                                                        ? "bg-rose-600/30 border-rose-500/50 text-white shadow-rose-500/20"
+                                                        : "bg-white/10 border-white/10 text-white hover:bg-white/20"
+                                                )}
+                                                title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                                            >
+                                                <Heart size={14} className={cn("transition-colors", isFavorite ? "text-rose-400 fill-rose-400" : "text-white/70")} />
+                                                <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
+                                                    {favoriteCount.toLocaleString()} <span className="hidden lg:inline">{favoriteCount === 1 ? 'Favorito' : 'Favoritos'}</span>
+                                                </span>
+                                            </button>
+                                            <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
+                                                Favorito
                                             </span>
-                                        </button>
-                                        <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
-                                            Favorito
-                                        </span>
-                                    </div>
+                                        </div>
+                                    )}
 
                                     {/* Enviar Mensaje Button */}
                                     <div className="flex flex-col items-center gap-1">
@@ -1307,7 +1332,7 @@ export default function CatalogPage() {
                                                 {review.rating}
                                             </div>
                                             {/* Edit/Delete Actions for Owner */}
-                                            {user && review.user_id === user.id && (
+                                            {user && (review.user_id === user.id || profile?.role === 'admin') && (
                                                 <div className="flex gap-1 ml-2">
                                                     <button
                                                         onClick={() => startEditReview(review)}
@@ -1330,7 +1355,7 @@ export default function CatalogPage() {
                                     <div className="flex mb-2">
                                         <StarRating rating={review.rating} size={12} />
                                     </div>
-                                    <p className="text-slate-600 text-sm italic leading-relaxed">"{review.comment}"</p>
+                                    <p className="text-slate-600 text-sm italic leading-relaxed break-words">"{review.comment}"</p>
                                 </div>
                             ))
                         ) : (
@@ -1355,12 +1380,18 @@ export default function CatalogPage() {
                                         size={32}
                                     />
                                 </div>
-                                <textarea
-                                    className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-primary-600 focus:ring-1 focus:ring-primary-600 outline-none transition-all resize-none min-h-[100px]"
-                                    placeholder="Cuéntanos tu experiencia (opcional)..."
-                                    value={tempReview.comment}
-                                    onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value }))}
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-primary-600 focus:ring-1 focus:ring-primary-600 outline-none transition-all resize-none min-h-[100px]"
+                                        placeholder="Cuéntanos tu experiencia (opcional)..."
+                                        value={tempReview.comment}
+                                        onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
+                                        maxLength={150}
+                                    />
+                                    <div className="absolute bottom-3 right-3 text-[10px] font-bold text-slate-400">
+                                        {tempReview.comment?.length || 0}/150
+                                    </div>
+                                </div>
                                 <Button
                                     className="w-full"
                                     onClick={editingReview ? handleUpdateReview : handleSubmitReview}
@@ -1444,7 +1475,7 @@ export default function CatalogPage() {
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex items-center gap-2">
-                                                        {user && review.user_id === user.id && (
+                                                        {user && (review.user_id === user.id || profile?.role === 'admin') && (
                                                             <div className="flex items-center gap-1 mr-1">
                                                                 <button
                                                                     onClick={(e) => {
@@ -1474,7 +1505,7 @@ export default function CatalogPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-slate-600 text-sm italic leading-relaxed pl-12">"{review.comment}"</p>
+                                            <p className="text-slate-600 text-sm italic leading-relaxed pl-12 break-words">"{review.comment}"</p>
                                         </div>
                                     ))
                                 ) : (
@@ -1527,12 +1558,18 @@ export default function CatalogPage() {
                                                 </label>
                                                 <p className="text-[10px] text-slate-400">Cuéntanos qué te pareció el producto para ayudar a otros clientes.</p>
                                             </div>
-                                            <textarea
-                                                value={tempProductReview.comment}
-                                                onChange={(e) => setTempProductReview(prev => ({ ...prev, comment: e.target.value }))}
-                                                className="w-full rounded-2xl border-2 border-slate-100 bg-white focus:bg-white focus:border-primary-500 focus:ring-primary-500 min-h-[120px] text-sm transition-all placeholder:text-slate-350 p-4 shadow-inner"
-                                                placeholder="Ej: El producto es excelente, llegó muy rápido y la calidad es increíble..."
-                                            />
+                                            <div className="relative">
+                                                <textarea
+                                                    value={tempProductReview.comment}
+                                                    onChange={(e) => setTempProductReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
+                                                    maxLength={150}
+                                                    className="w-full rounded-2xl border-2 border-slate-100 bg-white focus:bg-white focus:border-primary-500 focus:ring-primary-500 min-h-[120px] text-sm transition-all placeholder:text-slate-350 p-4 shadow-inner resize-none h-auto"
+                                                    placeholder="Ej: El producto es excelente, llegó muy rápido y la calidad es increíble..."
+                                                />
+                                                <div className="absolute bottom-3 right-4 text-[10px] font-bold text-slate-400">
+                                                    {tempProductReview.comment?.length || 0}/150
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div className="pt-2 flex gap-3">
@@ -1551,15 +1588,17 @@ export default function CatalogPage() {
                                             <Button
                                                 onClick={editingReview ? async () => {
                                                     try {
-                                                        const { error } = await supabase
-                                                            .from('reviews')
-                                                            .update({
-                                                                rating: tempProductReview.rating,
-                                                                comment: tempProductReview.comment,
-                                                                created_at: new Date().toISOString()
-                                                            })
-                                                            .eq('id', editingReview.id)
-                                                            .eq('user_id', user.id);
+                                                        let query = supabase.from('reviews').update({
+                                                            rating: tempProductReview.rating,
+                                                            comment: tempProductReview.comment.slice(0, 150),
+                                                            created_at: new Date().toISOString()
+                                                        }).eq('id', editingReview.id);
+
+                                                        if (profile?.role !== 'admin') {
+                                                            query = query.eq('user_id', user.id);
+                                                        }
+
+                                                        const { error } = await query;
 
                                                         if (error) throw error;
                                                         showToast("¡Reseña actualizada!", "success");
@@ -1567,7 +1606,7 @@ export default function CatalogPage() {
                                                         // Update local products state
                                                         setProducts(prevProducts => prevProducts.map(p => {
                                                             if (p.id === selectedProductForReviews.id) {
-                                                                const newReviews = p.reviews.map(r => r.id === editingReview.id ? { ...r, rating: tempProductReview.rating, comment: tempProductReview.comment } : r);
+                                                                const newReviews = p.reviews.map(r => r.id === editingReview.id ? { ...r, rating: tempProductReview.rating, comment: tempProductReview.comment.slice(0, 150), user: profile?.full_name || user.user_metadata?.full_name || r.user } : r);
                                                                 const newRating = parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1));
                                                                 return { ...p, reviews: newReviews, rating: newRating };
                                                             }
@@ -1576,7 +1615,7 @@ export default function CatalogPage() {
 
                                                         // Update modal state
                                                         setSelectedProductForReviews(prev => {
-                                                            const newReviews = prev.reviews.map(r => r.id === editingReview.id ? { ...r, rating: tempProductReview.rating, comment: tempProductReview.comment } : r);
+                                                            const newReviews = prev.reviews.map(r => r.id === editingReview.id ? { ...r, rating: tempProductReview.rating, comment: tempProductReview.comment.slice(0, 150), user: profile?.full_name || user.user_metadata?.full_name || r.user } : r);
                                                             const newRating = parseFloat((newReviews.reduce((acc, r) => acc + r.rating, 0) / newReviews.length).toFixed(1));
                                                             return { ...prev, reviews: newReviews, rating: newRating };
                                                         });

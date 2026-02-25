@@ -23,6 +23,8 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
+import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
+import { Zap } from 'lucide-react';
 
 export default function InboxPage() {
     const { user, company, profile, loading: authLoading } = useAuth();
@@ -45,6 +47,7 @@ export default function InboxPage() {
     const messageContainerRef = useRef(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
     // Derive current role context
     // If user has a company, they might be acting as store owner. 
@@ -113,6 +116,7 @@ export default function InboxPage() {
     }, [searchParams, navigate]); // Removed dependencies that might cause loops with setActiveTab if not careful, but activeTab is needed for logic. Actually, activeTab is internal state. Let's stick to searchParams and navigate.
 
     const [activeTab, setActiveTab] = useState('buying');
+    const isPaywalled = activeTab === 'selling' && (company?.plan === 'free' || !company?.plan);
 
     // Initial tab selection: if user is a store owner, favor selling tab
     useEffect(() => {
@@ -320,15 +324,15 @@ export default function InboxPage() {
                 if (customerIds.length > 0) {
                     const { data: profiles } = await supabase
                         .from('profiles')
-                        .select('id, full_name, email, avatar_url')
+                        .select('id, full_name, email, avatar_url, role')
                         .in('id', customerIds);
 
                     data = customerIds.map(id => {
                         const prof = profiles?.find(p => p.id === id);
                         return {
                             id: id,
-                            name: prof?.full_name || prof?.email || 'Cliente',
-                            avatar: prof?.avatar_url,
+                            name: prof?.role === 'admin' ? 'Admin Ktalogoo' : (prof?.full_name || prof?.email || 'Cliente'),
+                            avatar: prof?.role === 'admin' ? '/favicon-transparente.png' : prof?.avatar_url,
                             lastMessage: groups[id].content,
                             date: groups[id].created_at,
                             unread: groups[id].count,
@@ -376,8 +380,15 @@ export default function InboxPage() {
                     const { data: comp } = await supabase.from('companies').select('id, name, logo, slug').eq('id', chatId).maybeSingle();
                     if (comp) setSelectedChatData({ id: chatId, name: comp.name, avatar: comp.logo, slug: comp.slug, role: 'store' });
                 } else {
-                    const { data: prof } = await supabase.from('profiles').select('id, full_name, email, avatar_url').eq('id', chatId).maybeSingle();
-                    if (prof) setSelectedChatData({ id: chatId, name: prof.full_name || prof.email, avatar: prof.avatar_url, role: 'customer' });
+                    const { data: prof } = await supabase.from('profiles').select('id, full_name, email, avatar_url, role').eq('id', chatId).maybeSingle();
+                    if (prof) {
+                        setSelectedChatData({
+                            id: chatId,
+                            name: prof.role === 'admin' ? 'Admin Ktalogoo' : (prof.full_name || prof.email),
+                            avatar: prof.role === 'admin' ? '/favicon-transparente.png' : prof.avatar_url,
+                            role: 'customer'
+                        });
+                    }
                 }
             }
 
@@ -640,7 +651,8 @@ export default function InboxPage() {
                                             <div className="flex justify-between items-center">
                                                 <p className={cn(
                                                     "text-xs truncate max-w-[140px]",
-                                                    chat.unread > 0 ? "font-bold text-slate-900" : "text-slate-500"
+                                                    chat.unread > 0 ? "font-bold text-slate-900" : "text-slate-500",
+                                                    isPaywalled && "blur-[3px] select-none"
                                                 )}>
                                                     {chat.lastMessage}
                                                 </p>
@@ -722,73 +734,96 @@ export default function InboxPage() {
                             {/* Messages List */}
                             <div
                                 ref={messageContainerRef}
-                                className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50 custom-scrollbar"
+                                className="flex-1 overflow-hidden relative bg-slate-50/50"
                             >
-                                {messages.map((msg, idx) => {
-                                    const isMe = activeTab === 'buying' ? msg.sender_type === 'customer' : msg.sender_type === 'store';
-                                    const showTime = idx === messages.length - 1 || messages[idx + 1].sender_type !== msg.sender_type;
+                                <div className={cn("h-full overflow-y-auto p-6 space-y-4 custom-scrollbar", isPaywalled && "blur-[8px] select-none pointer-events-none")}>
+                                    {messages.map((msg, idx) => {
+                                        const isMe = activeTab === 'buying' ? msg.sender_type === 'customer' : msg.sender_type === 'store';
+                                        const showTime = idx === messages.length - 1 || messages[idx + 1].sender_type !== msg.sender_type;
 
-                                    return (
-                                        <div key={msg.id} className={cn("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
-                                            <div className={cn(
-                                                "px-4 py-2.5 text-sm rounded-2xl shadow-sm relative group break-words min-w-[80px]",
-                                                isMe ? "bg-primary-600 text-white rounded-tr-sm" : "bg-white text-slate-800 border border-slate-100 rounded-tl-sm"
-                                            )}>
-                                                {editingMessageId === msg.id ? (
-                                                    <div className="flex items-center gap-2 min-w-[120px]">
-                                                        <input
-                                                            value={editText}
-                                                            onChange={e => setEditText(e.target.value)}
-                                                            className="bg-white/20 text-white border-none rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-white/50 placeholder-white/50"
-                                                            autoFocus
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') saveEdit(msg.id);
-                                                                if (e.key === 'Escape') cancelEditing();
-                                                            }}
-                                                        />
-                                                        <button onClick={() => saveEdit(msg.id)} className="p-1 hover:bg-white/20 rounded"><Check size={14} /></button>
-                                                        <button onClick={cancelEditing} className="p-1 hover:bg-white/20 rounded"><X size={14} /></button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col gap-1">
-                                                        {msg.content}
-                                                        {(msg.updated_at && msg.updated_at !== msg.created_at || msg.is_edited) && (
-                                                            <span className={cn("text-[9px] mt-0.5", isMe ? "text-white/60" : "text-slate-400")}>
-                                                                (editado)
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
+                                        return (
+                                            <div key={msg.id} className={cn("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
+                                                <div className={cn(
+                                                    "px-4 py-2.5 text-sm rounded-2xl shadow-sm relative group break-words min-w-[80px]",
+                                                    isMe ? "bg-primary-600 text-white rounded-tr-sm" : "bg-white text-slate-800 border border-slate-100 rounded-tl-sm"
+                                                )}>
+                                                    {editingMessageId === msg.id ? (
+                                                        <div className="flex items-center gap-2 min-w-[120px]">
+                                                            <input
+                                                                value={editText}
+                                                                onChange={e => setEditText(e.target.value)}
+                                                                className="bg-white/20 text-white border-none rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-white/50 placeholder-white/50"
+                                                                autoFocus
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') saveEdit(msg.id);
+                                                                    if (e.key === 'Escape') cancelEditing();
+                                                                }}
+                                                            />
+                                                            <button onClick={() => saveEdit(msg.id)} className="p-1 hover:bg-white/20 rounded"><Check size={14} /></button>
+                                                            <button onClick={cancelEditing} className="p-1 hover:bg-white/20 rounded"><X size={14} /></button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-1">
+                                                            {msg.content}
+                                                            {(msg.updated_at && msg.updated_at !== msg.created_at || msg.is_edited) && (
+                                                                <span className={cn("text-[9px] mt-0.5", isMe ? "text-white/60" : "text-slate-400")}>
+                                                                    (editado)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
 
-                                                {isMe && !editingMessageId && (
-                                                    <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); startEditing(msg); }}
-                                                            className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-primary-600 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
-                                                            title="Editar"
-                                                        >
-                                                            <Pencil size={12} />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                            className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
-                                                            title="Eliminar"
-                                                        >
-                                                            <Trash2 size={12} />
-                                                        </button>
-                                                    </div>
+                                                    {isMe && !editingMessageId && (
+                                                        <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); startEditing(msg); }}
+                                                                className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-primary-600 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
+                                                                title="Editar"
+                                                            >
+                                                                <Pencil size={12} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                                className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
+                                                                title="Eliminar"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {showTime && (
+                                                    <span className="text-[10px] text-slate-400 mt-1 px-1 flex items-center gap-1 font-medium">
+                                                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        {isMe && <Check size={12} className={cn(msg.is_read ? "text-blue-500" : "text-slate-300")} />}
+                                                    </span>
                                                 )}
                                             </div>
-                                            {showTime && (
-                                                <span className="text-[10px] text-slate-400 mt-1 px-1 flex items-center gap-1 font-medium">
-                                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    {isMe && <Check size={12} className={cn(msg.is_read ? "text-blue-500" : "text-slate-300")} />}
-                                                </span>
-                                            )}
+                                        );
+                                    })}
+                                    <div ref={messagesEndRef} />
+                                </div>
+
+                                {/* Paywall Overlay */}
+                                {isPaywalled && (
+                                    <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-white/10 backdrop-blur-[2px]">
+                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 max-w-sm text-center animate-in zoom-in-95 duration-300">
+                                            <div className="h-16 w-16 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                                <Zap size={32} className="fill-current" />
+                                            </div>
+                                            <h3 className="text-xl font-black text-slate-900 mb-3">Función Exclusiva</h3>
+                                            <p className="text-slate-500 font-bold text-sm mb-8 leading-relaxed">
+                                                Solo las tiendas con un plan de pago pueden ver los mensajes de sus potenciales clientes y cerrar ventas en tiempo real.
+                                            </p>
+                                            <Button
+                                                onClick={() => setShowUpgradeModal(true)}
+                                                className="w-full h-14 rounded-2xl font-black bg-primary-600 text-white hover:bg-primary-700 shadow-xl shadow-primary-200"
+                                            >
+                                                Ver planes de pago
+                                            </Button>
                                         </div>
-                                    );
-                                })}
-                                <div ref={messagesEndRef} />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Input */}
@@ -798,12 +833,13 @@ export default function InboxPage() {
                                         <Input
                                             value={messageText}
                                             onChange={e => setMessageText(e.target.value)}
-                                            placeholder="Escribe un mensaje..."
-                                            className="border-none bg-transparent h-11 focus:ring-0 text-slate-800 placeholder:text-slate-400"
+                                            placeholder={isPaywalled ? "Mejora para chatear..." : "Escribe un mensaje..."}
+                                            disabled={isPaywalled}
+                                            className="border-none bg-transparent h-11 focus:ring-0 text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
                                         />
                                     </div>
-                                    <Button type="submit" disabled={!messageText.trim()} className="h-11 w-11 rounded-xl p-0 flex items-center justify-center bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-200 hover:scale-105 active:scale-95 transition-all">
-                                        <Send size={18} className={cn(messageText.trim() && "ml-0.5")} />
+                                    <Button type="submit" disabled={!messageText.trim() || isPaywalled} className="h-11 w-11 rounded-xl p-0 flex items-center justify-center bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-200 hover:scale-105 active:scale-95 transition-all">
+                                        <Send size={18} className={cn(messageText.trim() && !isPaywalled && "ml-0.5")} />
                                     </Button>
                                 </form>
                             </div>
@@ -858,6 +894,12 @@ export default function InboxPage() {
                     </div>
                 </div>
             </Modal>
+
+            <PlanUpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                companyId={company?.id}
+            />
         </div>
     );
 }

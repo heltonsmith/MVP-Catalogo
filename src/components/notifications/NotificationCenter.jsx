@@ -210,11 +210,11 @@ export function NotificationCenter() {
                                                 onClick={() => handleSelect(notification.id)}
                                             >
                                                 <div className="flex-shrink-0 mt-0.5">
-                                                    {notification.metadata?.actor_avatar ? (
+                                                    {notification.metadata?.actor_avatar || (notification.metadata?.actor_role === 'admin') ? (
                                                         <div className="h-9 w-9 rounded-2xl overflow-hidden shadow-sm border border-white ring-2 ring-slate-100">
                                                             <img
-                                                                src={notification.metadata.actor_avatar}
-                                                                alt={notification.metadata.customer_name || 'Avatar'}
+                                                                src={notification.metadata?.actor_role === 'admin' ? '/favicon-transparente.png' : notification.metadata.actor_avatar}
+                                                                alt={notification.metadata?.actor_role === 'admin' ? 'Admin Ktalogoo' : (notification.metadata.customer_name || 'Avatar')}
                                                                 className="h-full w-full object-cover"
                                                                 onError={(e) => {
                                                                     e.target.onerror = null;
@@ -244,17 +244,25 @@ export function NotificationCenter() {
                                                         )}>
                                                             {notification.type === 'review' && notification.metadata?.customer_name ? (
                                                                 <>
-                                                                    <span className="font-extrabold">{notification.metadata.customer_name}</span>
+                                                                    <span className="font-extrabold">{notification.metadata?.actor_role === 'admin' ? 'Admin Ktalogoo' : notification.metadata.customer_name}</span>
                                                                     <span className="font-normal opacity-80"> calificó tu {notification.metadata.product_slug ? 'producto' : 'tienda'}</span>
                                                                 </>
-                                                            ) : notification.title}
+                                                            ) : (
+                                                                notification.metadata?.actor_role === 'admin'
+                                                                    ? notification.title.replace(/.*(?= te ha enviado)/, 'Admin Ktalogoo') // Try to mask name in title
+                                                                    : notification.title
+                                                            )}
                                                         </p>
                                                         <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap">
                                                             {formatTime(notification.created_at)}
                                                         </span>
                                                     </div>
                                                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                                                        {notification.metadata?.comment || notification.content}
+                                                        {notification.metadata?.comment || (
+                                                            notification.metadata?.actor_role === 'admin' && notification.content
+                                                                ? notification.content.replace(/.*(?= te ha enviado)/, 'Admin Ktalogoo')
+                                                                : notification.content
+                                                        )}
                                                     </p>
 
                                                     {notification.type === 'stock' && notification.metadata?.company_slug && (

@@ -27,7 +27,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
 export default function CustomerReviews() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const targetUserId = profile?.id || user?.id;
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [reviews, setReviews] = useState([]);
@@ -45,10 +46,10 @@ export default function CustomerReviews() {
     const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
-        if (user) {
+        if (targetUserId) {
             loadReviews();
         }
-    }, [user]);
+    }, [targetUserId]);
 
     const loadReviews = async () => {
         setLoading(true);
@@ -56,7 +57,7 @@ export default function CustomerReviews() {
             const { data, error } = await supabase
                 .from('reviews')
                 .select('*, company:companies(*)')
-                .eq('user_id', user.id)
+                .eq('user_id', targetUserId)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -91,7 +92,8 @@ export default function CustomerReviews() {
                 .from('reviews')
                 .update({
                     rating: editRating,
-                    comment: editComment
+                    comment: editComment.slice(0, 150),
+                    customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo'
                 })
                 .eq('id', editingReview.id);
 
@@ -232,7 +234,7 @@ export default function CustomerReviews() {
                                                     </div>
 
                                                     <div className="flex-1 min-w-0 bg-white md:bg-transparent rounded-2xl md:rounded-none p-4 md:p-0 border md:border-none border-slate-100">
-                                                        <p className="text-sm text-slate-600 leading-relaxed italic">
+                                                        <p className="text-sm text-slate-600 leading-relaxed italic break-words">
                                                             "{review.comment}"
                                                         </p>
                                                         {review.reply && (
@@ -356,10 +358,14 @@ export default function CustomerReviews() {
                         </div>
 
                         <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tu Comentario</p>
+                            <div className="flex justify-between items-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tu Comentario</p>
+                                <span className="text-[10px] font-bold text-slate-400">{editComment?.length || 0}/150</span>
+                            </div>
                             <textarea
                                 value={editComment}
-                                onChange={(e) => setEditComment(e.target.value)}
+                                onChange={(e) => setEditComment(e.target.value.slice(0, 150))}
+                                maxLength={150}
                                 className="w-full h-32 p-4 bg-slate-50 border-none rounded-2xl text-sm text-slate-600 focus:ring-2 focus:ring-primary-500 transition-all resize-none"
                                 placeholder="Cuéntanos más sobre tu experiencia..."
                             />
