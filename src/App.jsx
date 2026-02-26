@@ -12,8 +12,12 @@ function App() {
       <ScrollToTop />
       <CartProvider>
         <ToastProvider>
-          <ObserverBanner />
-          <AppRouter />
+          <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50">
+            <ObserverBanner />
+            <div className="flex-1 flex flex-col min-h-0 relative">
+              <AppRouter />
+            </div>
+          </div>
         </ToastProvider>
       </CartProvider>
     </Router>

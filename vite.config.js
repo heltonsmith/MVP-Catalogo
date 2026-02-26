@@ -9,8 +9,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['lucide-react', 'framer-motion', 'clsx', 'tailwind-merge']
+          vendor: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
+          icons: ['lucide-react'],
+          animation: ['framer-motion'],
+          utils: ['clsx', 'tailwind-merge']
         }
       }
     }

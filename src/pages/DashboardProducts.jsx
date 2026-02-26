@@ -178,9 +178,12 @@ export default function DashboardProducts() {
             // 1. Delete images from storage first
             if (productToDelete?.product_images?.length > 0) {
                 const imagePaths = productToDelete.product_images.map(img => {
-                    // Extract path from URL: .../public/product-images/[path]
-                    const urlParts = img.image_url.split('/product-images/');
-                    return urlParts.length > 1 ? urlParts[1] : null;
+                    const parts = img.image_url.split('/product-images/');
+                    if (parts.length > 1) {
+                        const rawPath = parts[1];
+                        return rawPath.split('?')[0].split('#')[0];
+                    }
+                    return null;
                 }).filter(Boolean);
 
                 if (imagePaths.length > 0) {

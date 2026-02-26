@@ -19,7 +19,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardContent } from '../../components/ui/Card';
 import { useToast } from '../../components/ui/Toast';
-import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone } from '../../utils';
+import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, resizeImage } from '../../utils';
 
 export default function CustomerProfile() {
     const navigate = useNavigate();
@@ -62,21 +62,36 @@ export default function CustomerProfile() {
         const file = e.target.files[0];
         if (!file) return;
 
+        if (file.size > 50 * 1024 * 1024) {
+            showToast("La imagen debe ser menor a 50MB", "error");
+            return;
+        }
+
         setUploading(true);
         try {
-            const fileExt = file.name.split('.').pop();
-            const filePath = `${targetUserId}/avatar.${fileExt}`;
+            // Optimize image before upload (256x256, JPEG, 0.8 quality)
+            const optimizedBlob = await resizeImage(file, { maxWidth: 256, maxHeight: 256, quality: 0.8 });
 
+            const fileExt = 'jpg';
+            const fileName = `avatar-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `${targetUserId}/${fileName}`;
+
+            // 1. Upload new avatar
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
-                .upload(filePath, file, { upsert: true });
+                .upload(filePath, optimizedBlob);
 
             if (uploadError) throw uploadError;
 
+            // 2. Get public URL
             const { data: { publicUrl } } = supabase.storage
                 .from('avatars')
                 .getPublicUrl(filePath);
 
+            // 3. Keep track of old avatar URL to delete later
+            const oldAvatarUrl = profile?.avatar_url;
+
+            // 4. Update profile record
             const { error: updateError } = await supabase
                 .from('profiles')
                 .upsert({
@@ -86,7 +101,25 @@ export default function CustomerProfile() {
                     full_name: profile?.full_name || user?.user_metadata?.full_name || ''
                 });
 
-            if (updateError) throw updateError;
+            if (updateError) {
+                // ROLLBACK: Delete the newly uploaded avatar if DB update fails
+                console.log('Rolling back avatar due to DB error:', filePath);
+                await supabase.storage.from('avatars').remove([filePath]);
+                throw updateError;
+            }
+
+            // 5. Cleanup OLD avatar file from storage if it exists
+            if (oldAvatarUrl && oldAvatarUrl.includes('/avatars/')) {
+                const parts = oldAvatarUrl.split('/avatars/');
+                if (parts.length > 1) {
+                    const rawPath = parts[1];
+                    const cleanPath = rawPath.split('?')[0].split('#')[0];
+                    if (cleanPath) {
+                        console.log('Cleaning up old avatar (profile):', cleanPath);
+                        supabase.storage.from('avatars').remove([cleanPath]).catch(console.error);
+                    }
+                }
+            }
 
             await refreshProfile();
             showToast("Foto de perfil actualizada", "success");
@@ -168,9 +201,15 @@ export default function CustomerProfile() {
                                 ) : (
                                     <User className="h-16 w-16 text-slate-200" />
                                 )}
-                                {uploading && (
+                                {uploading ? (
                                     <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center">
                                         <Loader2 className="animate-spin text-primary-600" size={24} />
+                                    </div>
+                                ) : (
+                                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer">
+                                        <Camera className="text-white mb-1" size={24} />
+                                        <span className="text-[10px] text-white font-bold">Cambiar</span>
+                                        <span className="text-[8px] text-white/80 mt-1 uppercase tracking-tighter">Máx 50MB</span>
                                     </div>
                                 )}
                             </div>

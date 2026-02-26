@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+export * from './images';
 
 export function cn(...inputs) {
     return twMerge(clsx(inputs));

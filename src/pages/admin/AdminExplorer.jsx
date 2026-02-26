@@ -5,7 +5,6 @@ import {
     MapPin,
     TrendingUp,
     Eye,
-    Star,
     Building2,
     Clock,
     ChevronRight,
@@ -16,9 +15,6 @@ import {
     Utensils,
     LayoutGrid,
     Sparkles,
-    ShieldCheck,
-    XCircle,
-    CheckCircle2
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -41,43 +37,18 @@ const TABS = [
     { id: 'recent', label: 'Recientes', icon: <Clock size={16} /> },
     { id: 'popular', label: 'Más Vistas', icon: <Eye size={16} /> },
     { id: 'quoted', label: 'Más Cotizadas', icon: <TrendingUp size={16} /> },
-    { id: 'sponsored', label: 'Patrocinadas', icon: <Star size={16} /> },
-    { id: 'upgrades', label: 'Solicitudes Pro', icon: <Sparkles size={16} /> },
 ];
 
 export default function AdminExplorer() {
     const [companies, setCompanies] = useState([]);
-    const [upgradeRequests, setUpgradeRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('recent');
-    const [managingUpgrade, setManagingUpgrade] = useState(null);
     const [search, setSearch] = useState('');
     const [location, setLocation] = useState('');
     const [activeFilter, setActiveFilter] = useState('all');
 
-    const fetchUpgradeRequests = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('upgrade_requests')
-                .select('*, companies(*)')
-                .eq('status', 'pending')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setUpgradeRequests(data || []);
-        } catch (error) {
-            console.error('Error fetching upgrade requests:', error);
-        }
-    };
 
     const fetchCompanies = async () => {
-        if (activeTab === 'upgrades') {
-            setLoading(true);
-            await fetchUpgradeRequests();
-            setLoading(false);
-            return;
-        }
-
         setLoading(true);
         try {
             let query = supabase.from('companies').select('*');
@@ -101,8 +72,6 @@ export default function AdminExplorer() {
                 query = query.order('views_count', { ascending: false });
             } else if (activeTab === 'quoted') {
                 query = query.order('quotes_count', { ascending: false });
-            } else if (activeTab === 'sponsored') {
-                query = query.eq('is_sponsored', true).order('created_at', { ascending: false });
             }
 
             const { data, error } = await query.limit(50);
@@ -115,47 +84,6 @@ export default function AdminExplorer() {
         }
     };
 
-    const handleApproveUpgrade = async (request) => {
-        setManagingUpgrade(request.id);
-        try {
-            const { error: requestError } = await supabase
-                .from('upgrade_requests')
-                .update({ status: 'approved', processed_at: new Date().toISOString() })
-                .eq('id', request.id);
-            if (requestError) throw requestError;
-
-            const { error: companyError } = await supabase
-                .from('companies')
-                .update({ plan: request.requested_plan })
-                .eq('id', request.company_id);
-            if (companyError) throw companyError;
-
-            setUpgradeRequests(prev => prev.filter(r => r.id !== request.id));
-            alert(`Plan ${request.requested_plan} activado correctamente para ${request.companies.name}`);
-        } catch (error) {
-            console.error('Error approving upgrade:', error);
-            alert("Error al procesar la aprobación");
-        } finally {
-            setManagingUpgrade(null);
-        }
-    };
-
-    const handleRejectUpgrade = async (id) => {
-        setManagingUpgrade(id);
-        try {
-            const { error } = await supabase
-                .from('upgrade_requests')
-                .update({ status: 'rejected', processed_at: new Date().toISOString() })
-                .eq('id', id);
-            if (error) throw error;
-            setUpgradeRequests(prev => prev.filter(r => r.id !== id));
-        } catch (error) {
-            console.error('Error rejecting upgrade:', error);
-            alert("Error al rechazar la solicitud");
-        } finally {
-            setManagingUpgrade(null);
-        }
-    };
 
     useEffect(() => {
         const timer = setTimeout(fetchCompanies, 300);
@@ -276,64 +204,6 @@ export default function AdminExplorer() {
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <Loader2 className="h-12 w-12 animate-spin text-primary-600" />
                         <p className="text-slate-500 font-bold animate-pulse">Sincronizando datos...</p>
-                    </div>
-                ) : activeTab === 'upgrades' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {upgradeRequests.map((request) => (
-                            <Card key={request.id} className="border-none shadow-xl shadow-slate-200/50 bg-white rounded-3xl overflow-hidden ring-1 ring-slate-100">
-                                <CardContent className="p-6">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center p-1 border border-slate-100 shadow-sm">
-                                            {request.companies.logo ? (
-                                                <img src={request.companies.logo} className="w-full h-full object-cover rounded-xl" />
-                                            ) : (
-                                                <Store className="text-slate-300" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <h3 className="font-black text-slate-900 leading-tight">{request.companies.name}</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">PLAN ACTUAL: {request.companies.plan}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-primary-50 rounded-2xl p-4 mb-6 border border-primary-100">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">Plan Solicitado</span>
-                                            <Badge className="bg-primary-500 text-white border-none text-[10px] rounded-full uppercase">
-                                                {request.requested_plan}
-                                            </Badge>
-                                        </div>
-                                        <p className="text-xs text-primary-800 font-medium">Solicitud recibida el {new Date(request.created_at).toLocaleDateString()}</p>
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <Button
-                                            className="flex-1 bg-slate-900 hover:bg-slate-800 rounded-xl font-bold h-11"
-                                            onClick={() => handleApproveUpgrade(request)}
-                                            disabled={managingUpgrade === request.id}
-                                        >
-                                            {managingUpgrade === request.id ? <Loader2 className="animate-spin h-5 w-5" /> : <ShieldCheck className="mr-2 h-5 w-5 text-emerald-400" />}
-                                            Aprobar
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            className="bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-xl px-3"
-                                            onClick={() => handleRejectUpgrade(request.id)}
-                                            disabled={managingUpgrade === request.id}
-                                        >
-                                            <XCircle size={20} />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                        {upgradeRequests.length === 0 && !loading && (
-                            <div className="col-span-full py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
-                                <CheckCircle2 size={48} className="mx-auto mb-4 text-emerald-500 opacity-20" />
-                                <h3 className="text-slate-900 font-black text-sm">¡Todo al día!</h3>
-                                <p className="text-[10px] text-slate-500 mt-1">No hay solicitudes de upgrade pendientes.</p>
-                            </div>
-                        )}
                     </div>
                 ) : companies.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

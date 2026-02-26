@@ -33,7 +33,7 @@ export function DemoDashboardLayout() {
     ];
 
     return (
-        <div className="flex h-screen w-full bg-slate-50 overscroll-none supports-[height:100dvh]:h-[100dvh]">
+        <div className="flex h-full w-full bg-slate-50 overscroll-none">
             {/* Sidebar for Desktop */}
             <aside className="hidden w-72 border-r border-slate-200 bg-white md:flex flex-col">
                 <div className="p-6 border-b border-slate-100 bg-primary-50/50">
@@ -178,7 +178,7 @@ export function DemoDashboardLayout() {
                 </header>
 
                 {/* Content */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+                <main className="flex-1 overflow-y-auto p-4 md:p-8">
                     <div className="container mx-auto max-w-5xl">
                         <Outlet />
                     </div>

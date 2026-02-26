@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
-import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl } from '../utils';
+import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, resizeImage } from '../utils';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 
@@ -337,42 +337,80 @@ export default function DashboardProfile() {
             return;
         }
 
-        // Limit file size to 2MB
-        if (file.size > 2 * 1024 * 1024) {
-            showToast("La imagen debe ser menor a 2MB", "error");
-            return;
-        }
+        // 1. Keep track of old URL for cleanup IMMEDIATELY (before any async work)
+        const oldImageUrl = type === 'logo' ? company.logo : company.banner;
 
         setLoading(true);
+        if (file.size > 50 * 1024 * 1024) {
+            showToast("La imagen es demasiado grande. Máximo 50MB.", "error");
+            setLoading(false);
+            return;
+        }
         try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${company.id}/${type}-${Math.random()}.${fileExt}`;
+            // 2. Optimize image BEFORE size checks
+            // This allows users to upload >2MB images that will be compressed
+            const resizeOptions = type === 'logo'
+                ? { maxWidth: 400, maxHeight: 400, quality: 0.8 }
+                : { maxWidth: 1200, maxHeight: 800, quality: 0.7 };
+
+            const optimizedBlob = await resizeImage(file, resizeOptions);
+
+            // 3. Check resulting size (should be well under 2MB now)
+            if (optimizedBlob.size > 2 * 1024 * 1024) {
+                showToast("La imagen procesada es demasiado grande. Intenta con otra.", "error");
+                return;
+            }
+
+            const fileExt = 'jpg';
+            const fileName = `${company.id}/${type}-${Date.now()}.${fileExt}`;
             const filePath = `${fileName}`;
 
-            // Upload to Supabase Storage
+            // 4. Upload to Supabase Storage
             const { error: uploadError } = await supabase.storage
                 .from('store-assets')
-                .upload(filePath, file);
+                .upload(filePath, optimizedBlob);
 
             if (uploadError) {
                 if (uploadError.message.includes('bucket not found')) {
-                    throw new Error("El sistema de almacenamiento no está configurado. Contacta al soporte.");
+                    throw new Error("El sistema de almacenamiento no está configurado.");
                 }
                 throw uploadError;
             }
 
-            // Get Public URL
+            // 5. Get Public URL
             const { data: { publicUrl } } = supabase.storage
                 .from('store-assets')
                 .getPublicUrl(filePath);
 
-            // Update Company
+            // 6. Update Company Record
             const { error: updateError } = await supabase
                 .from('companies')
-                .update({ [type]: publicUrl })
+                .update({
+                    [type]: publicUrl
+                })
                 .eq('id', company.id);
 
-            if (updateError) throw updateError;
+            if (updateError) {
+                // ROLLBACK: Delete the newly uploaded file if DB update fails
+                console.log('Rolling back upload due to DB error:', filePath);
+                await supabase.storage.from('store-assets').remove([filePath]);
+                throw updateError;
+            }
+
+            // 7. Cleanup OLD file from storage
+            if (oldImageUrl && oldImageUrl.includes('/store-assets/')) {
+                // Extract path: everything between /store-assets/ and potential ? params
+                const parts = oldImageUrl.split('/store-assets/');
+                if (parts.length > 1) {
+                    const rawPath = parts[1];
+                    // Strip query parameters: banner.jpg?v=123 -> banner.jpg
+                    const cleanPath = rawPath.split('?')[0].split('#')[0];
+                    if (cleanPath) {
+                        console.log('Cleaning up old asset:', cleanPath);
+                        supabase.storage.from('store-assets').remove([cleanPath]).catch(console.error);
+                    }
+                }
+            }
 
             await refreshCompany();
             showToast("Imagen actualizada correctamente", "success");
@@ -928,10 +966,11 @@ export default function DashboardProfile() {
                                                             <ImageIcon className="text-slate-300" size={32} />
                                                         </div>
                                                     )}
-                                                </div>
-                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl font-bold text-white text-[10px] uppercase">
-                                                    <Camera size={16} className="mr-1" />
-                                                    Cambiar
+                                                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer">
+                                                        <Camera className="text-white mb-1" size={24} />
+                                                        <span className="text-[10px] text-white font-bold px-2 py-0.5 bg-white/20 rounded-full backdrop-blur-sm">Cambiar Logo</span>
+                                                        <span className="text-[8px] text-white/80 mt-1 uppercase tracking-tighter">Máx 50MB</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <input
@@ -957,9 +996,10 @@ export default function DashboardProfile() {
                                                         <span className="text-sm font-bold uppercase tracking-widest">Sin Banner</span>
                                                     </div>
                                                 )}
-                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-bold text-white text-[10px] uppercase">
-                                                    <ImageIcon size={16} className="mr-1" />
-                                                    Cambiar Banner
+                                                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer">
+                                                    <Camera className="text-white mb-1" size={24} />
+                                                    <span className="text-[10px] text-white font-bold px-2 py-0.5 bg-white/20 rounded-full backdrop-blur-sm">Cambiar Banner</span>
+                                                    <span className="text-[8px] text-white/80 mt-1 uppercase tracking-tighter">Máx 50MB</span>
                                                 </div>
                                             </div>
                                             <input

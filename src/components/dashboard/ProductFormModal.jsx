@@ -7,7 +7,7 @@ import { Input } from '../ui/Input';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../hooks/useSettings';
-import { cn } from '../../utils';
+import { cn, resizeImage } from '../../utils';
 
 export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSuccess, companyId, categories = [] }) {
     const { showToast } = useToast();
@@ -142,8 +142,9 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 showToast(`${file.name} no es una imagen válida`, 'error');
                 return false;
             }
-            if (file.size > 5 * 1024 * 1024) {
-                showToast(`${file.name} es muy grande (máx 5MB)`, 'error');
+            // Allow up to 10MB since we resize client-side
+            if (file.size > 50 * 1024 * 1024) {
+                showToast(`${file.name} es muy grande (máx 50MB)`, 'error');
                 return false;
             }
             return true;
@@ -185,13 +186,17 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
         try {
             for (let i = 0; i < imageFiles.length; i++) {
                 const file = imageFiles[i];
-                const fileExt = file.name.split('.').pop();
+
+                // Optimize image before upload (800x800, JPEG, 0.8 quality)
+                const optimizedBlob = await resizeImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.8 });
+
+                const fileExt = 'jpg'; // We convert to jpeg in resizeImage
                 const fileName = `${productId}_${Date.now()}_${i}.${fileExt}`;
                 const filePath = `${companyId}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('product-images')
-                    .upload(filePath, file);
+                    .upload(filePath, optimizedBlob);
 
                 if (uploadError) throw uploadError;
 
@@ -287,10 +292,25 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
 
             if (productToEdit || newImageUrls.length > 0) {
                 // Clear existing image records to re-sync
-                await supabase
+                const { error: deleteImgError } = await supabase
                     .from('product_images')
                     .delete()
                     .eq('product_id', productId);
+
+                if (deleteImgError) {
+                    // ROLLBACK: Delete new files if DB sync fails
+                    if (newImageUrls.length > 0) {
+                        const pathsToRollback = newImageUrls.map(url => {
+                            const parts = url.split('/product-images/');
+                            return parts.length > 1 ? parts[1].split('?')[0].split('#')[0] : null;
+                        }).filter(Boolean);
+                        if (pathsToRollback.length > 0) {
+                            console.log('Rolling back new products images due to DB error (delete):', pathsToRollback);
+                            await supabase.storage.from('product-images').remove(pathsToRollback);
+                        }
+                    }
+                    throw deleteImgError;
+                }
 
                 if (allImageUrls.length > 0) {
                     const imageInserts = allImageUrls.map((url, index) => ({
@@ -299,9 +319,24 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                         display_order: index
                     }));
 
-                    await supabase
+                    const { error: insertImgError } = await supabase
                         .from('product_images')
                         .insert(imageInserts);
+
+                    if (insertImgError) {
+                        // ROLLBACK: Delete new files if DB sync fails
+                        if (newImageUrls.length > 0) {
+                            const pathsToRollback = newImageUrls.map(url => {
+                                const parts = url.split('/product-images/');
+                                return parts.length > 1 ? parts[1].split('?')[0].split('#')[0] : null;
+                            }).filter(Boolean);
+                            if (pathsToRollback.length > 0) {
+                                console.log('Rolling back new products images due to DB error (insert):', pathsToRollback);
+                                await supabase.storage.from('product-images').remove(pathsToRollback);
+                            }
+                        }
+                        throw insertImgError;
+                    }
                 }
 
                 // 4. CLEANUP STORAGE: Remove files that were replaced or deleted
@@ -421,6 +456,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                             <label className="aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-primary-500 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50 hover:bg-slate-100">
                                                 <Camera size={24} className="text-slate-400 mb-2" />
                                                 <span className="text-xs font-bold text-slate-500">Subir imagen</span>
+                                                <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-tighter">Máx 50MB</span>
                                                 <input
                                                     type="file"
                                                     accept="image/*"
