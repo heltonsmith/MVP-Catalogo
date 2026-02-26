@@ -339,7 +339,6 @@ export default function RegisterPage() {
 
     const socialProviders = [
         { id: 'google', name: 'Google', icon: GoogleIcon },
-        { id: 'apple', name: 'Apple', icon: AppleIcon },
     ];
 
     return (
