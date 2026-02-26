@@ -41,9 +41,10 @@ export const AuthProvider = ({ children }) => {
         try {
             const { data, error } = await supabase
                 .from('notifications')
-                .select('id, is_read')
+                .select('id, is_read, type')
                 .eq('user_id', targetId)
-                .eq('is_read', false);
+                .eq('is_read', false)
+                .not('type', 'in', '(message,chat)');
 
             if (error) {
                 console.error('Auth: Error refreshing unread notifications:', error);
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }) => {
 
             // Use data length directly - most reliable method
             const newCount = data?.length || 0;
-            console.log('Auth: Unread count for', targetId, '=', newCount);
+            console.log('Auth: Unread bell count for', targetId, '=', newCount);
             setUnreadNotifications(newCount);
         } catch (err) {
             console.error('Auth: Exception refreshing notifications:', err);
@@ -396,6 +397,17 @@ export const AuthProvider = ({ children }) => {
         return { data, error };
     };
 
+    const signInWithSocial = async (provider) => {
+        console.log('AuthContext: signInWithSocial called with provider:', provider);
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: {
+                redirectTo: `${window.location.origin}/login`
+            }
+        });
+        return { data, error };
+    };
+
     const signOut = async () => {
         setIsObserving(false);
         setObserverData(null);
@@ -516,6 +528,7 @@ export const AuthProvider = ({ children }) => {
     const value = useMemo(() => ({
         signUp: (data) => supabase.auth.signUp(data),
         signIn,
+        signInWithSocial,
         signOut,
         refreshCompany,
         refreshProfile: refreshCompany,

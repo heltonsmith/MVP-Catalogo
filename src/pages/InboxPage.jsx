@@ -12,6 +12,7 @@ import {
     Send,
     MoreVertical,
     Check,
+    CheckCheck,
     ArrowLeft,
     User,
     Store,
@@ -44,7 +45,7 @@ export default function InboxPage() {
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editText, setEditText] = useState('');
     const messagesEndRef = useRef(null);
-    const messageContainerRef = useRef(null);
+    const scrollableRef = useRef(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [chatToDelete, setChatToDelete] = useState(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -152,17 +153,78 @@ export default function InboxPage() {
 
         load();
 
-        // Subscribe to new messages for the list updates
+        // Subscribe to new messages for the list updates (targeted, no full reload)
+        const listChannelName = `inbox_list_${activeTab}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const channel = supabase
-            .channel(`inbox_list_${activeTab}`)
+            .channel(listChannelName)
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'messages' },
-                () => {
-                    load();
+                (payload) => {
+                    const msg = payload.new;
+                    if (!msg) return;
+
+                    // Determine which conversation ID this message belongs to
+                    const conversationId = activeTab === 'buying' ? msg.company_id : msg.customer_id;
+                    const isRelevant = activeTab === 'buying'
+                        ? msg.customer_id === user.id
+                        : msg.company_id === currentCompany?.id;
+
+                    if (!isRelevant || !conversationId) return;
+
+                    // Check if this conversation already exists in the sidebar
+                    setConversations(prev => {
+                        const existing = prev.find(c => c.id === conversationId);
+                        if (existing) {
+                            // Update the existing conversation in-place
+                            const isUnreadForMe = !msg.is_read && (
+                                (activeTab === 'buying' && msg.sender_type === 'store') ||
+                                (activeTab === 'selling' && msg.sender_type === 'customer')
+                            );
+                            const updated = prev.map(c => {
+                                if (c.id !== conversationId) return c;
+                                return {
+                                    ...c,
+                                    lastMessage: msg.content,
+                                    date: msg.created_at,
+                                    unread: (conversationId === selectedChatId) ? 0 : c.unread + (isUnreadForMe ? 1 : 0)
+                                };
+                            });
+                            // Re-sort so the most recent conversation is at the top
+                            return updated.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        } else {
+                            // New conversation — need a full reload to get profile/company info
+                            load();
+                            return prev;
+                        }
+                    });
                 }
             )
-            .subscribe();
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'messages' },
+                (payload) => {
+                    // Update read status in the sidebar without reloading
+                    const msg = payload.new;
+                    if (!msg) return;
+                    const conversationId = activeTab === 'buying' ? msg.company_id : msg.customer_id;
+                    const isRelevant = activeTab === 'buying'
+                        ? msg.customer_id === user.id
+                        : msg.company_id === currentCompany?.id;
+                    if (!isRelevant || !conversationId) return;
+
+                    // If a message was marked as read, recalculate unread count
+                    if (msg.is_read) {
+                        setConversations(prev => prev.map(c => {
+                            if (c.id !== conversationId) return c;
+                            return { ...c, unread: Math.max(0, c.unread - 1) };
+                        }));
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log(`[Inbox] List channel ${listChannelName} status:`, status);
+            });
 
         return () => {
             isCancelled = true;
@@ -175,9 +237,16 @@ export default function InboxPage() {
             fetchMessages(selectedChatId);
             setIsMobileListVisible(false);
 
-            // Subscribe to this specific chat
+            // Determine the filter for this specific conversation
+            const companyId = activeTab === 'buying' ? selectedChatId : currentCompany?.id;
+            const customerId = activeTab === 'buying' ? user?.id : selectedChatId;
+
+            if (!companyId || !customerId) return;
+
+            // Subscribe to this specific chat with unique channel name
+            const channelName = `chat_${selectedChatId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const channel = supabase
-                .channel(`chat:${selectedChatId}`)
+                .channel(channelName)
                 .on(
                     'postgres_changes',
                     {
@@ -189,23 +258,16 @@ export default function InboxPage() {
                         if (payload.eventType === 'INSERT') {
                             const msg = payload.new;
 
-                            // Guard for selling mode
-                            if (activeTab === 'selling' && !currentCompany) return;
+                            // Only process if this message belongs to our current conversation
+                            if (msg.company_id !== companyId || msg.customer_id !== customerId) return;
 
-                            const isMatch = activeTab === 'buying'
-                                ? msg.company_id === selectedChatId && msg.customer_id === user.id
-                                : msg.company_id === currentCompany?.id && msg.customer_id === selectedChatId;
-
-                            if (isMatch) {
-                                setMessages(prev => {
-                                    if (prev.find(m => m.id === msg.id)) return prev;
-                                    return [...prev, msg];
-                                });
-                            }
+                            setMessages(prev => {
+                                if (prev.find(m => m.id === msg.id)) return prev;
+                                return [...prev, msg];
+                            });
                         } else if (payload.eventType === 'UPDATE') {
                             setMessages(prev => prev.map(m => {
                                 if (m.id !== payload.new.id) return m;
-                                // Only mark as edited if the content has changed from our local state
                                 const contentChanged = payload.new.content !== m.content;
                                 return { ...payload.new, is_edited: contentChanged || m.is_edited };
                             }));
@@ -214,7 +276,9 @@ export default function InboxPage() {
                         }
                     }
                 )
-                .subscribe();
+                .subscribe((status) => {
+                    console.log(`[Inbox] Chat channel ${channelName} status:`, status);
+                });
 
             return () => {
                 supabase.removeChannel(channel);
@@ -242,8 +306,8 @@ export default function InboxPage() {
     }, [messages, selectedChatId, activeTab]);
 
     const scrollToBottom = () => {
-        if (messageContainerRef.current) {
-            messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        if (scrollableRef.current) {
+            scrollableRef.current.scrollTop = scrollableRef.current.scrollHeight;
         }
     };
 
@@ -466,9 +530,18 @@ export default function InboxPage() {
                     return [...prev, data];
                 });
 
-                // Force a reload of conversations to update the sidebar immediately
-                const results = await performFetchConversations(user, activeTab, currentCompany, selectedChatId);
-                setConversations(results);
+                // Optimistic sidebar update — no full reload
+                setConversations(prev => {
+                    const exists = prev.find(c => c.id === selectedChatId);
+                    if (exists) {
+                        const updated = prev.map(c => {
+                            if (c.id !== selectedChatId) return c;
+                            return { ...c, lastMessage: data.content, date: data.created_at };
+                        });
+                        return updated.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    }
+                    return prev;
+                });
             }
 
         } catch (err) {
@@ -733,10 +806,9 @@ export default function InboxPage() {
 
                             {/* Messages List */}
                             <div
-                                ref={messageContainerRef}
                                 className="flex-1 overflow-hidden relative bg-slate-50/50"
                             >
-                                <div className={cn("h-full overflow-y-auto p-6 space-y-4 custom-scrollbar", isPaywalled && "blur-[8px] select-none pointer-events-none")}>
+                                <div ref={scrollableRef} className={cn("h-full overflow-y-auto p-6 space-y-4 custom-scrollbar", isPaywalled && "blur-[8px] select-none pointer-events-none")}>
                                     {messages.map((msg, idx) => {
                                         const isMe = activeTab === 'buying' ? msg.sender_type === 'customer' : msg.sender_type === 'store';
                                         const showTime = idx === messages.length - 1 || messages[idx + 1].sender_type !== msg.sender_type;
@@ -795,7 +867,11 @@ export default function InboxPage() {
                                                 {showTime && (
                                                     <span className="text-[10px] text-slate-400 mt-1 px-1 flex items-center gap-1 font-medium">
                                                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        {isMe && <Check size={12} className={cn(msg.is_read ? "text-blue-500" : "text-slate-300")} />}
+                                                        {isMe && (
+                                                            msg.is_read
+                                                                ? <CheckCheck size={14} className="text-blue-500" />
+                                                                : <Check size={12} className="text-slate-300" />
+                                                        )}
                                                     </span>
                                                 )}
                                             </div>

@@ -79,7 +79,9 @@ export function DashboardLayout() {
                             <h2 className="text-sm font-bold text-slate-900 truncate">
                                 {profile?.role === 'admin' || profile?.role === 'super_admin'
                                     ? 'Admin Ktaloog'
-                                    : (company?.name || 'Mi Tienda')}
+                                    : (profile?.role === 'client' || profile?.role === 'user')
+                                        ? (profile?.full_name || user?.user_metadata?.full_name || 'Mi Perfil')
+                                        : (company?.name || 'Mi Tienda')}
                             </h2>
                             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
                                 {company ? 'Tienda Verificada' : 'Configurando...'}
@@ -203,7 +205,9 @@ export function DashboardLayout() {
                         <span className="font-bold text-slate-900 text-sm truncate max-w-[150px]">
                             {profile?.role === 'admin' || profile?.role === 'super_admin'
                                 ? 'Admin Ktaloog'
-                                : (company?.name || 'Mi Tienda')}
+                                : (profile?.role === 'client' || profile?.role === 'user')
+                                    ? (profile?.full_name || user?.user_metadata?.full_name || 'Mi Perfil')
+                                    : (company?.name || 'Mi Tienda')}
                         </span>
                     </div>
                     <div className="flex items-center gap-1">

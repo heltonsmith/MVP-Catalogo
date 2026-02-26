@@ -21,10 +21,13 @@ export function useNotifications() {
 
             if (error) throw error;
             const fetchedNotifications = data || [];
-            console.log(`[useNotifications] Fetched ${fetchedNotifications.length} notifications`);
-            setNotifications(fetchedNotifications);
+            console.log(`[useNotifications] Fetched ${fetchedNotifications.length} notifications raw`);
 
-            const count = fetchedNotifications.filter(n => n.is_read === false || n.is_read === 'f').length;
+            // FILTER: Separate Inbox notifications from Bell notifications
+            const bellNotifications = fetchedNotifications.filter(n => n.type !== 'message' && n.type !== 'chat');
+            setNotifications(bellNotifications);
+
+            const count = bellNotifications.filter(n => n.is_read === false || n.is_read === 'f').length;
             setUnreadCount(count);
 
             if (setUnreadNotifications) {
@@ -213,7 +216,7 @@ export function useNotifications() {
 
     const unreadSystemCount = notifications.filter(n =>
         (n.is_read === false || n.is_read === 'f') &&
-        (n.type === 'system' || n.type === 'message' || n.type === 'grace_period')
+        (n.type === 'system' || n.type === 'grace_period')
     ).length;
 
     const markTicketNotificationsAsRead = async (ticketId) => {

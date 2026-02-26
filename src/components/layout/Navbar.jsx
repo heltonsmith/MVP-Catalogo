@@ -95,7 +95,6 @@ export function Navbar({ isLandingMode = false }) {
                 table: 'messages'
             }, () => {
                 fetchUnread();
-                if (refreshUnreadNotifications) refreshUnreadNotifications();
             })
             .subscribe();
 
@@ -343,30 +342,45 @@ export function Navbar({ isLandingMode = false }) {
                         <div className="pt-4 flex flex-col space-y-2">
                             {user ? (
                                 <>
-                                    <div className="px-3 py-2 flex items-center gap-3 bg-slate-50 rounded-xl mb-2">
-                                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
-                                            <Store size={20} />
+                                    <div className="px-3 py-1 flex items-center gap-3 bg-slate-50 rounded-2xl mb-2">
+                                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 overflow-hidden ring-2 ring-white">
+                                            {(profile?.avatar_url || user?.user_metadata?.avatar_url) ? (
+                                                <img
+                                                    src={profile?.avatar_url || user?.user_metadata?.avatar_url}
+                                                    alt=""
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            ) : (
+                                                profile?.role === 'client' || profile?.role === 'user' ? <User size={20} /> : <Store size={20} />
+                                            )}
                                         </div>
-                                        <div>
+                                        <div className="flex-1 min-w-0">
                                             {profile?.role === 'admin' || profile?.role === 'super_admin' ? (
-                                                <p className="font-bold text-slate-900">Admin Ktaloog</p>
+                                                <p className="font-bold text-slate-900 truncate">Admin Ktaloog</p>
+                                            ) : (profile?.role === 'client' || profile?.role === 'user') ? (
+                                                <p className="font-bold text-slate-900 truncate">
+                                                    {profile?.full_name || user?.user_metadata?.full_name || 'Mi Perfil'}
+                                                </p>
                                             ) : company?.slug ? (
                                                 <Link
                                                     to={`/catalogo/${company.slug}`}
                                                     onClick={() => setIsOpen(false)}
-                                                    className="font-bold text-slate-900 hover:text-primary-600 transition-colors"
+                                                    className="font-bold text-slate-900 hover:text-primary-600 transition-colors block truncate"
                                                 >
                                                     {company?.name || 'Mi Tienda'}
                                                 </Link>
                                             ) : (
-                                                <p className="font-bold text-slate-900">{company?.name || 'Mi Tienda'}</p>
+                                                <p className="font-bold text-slate-900 truncate">{company?.name || 'Mi Tienda'}</p>
                                             )}
-                                            <p className="text-xs text-slate-500">
-                                                {profile?.role === 'admin' || profile?.role === 'super_admin'
-                                                    ? 'Admin Ktaloog'
-                                                    : (profile?.email || user?.email)
-                                                }
-                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-black text-primary-600 uppercase tracking-tighter">
+                                                    {profile?.role === 'client' || profile?.role === 'user' ? 'Cliente' : 'Tienda'}
+                                                </span>
+                                                <span className="text-slate-300">•</span>
+                                                <p className="text-[10px] text-slate-500 truncate lowercase">
+                                                    {profile?.email || user?.email}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                     <Link to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'} onClick={() => setIsOpen(false)}>
