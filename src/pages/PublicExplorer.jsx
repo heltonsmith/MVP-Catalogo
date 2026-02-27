@@ -27,6 +27,7 @@ import { StoreSearch } from '../components/search/StoreSearch';
 import { supabase } from '../lib/supabase';
 import { cn } from '../utils';
 import { Link } from 'react-router-dom';
+import { SEO } from '../components/layout/SEO';
 
 const BUSINESS_FILTERS = [
     { id: 'all', label: 'Todo', icon: <LayoutGrid size={16} /> },
@@ -257,6 +258,11 @@ export default function PublicExplorer() {
 
     return (
         <div className="min-h-screen bg-slate-50 pt-20 pb-12">
+            <SEO
+                title="Explora Tiendas y Mayoristas"
+                description="Descubre emprendedores locales, mayoristas y tiendas en Chile. Filtra por ubicación y categoría para encontrar lo que necesitas."
+                url="https://www.ktaloog.com/explorar"
+            />
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Hero Header */}
                 <div className="flex flex-col items-center text-center mb-12">

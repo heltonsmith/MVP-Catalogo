@@ -1,0 +1,10 @@
+# https://www.ktaloog.com robots.txt
+User-agent: *
+Allow: /
+
+# Disallow admin and dashboard areas
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /checkout/
+
+Sitemap: https://www.ktaloog.com/sitemap.xml

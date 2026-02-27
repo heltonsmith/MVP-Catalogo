@@ -6,6 +6,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { useSettings } from '../hooks/useSettings';
 
 import { motion } from 'framer-motion';
+import { SEO } from '../components/layout/SEO';
 
 export default function LandingPage() {
     const { getSetting } = useSettings();
@@ -68,6 +69,10 @@ export default function LandingPage() {
 
     return (
         <div className="flex flex-col overflow-hidden">
+            <SEO
+                title="Crea tu Catálogo Digital Gratis"
+                description="La forma más rápida de mostrar tus productos y recibir pedidos por WhatsApp en Chile. Sin comisiones, móvil-first y profesional."
+            />
             {/* Hero Section */}
             <section className="relative bg-slate-50 py-20 lg:py-32 overflow-x-hidden">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

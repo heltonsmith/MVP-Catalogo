@@ -11,6 +11,7 @@ import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
 import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl } from '../utils';
 import { CAPTCHA_ICONS } from '../constants/auth';
+import { SEO } from '../components/layout/SEO';
 
 // --- Branded SVG Icons for Social Providers ---
 const GoogleIcon = () => (
