@@ -1,8 +1,14 @@
 import { ShieldAlert, BookOpen, Scale } from 'lucide-react';
+import { SEO } from '../components/layout/SEO';
 
 export default function TermsPage() {
     return (
         <div className="bg-slate-50 min-h-screen py-16 px-4">
+            <SEO
+                title="Términos y Condiciones"
+                description="Consulta los aspectos legales y condiciones de uso de Ktaloog.com. Información sobre nuestra naturaleza de servicio y exención de responsabilidad."
+                keywords="términos y condiciones, aspectos legales ktaloog, aviso legal"
+            />
             <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="bg-primary-600 p-8 text-white">
                     <div className="flex items-center gap-3 mb-4">

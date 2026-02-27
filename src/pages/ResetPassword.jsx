@@ -7,6 +7,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { translateAuthError } from '../utils/authErrors';
+import { SEO } from '../components/layout/SEO';
 
 export default function ResetPassword() {
     const { updatePassword, session } = useAuth();
@@ -54,82 +55,89 @@ export default function ResetPassword() {
     };
 
     return (
-        <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
-            <Card className="w-full max-w-md border-none shadow-xl rounded-[2rem] overflow-hidden">
-                <CardContent className="p-8 sm:p-12">
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-200">
-                            <Rocket size={24} />
-                        </div>
-
-                        {success ? (
-                            <div className="space-y-6">
-                                <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto">
-                                    <CheckCircle2 size={40} />
-                                </div>
-                                <div className="space-y-2">
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">¡Éxito!</h2>
-                                    <p className="text-slate-500 font-medium text-sm leading-relaxed">
-                                        Tu contraseña ha sido actualizada. Te redirigiremos al inicio de sesión en unos segundos...
-                                    </p>
-                                </div>
+        <>
+            <SEO
+                title="Restablecer Contraseña | Ktaloog"
+                description="Establece una nueva contraseña para tu cuenta de Ktaloog."
+                noindex={true}
+            />
+            <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
+                <Card className="w-full max-w-md border-none shadow-xl rounded-[2rem] overflow-hidden">
+                    <CardContent className="p-8 sm:p-12">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-200">
+                                <Rocket size={24} />
                             </div>
-                        ) : (
-                            <>
-                                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Nueva contraseña</h2>
-                                <p className="mt-3 text-slate-500 font-medium text-sm leading-relaxed max-w-xs mx-auto">
-                                    Establece una contraseña segura para tu cuenta.
-                                </p>
 
-                                <form onSubmit={handleSubmit} className="mt-10 w-full space-y-6">
-                                    <div className="text-left relative">
-                                        <Input
-                                            label="Contraseña nueva"
-                                            type="password"
-                                            required
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="••••••••"
-                                            className="pl-12 h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-primary-600 transition-all"
-                                        />
-                                        <Lock className="absolute left-4 top-[46px] h-5 w-5 text-slate-400" />
+                            {success ? (
+                                <div className="space-y-6">
+                                    <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto">
+                                        <CheckCircle2 size={40} />
                                     </div>
+                                    <div className="space-y-2">
+                                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">¡Éxito!</h2>
+                                        <p className="text-slate-500 font-medium text-sm leading-relaxed">
+                                            Tu contraseña ha sido actualizada. Te redirigiremos al inicio de sesión en unos segundos...
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Nueva contraseña</h2>
+                                    <p className="mt-3 text-slate-500 font-medium text-sm leading-relaxed max-w-xs mx-auto">
+                                        Establece una contraseña segura para tu cuenta.
+                                    </p>
 
-                                    <div className="text-left relative">
-                                        <Input
-                                            label="Confirmar contraseña"
-                                            type="password"
-                                            required
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            placeholder="••••••••"
-                                            className="pl-12 h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-primary-600 transition-all"
-                                        />
-                                        <Lock className="absolute left-4 top-[46px] h-5 w-5 text-slate-400" />
-                                    </div>
+                                    <form onSubmit={handleSubmit} className="mt-10 w-full space-y-6">
+                                        <div className="text-left relative">
+                                            <Input
+                                                label="Contraseña nueva"
+                                                type="password"
+                                                required
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                                className="pl-12 h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-primary-600 transition-all"
+                                            />
+                                            <Lock className="absolute left-4 top-[46px] h-5 w-5 text-slate-400" />
+                                        </div>
 
-                                    <div className="pt-2">
-                                        <Button
-                                            type="submit"
-                                            className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary-200"
-                                            disabled={loading}
-                                        >
-                                            {loading ? (
-                                                <>
-                                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                                    ACTUALIZANDO...
-                                                </>
-                                            ) : (
-                                                'CAMBIAR CONTRASEÑA'
-                                            )}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+                                        <div className="text-left relative">
+                                            <Input
+                                                label="Confirmar contraseña"
+                                                type="password"
+                                                required
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                                className="pl-12 h-14 rounded-2xl bg-slate-50 border-transparent focus:bg-white focus:border-primary-600 transition-all"
+                                            />
+                                            <Lock className="absolute left-4 top-[46px] h-5 w-5 text-slate-400" />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <Button
+                                                type="submit"
+                                                className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary-200"
+                                                disabled={loading}
+                                            >
+                                                {loading ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                        ACTUALIZANDO...
+                                                    </>
+                                                ) : (
+                                                    'CAMBIAR CONTRASEÑA'
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </>
     );
 }

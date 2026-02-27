@@ -26,6 +26,7 @@ import {
 import { Modal } from '../components/ui/Modal';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { Zap } from 'lucide-react';
+import { SEO } from '../components/layout/SEO';
 
 export default function InboxPage() {
     const { user, company, profile, loading: authLoading } = useAuth();
@@ -629,353 +630,360 @@ export default function InboxPage() {
     };
 
     return (
-        <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
-            {/* Simple Top Bar */}
-            <header className="bg-white border-b border-slate-200 h-16 sticky top-0 z-30">
-                <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center gap-3">
-                        <Link to="/explorar" className="text-slate-400 hover:text-slate-600 transition-colors">
-                            <ArrowLeft size={24} />
-                        </Link>
-                        <h1 className="text-xl font-bold text-slate-900">Bandeja de Entrada</h1>
-                    </div>
-
-                    {hasStore && (
-                        <div className="flex bg-slate-100 p-1 rounded-xl">
-                            <button
-                                onClick={() => { setActiveTab('buying'); setSelectedChatId(null); }}
-                                className={cn(
-                                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
-                                    activeTab === 'buying' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                                )}
-                            >
-                                Mis Compras
-                            </button>
-                            <button
-                                onClick={() => { setActiveTab('selling'); setSelectedChatId(null); }}
-                                className={cn(
-                                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
-                                    activeTab === 'selling' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                                )}
-                            >
-                                Mis Ventas
-                            </button>
+        <>
+            <SEO
+                title="Bandeja de Entrada | Ktaloog"
+                description="Gestiona tus conversaciones con tiendas y clientes en Ktaloog."
+                noindex={true}
+            />
+            <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
+                {/* Simple Top Bar */}
+                <header className="bg-white border-b border-slate-200 h-16 sticky top-0 z-30">
+                    <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
+                        <div className="flex items-center gap-3">
+                            <Link to="/explorar" className="text-slate-400 hover:text-slate-600 transition-colors">
+                                <ArrowLeft size={24} />
+                            </Link>
+                            <h1 className="text-xl font-bold text-slate-900">Bandeja de Entrada</h1>
                         </div>
-                    )}
-                </div>
-            </header>
 
-            <main className="flex-1 min-h-0 max-w-7xl w-full mx-auto p-0 md:p-6 lg:px-8 flex flex-col md:flex-row gap-0 md:gap-4 md:h-[600px] md:my-8 relative shrink-0">
-                {/* Conversations Sidebar */}
-                <div className={cn(
-                    "w-full md:w-72 lg:w-80 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0",
-                    !isMobileListVisible && "hidden md:flex"
-                )}>
-                    <div className="p-4 border-b border-slate-100">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                            <Input placeholder="Buscar..." className="pl-9 bg-slate-50 border-transparent focus:bg-white transition-all h-10" />
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto">
-                        {(loadingConversations || authLoading || (activeTab === 'selling' && !currentCompany)) ? (
-                            <div className="flex flex-col items-center justify-center p-12 gap-3 text-slate-400">
-                                <Loader2 className="animate-spin h-6 w-6 text-primary-600" />
-                                <p className="text-xs font-medium animate-pulse">Cargando...</p>
+                        {hasStore && (
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                <button
+                                    onClick={() => { setActiveTab('buying'); setSelectedChatId(null); }}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                        activeTab === 'buying' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    Mis Compras
+                                </button>
+                                <button
+                                    onClick={() => { setActiveTab('selling'); setSelectedChatId(null); }}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                        activeTab === 'selling' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    Mis Ventas
+                                </button>
                             </div>
-                        ) : conversations.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400">
-                                <MessageCircle size={32} className="mx-auto mb-3 opacity-20" />
-                                <p className="text-sm">No hay conversaciones activas.</p>
-                            </div>
-                        ) : (
-                            conversations.map(chat => (
-                                <div key={chat.id} className="relative group/chat">
-                                    <button
-                                        onClick={() => handleSelectChat(chat.id)}
-                                        className={cn(
-                                            "w-full p-4 flex gap-3 text-left transition-colors border-b border-slate-50 hover:bg-slate-50",
-                                            selectedChatId === chat.id && "bg-slate-50 border-l-4 border-l-primary-500"
-                                        )}
-                                    >
-                                        <div className="relative shrink-0">
-                                            <div className="h-12 w-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-                                                {chat.avatar ? (
-                                                    <img src={chat.avatar} alt={chat.name} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <div className="h-full w-full flex items-center justify-center text-slate-400">
-                                                        {chat.role === 'store' ? <Store size={20} /> : <User size={20} />}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {/* Online Indicator Mockup */}
-                                            <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0 pr-4">
-                                            <div className="flex justify-between items-baseline mb-1">
-                                                <h3 className="font-bold text-slate-900 truncate text-sm">{chat.name}</h3>
-                                                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap ml-auto">
-                                                    {new Date(chat.date).toLocaleDateString() === new Date().toLocaleDateString()
-                                                        ? new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                        : new Date(chat.date).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <p className={cn(
-                                                    "text-xs truncate max-w-[140px]",
-                                                    chat.unread > 0 ? "font-bold text-slate-900" : "text-slate-500",
-                                                    isPaywalled && "blur-[3px] select-none"
-                                                )}>
-                                                    {chat.lastMessage}
-                                                </p>
-                                                {chat.unread > 0 && (
-                                                    <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">
-                                                        {chat.unread}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteConversationByChatId(chat.id);
-                                        }}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover/chat:opacity-100 transition-opacity md:flex hidden"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteConversationByChatId(chat.id);
-                                        }}
-                                        className="absolute right-0 top-0 h-8 w-8 flex items-center justify-center text-slate-300 active:text-red-500 md:hidden"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            ))
                         )}
                     </div>
-                </div>
+                </header>
 
-                {/* Chat Area */}
-                <div className={cn(
-                    "flex-1 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0",
-                    isMobileListVisible && "hidden md:flex"
-                )}>
-                    {selectedChatId ? (
-                        <>
-                            {/* Chat Header */}
-                            <div className="h-16 md:h-16 px-4 md:px-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => setIsMobileListVisible(true)} className="md:hidden -ml-2 p-2 text-slate-400">
-                                        <ArrowLeft size={20} />
-                                    </button>
-
-                                    <div className="h-10 w-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-                                        {selectedChatData?.avatar ? (
-                                            <img src={selectedChatData.avatar} alt={selectedChatData?.name} className="h-full w-full object-cover" />
-                                        ) : (
-                                            <div className="h-full w-full flex items-center justify-center text-slate-400">
-                                                {selectedChatData?.role === 'store' ? <Store size={18} /> : <User size={18} />}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <h2 className="font-bold text-slate-900">{selectedChatData?.name}</h2>
-                                        {activeTab === 'buying' && selectedChatData?.slug && (
-                                            <Link to={`/catalogo/${selectedChatData.slug}`} className="text-xs text-primary-600 hover:underline">
-                                                Ver Tienda
-                                            </Link>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleDeleteConversation}
-                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                                        title="Borrar conversación"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
+                <main className="flex-1 min-h-0 max-w-7xl w-full mx-auto p-0 md:p-6 lg:px-8 flex flex-col md:flex-row gap-0 md:gap-4 md:h-[600px] md:my-8 relative shrink-0">
+                    {/* Conversations Sidebar */}
+                    <div className={cn(
+                        "w-full md:w-72 lg:w-80 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0",
+                        !isMobileListVisible && "hidden md:flex"
+                    )}>
+                        <div className="p-4 border-b border-slate-100">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Input placeholder="Buscar..." className="pl-9 bg-slate-50 border-transparent focus:bg-white transition-all h-10" />
                             </div>
+                        </div>
 
-                            {/* Messages List */}
-                            <div
-                                className="flex-1 overflow-hidden relative bg-slate-50/50"
-                            >
-                                <div ref={scrollableRef} className={cn("h-full overflow-y-auto p-6 space-y-4 custom-scrollbar", isPaywalled && "blur-[8px] select-none pointer-events-none")}>
-                                    {messages.map((msg, idx) => {
-                                        const isMe = activeTab === 'buying' ? msg.sender_type === 'customer' : msg.sender_type === 'store';
-                                        const showTime = idx === messages.length - 1 || messages[idx + 1].sender_type !== msg.sender_type;
-
-                                        return (
-                                            <div key={msg.id} className={cn("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
-                                                <div className={cn(
-                                                    "px-4 py-2.5 text-sm rounded-2xl shadow-sm relative group break-words min-w-[80px]",
-                                                    isMe ? "bg-primary-600 text-white rounded-tr-sm" : "bg-white text-slate-800 border border-slate-100 rounded-tl-sm"
-                                                )}>
-                                                    {editingMessageId === msg.id ? (
-                                                        <div className="flex items-center gap-2 min-w-[120px]">
-                                                            <input
-                                                                value={editText}
-                                                                onChange={e => setEditText(e.target.value)}
-                                                                className="bg-white/20 text-white border-none rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-white/50 placeholder-white/50"
-                                                                autoFocus
-                                                                onKeyDown={e => {
-                                                                    if (e.key === 'Enter') saveEdit(msg.id);
-                                                                    if (e.key === 'Escape') cancelEditing();
-                                                                }}
-                                                            />
-                                                            <button onClick={() => saveEdit(msg.id)} className="p-1 hover:bg-white/20 rounded"><Check size={14} /></button>
-                                                            <button onClick={cancelEditing} className="p-1 hover:bg-white/20 rounded"><X size={14} /></button>
-                                                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                            {(loadingConversations || authLoading || (activeTab === 'selling' && !currentCompany)) ? (
+                                <div className="flex flex-col items-center justify-center p-12 gap-3 text-slate-400">
+                                    <Loader2 className="animate-spin h-6 w-6 text-primary-600" />
+                                    <p className="text-xs font-medium animate-pulse">Cargando...</p>
+                                </div>
+                            ) : conversations.length === 0 ? (
+                                <div className="p-8 text-center text-slate-400">
+                                    <MessageCircle size={32} className="mx-auto mb-3 opacity-20" />
+                                    <p className="text-sm">No hay conversaciones activas.</p>
+                                </div>
+                            ) : (
+                                conversations.map(chat => (
+                                    <div key={chat.id} className="relative group/chat">
+                                        <button
+                                            onClick={() => handleSelectChat(chat.id)}
+                                            className={cn(
+                                                "w-full p-4 flex gap-3 text-left transition-colors border-b border-slate-50 hover:bg-slate-50",
+                                                selectedChatId === chat.id && "bg-slate-50 border-l-4 border-l-primary-500"
+                                            )}
+                                        >
+                                            <div className="relative shrink-0">
+                                                <div className="h-12 w-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
+                                                    {chat.avatar ? (
+                                                        <img src={chat.avatar} alt={chat.name} className="h-full w-full object-cover" />
                                                     ) : (
-                                                        <div className="flex flex-col gap-1">
-                                                            {msg.content}
-                                                            {(msg.updated_at && msg.updated_at !== msg.created_at || msg.is_edited) && (
-                                                                <span className={cn("text-[9px] mt-0.5", isMe ? "text-white/60" : "text-slate-400")}>
-                                                                    (editado)
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {isMe && !editingMessageId && (
-                                                        <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); startEditing(msg); }}
-                                                                className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-primary-600 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
-                                                                title="Editar"
-                                                            >
-                                                                <Pencil size={12} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                                className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
-                                                                title="Eliminar"
-                                                            >
-                                                                <Trash2 size={12} />
-                                                            </button>
+                                                        <div className="h-full w-full flex items-center justify-center text-slate-400">
+                                                            {chat.role === 'store' ? <Store size={20} /> : <User size={20} />}
                                                         </div>
                                                     )}
                                                 </div>
-                                                {showTime && (
-                                                    <span className="text-[10px] text-slate-400 mt-1 px-1 flex items-center gap-1 font-medium">
-                                                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        {isMe && (
-                                                            msg.is_read
-                                                                ? <CheckCheck size={14} className="text-blue-500" />
-                                                                : <Check size={12} className="text-slate-300" />
-                                                        )}
+                                                {/* Online Indicator Mockup */}
+                                                <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 pr-4">
+                                                <div className="flex justify-between items-baseline mb-1">
+                                                    <h3 className="font-bold text-slate-900 truncate text-sm">{chat.name}</h3>
+                                                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap ml-auto">
+                                                        {new Date(chat.date).toLocaleDateString() === new Date().toLocaleDateString()
+                                                            ? new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                            : new Date(chat.date).toLocaleDateString()}
                                                     </span>
-                                                )}
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <p className={cn(
+                                                        "text-xs truncate max-w-[140px]",
+                                                        chat.unread > 0 ? "font-bold text-slate-900" : "text-slate-500",
+                                                        isPaywalled && "blur-[3px] select-none"
+                                                    )}>
+                                                        {chat.lastMessage}
+                                                    </p>
+                                                    {chat.unread > 0 && (
+                                                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                                            {chat.unread}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        );
-                                    })}
-                                    <div ref={messagesEndRef} />
-                                </div>
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteConversationByChatId(chat.id);
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover/chat:opacity-100 transition-opacity md:flex hidden"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteConversationByChatId(chat.id);
+                                            }}
+                                            className="absolute right-0 top-0 h-8 w-8 flex items-center justify-center text-slate-300 active:text-red-500 md:hidden"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
 
-                                {/* Paywall Overlay */}
-                                {isPaywalled && (
-                                    <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-white/10 backdrop-blur-[2px]">
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 max-w-sm text-center animate-in zoom-in-95 duration-300">
-                                            <div className="h-16 w-16 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-                                                <Zap size={32} className="fill-current" />
-                                            </div>
-                                            <h3 className="text-xl font-black text-slate-900 mb-3">Función Exclusiva</h3>
-                                            <p className="text-slate-500 font-bold text-sm mb-8 leading-relaxed">
-                                                Solo las tiendas con un plan de pago pueden ver los mensajes de sus potenciales clientes y cerrar ventas en tiempo real.
-                                            </p>
-                                            <Button
-                                                onClick={() => setShowUpgradeModal(true)}
-                                                className="w-full h-14 rounded-2xl font-black bg-primary-600 text-white hover:bg-primary-700 shadow-xl shadow-primary-200"
-                                            >
-                                                Ver planes de pago
-                                            </Button>
+                    {/* Chat Area */}
+                    <div className={cn(
+                        "flex-1 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0",
+                        isMobileListVisible && "hidden md:flex"
+                    )}>
+                        {selectedChatId ? (
+                            <>
+                                {/* Chat Header */}
+                                <div className="h-16 md:h-16 px-4 md:px-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setIsMobileListVisible(true)} className="md:hidden -ml-2 p-2 text-slate-400">
+                                            <ArrowLeft size={20} />
+                                        </button>
+
+                                        <div className="h-10 w-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
+                                            {selectedChatData?.avatar ? (
+                                                <img src={selectedChatData.avatar} alt={selectedChatData?.name} className="h-full w-full object-cover" />
+                                            ) : (
+                                                <div className="h-full w-full flex items-center justify-center text-slate-400">
+                                                    {selectedChatData?.role === 'store' ? <Store size={18} /> : <User size={18} />}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h2 className="font-bold text-slate-900">{selectedChatData?.name}</h2>
+                                            {activeTab === 'buying' && selectedChatData?.slug && (
+                                                <Link to={`/catalogo/${selectedChatData.slug}`} className="text-xs text-primary-600 hover:underline">
+                                                    Ver Tienda
+                                                </Link>
+                                            )}
                                         </div>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Input */}
-                            <div className="p-4 bg-white border-t border-slate-100">
-                                <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
-                                    <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-200 focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary-100 transition-all flex items-center px-1">
-                                        <Input
-                                            value={messageText}
-                                            onChange={e => setMessageText(e.target.value)}
-                                            placeholder={isPaywalled ? "Mejora para chatear..." : "Escribe un mensaje..."}
-                                            disabled={isPaywalled}
-                                            className="border-none bg-transparent h-11 focus:ring-0 text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
-                                        />
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleDeleteConversation}
+                                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                                            title="Borrar conversación"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
                                     </div>
-                                    <Button type="submit" disabled={!messageText.trim() || isPaywalled} className="h-11 w-11 rounded-xl p-0 flex items-center justify-center bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-200 hover:scale-105 active:scale-95 transition-all">
-                                        <Send size={18} className={cn(messageText.trim() && !isPaywalled && "ml-0.5")} />
-                                    </Button>
-                                </form>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/30">
-                            <div className="h-24 w-24 bg-gradient-to-br from-primary-50 to-indigo-50 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-slate-100 rotate-6 transform">
-                                <MessageCircle size={40} className="text-primary-300" />
-                            </div>
-                            <h2 className="text-2xl font-bold text-slate-900 mb-2">Tus Mensajes</h2>
-                            <p className="text-slate-500 max-w-sm">
-                                Selecciona una conversación para leer y enviar mensajes en tiempo real.
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </main>
+                                </div>
 
-            {/* Delete Confirmation Modal */}
-            <Modal
-                isOpen={!!chatToDelete}
-                onClose={() => !isDeleting && setChatToDelete(null)}
-                title="Borrar conversación"
-                maxWidth="sm"
-            >
-                <div className="p-6">
-                    <div className="flex items-center gap-4 mb-4 text-red-600">
-                        <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
-                            <AlertTriangle size={20} />
-                        </div>
-                        <p className="font-bold">¿Estás seguro de borrar esta conversación?</p>
-                    </div>
-                    <p className="text-sm text-slate-600 mb-6">
-                        Se eliminarán los mensajes para ti. La otra persona aún podrá ver la conversación a menos que también la elimine.
-                    </p>
-                    <div className="flex gap-3">
-                        <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => setChatToDelete(null)}
-                            disabled={isDeleting}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                            onClick={handleConfirmDelete}
-                            disabled={isDeleting}
-                        >
-                            {isDeleting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Borrar'}
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
+                                {/* Messages List */}
+                                <div
+                                    className="flex-1 overflow-hidden relative bg-slate-50/50"
+                                >
+                                    <div ref={scrollableRef} className={cn("h-full overflow-y-auto p-6 space-y-4 custom-scrollbar", isPaywalled && "blur-[8px] select-none pointer-events-none")}>
+                                        {messages.map((msg, idx) => {
+                                            const isMe = activeTab === 'buying' ? msg.sender_type === 'customer' : msg.sender_type === 'store';
+                                            const showTime = idx === messages.length - 1 || messages[idx + 1].sender_type !== msg.sender_type;
 
-            <PlanUpgradeModal
-                isOpen={showUpgradeModal}
-                onClose={() => setShowUpgradeModal(false)}
-                companyId={company?.id}
-            />
-        </div>
+                                            return (
+                                                <div key={msg.id} className={cn("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
+                                                    <div className={cn(
+                                                        "px-4 py-2.5 text-sm rounded-2xl shadow-sm relative group break-words min-w-[80px]",
+                                                        isMe ? "bg-primary-600 text-white rounded-tr-sm" : "bg-white text-slate-800 border border-slate-100 rounded-tl-sm"
+                                                    )}>
+                                                        {editingMessageId === msg.id ? (
+                                                            <div className="flex items-center gap-2 min-w-[120px]">
+                                                                <input
+                                                                    value={editText}
+                                                                    onChange={e => setEditText(e.target.value)}
+                                                                    className="bg-white/20 text-white border-none rounded px-2 py-1 text-sm w-full focus:ring-1 focus:ring-white/50 placeholder-white/50"
+                                                                    autoFocus
+                                                                    onKeyDown={e => {
+                                                                        if (e.key === 'Enter') saveEdit(msg.id);
+                                                                        if (e.key === 'Escape') cancelEditing();
+                                                                    }}
+                                                                />
+                                                                <button onClick={() => saveEdit(msg.id)} className="p-1 hover:bg-white/20 rounded"><Check size={14} /></button>
+                                                                <button onClick={cancelEditing} className="p-1 hover:bg-white/20 rounded"><X size={14} /></button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col gap-1">
+                                                                {msg.content}
+                                                                {(msg.updated_at && msg.updated_at !== msg.created_at || msg.is_edited) && (
+                                                                    <span className={cn("text-[9px] mt-0.5", isMe ? "text-white/60" : "text-slate-400")}>
+                                                                        (editado)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {isMe && !editingMessageId && (
+                                                            <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); startEditing(msg); }}
+                                                                    className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-primary-600 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil size={12} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                                    className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white shadow-md rounded-full border border-slate-100 transition-all active:scale-90"
+                                                                    title="Eliminar"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {showTime && (
+                                                        <span className="text-[10px] text-slate-400 mt-1 px-1 flex items-center gap-1 font-medium">
+                                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            {isMe && (
+                                                                msg.is_read
+                                                                    ? <CheckCheck size={14} className="text-blue-500" />
+                                                                    : <Check size={12} className="text-slate-300" />
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+
+                                    {/* Paywall Overlay */}
+                                    {isPaywalled && (
+                                        <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-white/10 backdrop-blur-[2px]">
+                                            <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 max-w-sm text-center animate-in zoom-in-95 duration-300">
+                                                <div className="h-16 w-16 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                                    <Zap size={32} className="fill-current" />
+                                                </div>
+                                                <h3 className="text-xl font-black text-slate-900 mb-3">Función Exclusiva</h3>
+                                                <p className="text-slate-500 font-bold text-sm mb-8 leading-relaxed">
+                                                    Solo las tiendas con un plan de pago pueden ver los mensajes de sus potenciales clientes y cerrar ventas en tiempo real.
+                                                </p>
+                                                <Button
+                                                    onClick={() => setShowUpgradeModal(true)}
+                                                    className="w-full h-14 rounded-2xl font-black bg-primary-600 text-white hover:bg-primary-700 shadow-xl shadow-primary-200"
+                                                >
+                                                    Ver planes de pago
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Input */}
+                                <div className="p-4 bg-white border-t border-slate-100">
+                                    <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                                        <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-200 focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary-100 transition-all flex items-center px-1">
+                                            <Input
+                                                value={messageText}
+                                                onChange={e => setMessageText(e.target.value)}
+                                                placeholder={isPaywalled ? "Mejora para chatear..." : "Escribe un mensaje..."}
+                                                disabled={isPaywalled}
+                                                className="border-none bg-transparent h-11 focus:ring-0 text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
+                                            />
+                                        </div>
+                                        <Button type="submit" disabled={!messageText.trim() || isPaywalled} className="h-11 w-11 rounded-xl p-0 flex items-center justify-center bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-200 hover:scale-105 active:scale-95 transition-all">
+                                            <Send size={18} className={cn(messageText.trim() && !isPaywalled && "ml-0.5")} />
+                                        </Button>
+                                    </form>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/30">
+                                <div className="h-24 w-24 bg-gradient-to-br from-primary-50 to-indigo-50 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-slate-100 rotate-6 transform">
+                                    <MessageCircle size={40} className="text-primary-300" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-slate-900 mb-2">Tus Mensajes</h2>
+                                <p className="text-slate-500 max-w-sm">
+                                    Selecciona una conversación para leer y enviar mensajes en tiempo real.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </main>
+
+                {/* Delete Confirmation Modal */}
+                <Modal
+                    isOpen={!!chatToDelete}
+                    onClose={() => !isDeleting && setChatToDelete(null)}
+                    title="Borrar conversación"
+                    maxWidth="sm"
+                >
+                    <div className="p-6">
+                        <div className="flex items-center gap-4 mb-4 text-red-600">
+                            <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                                <AlertTriangle size={20} />
+                            </div>
+                            <p className="font-bold">¿Estás seguro de borrar esta conversación?</p>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-6">
+                            Se eliminarán los mensajes para ti. La otra persona aún podrá ver la conversación a menos que también la elimine.
+                        </p>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => setChatToDelete(null)}
+                                disabled={isDeleting}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                onClick={handleConfirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Borrar'}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+
+                <PlanUpgradeModal
+                    isOpen={showUpgradeModal}
+                    onClose={() => setShowUpgradeModal(false)}
+                    companyId={company?.id}
+                />
+            </div>
+        </>
     );
 }

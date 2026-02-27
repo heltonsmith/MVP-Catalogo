@@ -259,9 +259,10 @@ export default function PublicExplorer() {
     return (
         <div className="min-h-screen bg-slate-50 pt-20 pb-12">
             <SEO
-                title="Explora Tiendas y Mayoristas"
-                description="Descubre emprendedores locales, mayoristas y tiendas en Chile. Filtra por ubicación y categoría para encontrar lo que necesitas."
+                title="Explora Tiendas, Restaurantes y Mayoristas en Chile"
+                description="Encuentra tus tiendas favoritas, restaurantes con carta digital y mayoristas cerca de ti. Filtra por ubicación, categoría y tipo de negocio en Ktaloog.com."
                 url="https://www.ktaloog.com/explorar"
+                keywords="explorar tiendas chile, restaurantes carta digital, mayoristas cerca de mi, buscador de tiendas, tiendas favoritas, catálogos digitales"
             />
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Hero Header */}

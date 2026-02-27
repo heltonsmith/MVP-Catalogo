@@ -19,6 +19,7 @@ import { TooltipCard } from '../ui/Tooltip';
 
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { useNotifications } from '../../hooks/useNotifications';
+import { SEO } from '../layout/SEO';
 
 export function DashboardLayout() {
     const navigate = useNavigate();
@@ -60,6 +61,7 @@ export function DashboardLayout() {
 
     return (
         <div className="flex h-full w-full bg-slate-50 overscroll-none">
+            <SEO title="Panel de Control" noindex={true} />
             {/* Sidebar for Desktop */}
             <aside className="hidden w-72 border-r border-slate-200 bg-white md:flex flex-col">
                 <div className="p-6 border-b border-slate-100">

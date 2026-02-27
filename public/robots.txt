@@ -7,4 +7,4 @@ Disallow: /admin/
 Disallow: /dashboard/
 Disallow: /checkout/
 
-Sitemap: https://www.ktaloog.com/sitemap.xml
+Sitemap: https://dkrosrrlkerbkjggrvuy.supabase.co/functions/v1/sitemap

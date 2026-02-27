@@ -1,6 +1,7 @@
 import { Target, Users, Sparkles, Heart } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Link } from 'react-router-dom';
+import { SEO } from '../components/layout/SEO';
 
 export default function AboutUsPage() {
     const values = [
@@ -11,6 +12,11 @@ export default function AboutUsPage() {
 
     return (
         <div className="bg-white min-h-screen">
+            <SEO
+                title="Sobre Nosotros"
+                description="Conoce la historia de Ktaloog.com. Nuestra misión es digitalizar a los emprendedores de Chile con herramientas profesionales y accesibles para potenciar sus ventas."
+                keywords="sobre ktaloog, misión empresa, digitalización pymes chile, equipo ktaloog"
+            />
             {/* Hero Section */}
             <div className="relative py-24 bg-slate-900 overflow-hidden">
                 <div className="absolute inset-0 opacity-20">

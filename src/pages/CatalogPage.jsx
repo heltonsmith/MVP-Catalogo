@@ -779,6 +779,7 @@ export default function CatalogPage() {
                 image={company?.logo || company?.banner}
                 url={`https://www.ktaloog.com/catalogo/${companySlug}`}
                 type="profile"
+                keywords={`${company?.name}, catálogo digital, ${company?.business_type === 'wholesale' ? 'mayorista' : 'tienda'}, chile, ktaloog`}
             />
             {/* Company Header */}
             <div

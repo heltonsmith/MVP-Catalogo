@@ -1,8 +1,14 @@
 import { ShieldCheck, Lock, EyeOff, Server, HardDrive, Bell } from 'lucide-react';
+import { SEO } from '../components/layout/SEO';
 
 export default function PrivacyPage() {
     return (
         <div className="bg-slate-50 min-h-screen py-16 px-4">
+            <SEO
+                title="Política de Privacidad"
+                description="Tu privacidad es nuestra prioridad. Conoce cómo protegemos tus datos personales y comerciales en Ktaloog.com con estándares de seguridad avanzados."
+                keywords="privacidad ktaloog, protección de datos, seguridad de datos chile"
+            />
             <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="bg-primary-600 p-10 text-white relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
