@@ -26,6 +26,8 @@ const AboutUsPage = lazy(() => import('../pages/AboutUsPage'));
 const PrivacyPage = lazy(() => import('../pages/PrivacyPage'));
 const HelpPage = lazy(() => import('../pages/HelpPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('../pages/ResetPassword'));
 
 // Dashboard Pages
 const DashboardOverview = lazy(() => import('../pages/DashboardOverview'));
@@ -91,6 +93,8 @@ export function AppRouter() {
                     <Route path="/ayuda" element={<HelpPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/registro" element={<RegisterPage />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Route>
 

@@ -97,7 +97,16 @@ export default function CustomerFavorites() {
 
 
     const filteredFavorites = favorites.filter(f => {
-        const matchesTab = activeTab === 'all' || f.company?.business_type === activeTab;
+        let matchesTab = activeTab === 'all';
+        if (!matchesTab) {
+            if (activeTab === 'retail') {
+                matchesTab = f.company?.business_type === 'retail' || f.company?.business_type === 'mixed';
+            } else if (activeTab === 'wholesale') {
+                matchesTab = f.company?.business_type === 'wholesale' || f.company?.business_type === 'mixed';
+            } else {
+                matchesTab = f.company?.business_type === activeTab;
+            }
+        }
         const matchesSearch = f.company?.name?.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTab && matchesSearch;
     });

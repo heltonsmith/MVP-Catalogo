@@ -62,7 +62,13 @@ export default function AdminExplorer() {
                 query = query.or(`region.ilike.%${city}%,city.ilike.%${city}%,commune.ilike.%${city}%`);
             }
             if (activeFilter !== 'all') {
-                query = query.eq('business_type', activeFilter);
+                if (activeFilter === 'retail') {
+                    query = query.in('business_type', ['retail', 'mixed']);
+                } else if (activeFilter === 'wholesale') {
+                    query = query.in('business_type', ['wholesale', 'mixed']);
+                } else {
+                    query = query.eq('business_type', activeFilter);
+                }
             }
 
             // Apply Tab Sorting

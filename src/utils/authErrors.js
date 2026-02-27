@@ -24,8 +24,8 @@ export const translateAuthError = (error) => {
     if (message.includes("Check your email for the confirmation link")) {
         return "Por favor, revisa tu correo para el enlace de confirmación.";
     }
-    if (message.includes("Too many requests")) {
-        return "Demasiados intentos. Por favor, inténtalo más tarde.";
+    if (message.includes("Too many requests") || message.includes("rate limit exceeded")) {
+        return "Límite de correos excedido. Por favor, espera unos minutos e inténtalo de nuevo.";
     }
     if (message.includes("Network request failed")) {
         return "Error de red. Verifica tu conexión a internet.";
@@ -43,6 +43,9 @@ export const translateAuthError = (error) => {
         return message; // Already in Spanish from AuthContext
     }
 
+    if (message.includes("Error sending recovery email") || message.includes("Error sending confirmation mail")) {
+        return "Error al enviar el correo. Por favor, verifica la configuración de SMTP o inténtalo más tarde.";
+    }
     // Default error mapping if no specific match
     console.warn("Untranslated auth error:", message);
     return "Ocurrió un problema con la autenticación. Por favor, inténtalo de nuevo.";

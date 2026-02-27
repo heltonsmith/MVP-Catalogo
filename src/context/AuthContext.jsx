@@ -408,6 +408,20 @@ export const AuthProvider = ({ children }) => {
         return { data, error };
     };
 
+    const resetPasswordForEmail = async (email) => {
+        console.log('AuthContext: resetPasswordForEmail called for:', email);
+        return await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`
+        });
+    };
+
+    const updatePassword = async (newPassword) => {
+        console.log('AuthContext: updatePassword called');
+        return await supabase.auth.updateUser({
+            password: newPassword
+        });
+    };
+
     const signOut = async () => {
         setIsObserving(false);
         setObserverData(null);
@@ -417,6 +431,17 @@ export const AuthProvider = ({ children }) => {
         setCompany(null);
         setPendingUpgrade(null);
         setUnreadNotifications(0);
+    };
+
+    const resendConfirmationEmail = async (email) => {
+        console.log('AuthContext: resendConfirmationEmail called for:', email);
+        return await supabase.auth.resend({
+            type: 'signup',
+            email: email,
+            options: {
+                emailRedirectTo: `${window.location.origin}/login`
+            }
+        });
     };
 
     const handleAutoDowngrade = async (companyData) => {
@@ -530,6 +555,9 @@ export const AuthProvider = ({ children }) => {
         signIn,
         signInWithSocial,
         signOut,
+        resetPasswordForEmail,
+        resendConfirmationEmail,
+        updatePassword,
         refreshCompany,
         refreshProfile: refreshCompany,
         user,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Rocket, Instagram, Twitter, Linkedin, Globe, Phone, Loader2, BadgeCheck, TrendingUp, User, Search, Heart, Star, Smile, Cloud, Moon, Sun, Zap, Music, Camera, Coffee, ShoppingBag } from 'lucide-react';
+import { Rocket, Mail, Instagram, Twitter, Linkedin, Globe, Phone, Loader2, BadgeCheck, TrendingUp, User, Search, Heart, Star, Smile, Cloud, Moon, Sun, Zap, Music, Camera, Coffee, ShoppingBag } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
 import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl } from '../utils';
+import { CAPTCHA_ICONS } from '../constants/auth';
 
 // --- Branded SVG Icons for Social Providers ---
 const GoogleIcon = () => (
@@ -27,27 +28,18 @@ const TikTokIcon = () => (
     </svg>
 );
 
-const CAPTCHA_ICONS = [
-    { id: 'heart', component: Heart, label: 'Corazón' },
-    { id: 'star', component: Star, label: 'Estrella' },
-    { id: 'smile', component: Smile, label: 'Cara Feliz' },
-    { id: 'cloud', component: Cloud, label: 'Nube' },
-    { id: 'moon', component: Moon, label: 'Luna' },
-    { id: 'sun', component: Sun, label: 'Sol' },
-    { id: 'zap', component: Zap, label: 'Rayo' },
-    { id: 'music', component: Music, label: 'Nota Musical' },
-    { id: 'camera', component: Camera, label: 'Cámara' },
-    { id: 'coffee', component: Coffee, label: 'Café' },
-];
 
 export default function RegisterPage() {
     const navigate = useNavigate();
     const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [resendLoading, setResendLoading] = useState(false);
+    const [countdown, setCountdown] = useState(0);
     const [captcha, setCaptcha] = useState({ target: null, options: [] });
     const [selectedIconId, setSelectedIconId] = useState(null);
-    const { user, profile, signUp, signInWithSocial, loading: authLoading } = useAuth();
+    const { user, profile, signUp, signInWithSocial, resendConfirmationEmail, loading: authLoading } = useAuth();
     const [socialLoading, setSocialLoading] = useState(null);
+    const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
     // Handle redirection once we have the user and their profile
     useEffect(() => {
@@ -66,6 +58,22 @@ export default function RegisterPage() {
             }
         }
     }, [user, profile, authLoading, navigate]);
+
+    useEffect(() => {
+        let timer;
+        if (countdown > 0) {
+            timer = setInterval(() => {
+                setCountdown(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [countdown]);
+
+    useEffect(() => {
+        if (registrationSuccess) {
+            setCountdown(60);
+        }
+    }, [registrationSuccess]);
 
     const generateCaptcha = () => {
         // Shuffle and pick 5
@@ -309,10 +317,16 @@ export default function RegisterPage() {
                     }
                 }
 
-                showToast(isAdmin ? "Cuenta de Administrador creada exitosamente." : "Cuenta creada exitosamente. ¡Bienvenido!", "success");
+                // If there is no session but registration was successful, 
+                // it means confirmation is required
+                if (!authData.session) {
+                    setRegistrationSuccess(true);
+                    showToast("Por favor, revisa tu correo para confirmar tu cuenta.", "success");
+                } else {
+                    showToast(isAdmin ? "Cuenta de Administrador creada exitosamente." : "Cuenta creada exitosamente. ¡Bienvenido!", "success");
+                }
 
-                // We DON'T navigate here. useEffect will handle it once profile is loaded.
-                console.log('RegisterPage: Registration successful, waiting for profile...');
+                console.log('RegisterPage: Registration successful');
             }
         } catch (error) {
             console.error('Registration error:', error);
@@ -346,380 +360,445 @@ export default function RegisterPage() {
             {/* Left Side: Form Section */}
             <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 overflow-y-auto bg-slate-50/50">
                 <div className="mx-auto w-full max-w-xl lg:w-[500px]">
-                    <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
-                        <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-xl shadow-primary-200 ring-4 ring-white transition-transform hover:scale-110">
-                            <Rocket size={24} />
-                        </Link>
-                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-                            {formData.role === 'owner' ? 'Emprende con Ktaloog' : 'Únete a la Comunidad'}
-                        </h2>
-                        <p className="mt-3 text-slate-500 font-medium text-sm leading-relaxed max-w-sm">
-                            {formData.role === 'owner'
-                                ? 'Crea tu catálogo profesional en minutos y llega a miles de clientes.'
-                                : 'Guarda tus tiendas favoritas, gestiona pedidos y obtén atención personalizada.'}
-                        </p>
-                    </div>
+                    {registrationSuccess ? (
+                        <div className="flex flex-col items-center text-center space-y-6 py-12">
+                            <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 animate-bounce">
+                                <Mail size={40} />
+                            </div>
+                            <div className="space-y-2">
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight">¡Casi listo!</h2>
+                                <p className="text-slate-500 font-medium">
+                                    Hemos enviado un enlace de confirmación a <span className="text-slate-900 font-bold">{formData.email}</span>.
+                                </p>
+                            </div>
+                            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm max-w-sm">
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    Para proteger tu privacidad, necesitamos verificar que este correo te pertenece antes de habilitar tu acceso.
+                                </p>
+                            </div>
+                            <div className="pt-6 w-full space-y-4">
+                                <Button
+                                    onClick={() => navigate('/login')}
+                                    className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary-200"
+                                >
+                                    IR AL INICIO DE SESIÓN
+                                </Button>
 
-                    <form onSubmit={handleSubmit} className="mt-10 space-y-8 pb-12">
-                        {/* Role Selector with Radio Buttons */}
-                        <div className="grid grid-cols-2 gap-3 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                            <label className={cn(
-                                "flex flex-col items-center justify-center gap-2 cursor-pointer p-4 rounded-xl border-2 transition-all",
-                                formData.role === 'client'
-                                    ? "border-primary-500 bg-primary-50/50"
-                                    : "border-transparent hover:bg-slate-50"
-                            )}>
-                                <input
-                                    type="radio"
-                                    name="role"
-                                    value="client"
-                                    checked={formData.role === 'client'}
-                                    onChange={() => setFormData(prev => ({ ...prev, role: 'client' }))}
-                                    className="sr-only"
-                                />
-                                <div className={cn("p-2 rounded-lg", formData.role === 'client' ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400")}>
-                                    <User size={20} />
-                                </div>
-                                <span className={cn("text-xs font-black uppercase tracking-widest", formData.role === 'client' ? "text-primary-700" : "text-slate-400")}>Cliente</span>
-                            </label>
-
-                            <label className={cn(
-                                "flex flex-col items-center justify-center gap-2 cursor-pointer p-4 rounded-xl border-2 transition-all",
-                                formData.role === 'owner'
-                                    ? "border-primary-500 bg-primary-50/50"
-                                    : "border-transparent hover:bg-slate-50"
-                            )}>
-                                <input
-                                    type="radio"
-                                    name="role"
-                                    value="owner"
-                                    checked={formData.role === 'owner'}
-                                    onChange={() => setFormData(prev => ({ ...prev, role: 'owner' }))}
-                                    className="sr-only"
-                                />
-                                <div className={cn("p-2 rounded-lg", formData.role === 'owner' ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400")}>
-                                    <Rocket size={20} />
-                                </div>
-                                <span className={cn("text-xs font-black uppercase tracking-widest", formData.role === 'owner' ? "text-primary-700" : "text-slate-400")}>Emprendedor</span>
-                            </label>
-                        </div>
-
-                        {/* Social Registration for Clients */}
-                        {formData.role === 'client' && (
-                            <div className="space-y-4">
-                                {/* Social Sign Up */}
-                                <div className="space-y-3 pt-2">
-                                    <Button
+                                <div className="flex flex-col items-center gap-2">
+                                    <button
                                         type="button"
-                                        variant="secondary"
-                                        className="w-full h-11 flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50"
-                                        onClick={() => handleSocialLogin('google')}
-                                        disabled={!!socialLoading || loading}
+                                        onClick={async () => {
+                                            if (countdown > 0 || resendLoading) return;
+                                            setResendLoading(true);
+                                            try {
+                                                const { error } = await resendConfirmationEmail(formData.email);
+                                                if (error) throw error;
+                                                showToast("Correo de confirmación re-enviado", "success");
+                                                setCountdown(60);
+                                            } catch (error) {
+                                                showToast("Error al reenviar: " + error.message, "error");
+                                            } finally {
+                                                setResendLoading(false);
+                                            }
+                                        }}
+                                        disabled={countdown > 0 || resendLoading}
+                                        className={cn(
+                                            "text-xs font-bold uppercase tracking-widest transition-colors",
+                                            countdown > 0 || resendLoading
+                                                ? "text-slate-300 cursor-not-allowed"
+                                                : "text-primary-600 hover:text-primary-700"
+                                        )}
                                     >
-                                        {socialLoading === 'google' ? (
-                                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                                        ) : (
+                                        {resendLoading ? "Enviando..." : countdown > 0 ? `Reenviar en ${countdown}s` : "¿No recibiste el correo? Reenviar"}
+                                    </button>
+
+                                    <button
+                                        onClick={() => setRegistrationSuccess(false)}
+                                        className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-primary-600 transition-colors"
+                                    >
+                                        ¿Te equivocaste de correo? Volver
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+                                <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-xl shadow-primary-200 ring-4 ring-white transition-transform hover:scale-110">
+                                    <Rocket size={24} />
+                                </Link>
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                                    {formData.role === 'owner' ? 'Emprende con Ktaloog' : 'Únete a la Comunidad'}
+                                </h2>
+                                <p className="mt-3 text-slate-500 font-medium text-sm leading-relaxed max-w-sm">
+                                    {formData.role === 'owner'
+                                        ? 'Crea tu catálogo profesional en minutos y llega a miles de clientes.'
+                                        : 'Guarda tus tiendas favoritas, gestiona pedidos y obtén atención personalizada.'}
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="mt-10 space-y-8 pb-12">
+                                {/* Role Selector with Radio Buttons */}
+                                <div className="grid grid-cols-2 gap-3 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                                    <label className={cn(
+                                        "flex flex-col items-center justify-center gap-2 cursor-pointer p-4 rounded-xl border-2 transition-all",
+                                        formData.role === 'client'
+                                            ? "border-primary-500 bg-primary-50/50"
+                                            : "border-transparent hover:bg-slate-50"
+                                    )}>
+                                        <input
+                                            type="radio"
+                                            name="role"
+                                            value="client"
+                                            checked={formData.role === 'client'}
+                                            onChange={() => setFormData(prev => ({ ...prev, role: 'client' }))}
+                                            className="sr-only"
+                                        />
+                                        <div className={cn("p-2 rounded-lg", formData.role === 'client' ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400")}>
+                                            <User size={20} />
+                                        </div>
+                                        <span className={cn("text-xs font-black uppercase tracking-widest", formData.role === 'client' ? "text-primary-700" : "text-slate-400")}>Cliente</span>
+                                    </label>
+
+                                    <label className={cn(
+                                        "flex flex-col items-center justify-center gap-2 cursor-pointer p-4 rounded-xl border-2 transition-all",
+                                        formData.role === 'owner'
+                                            ? "border-primary-500 bg-primary-50/50"
+                                            : "border-transparent hover:bg-slate-50"
+                                    )}>
+                                        <input
+                                            type="radio"
+                                            name="role"
+                                            value="owner"
+                                            checked={formData.role === 'owner'}
+                                            onChange={() => setFormData(prev => ({ ...prev, role: 'owner' }))}
+                                            className="sr-only"
+                                        />
+                                        <div className={cn("p-2 rounded-lg", formData.role === 'owner' ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400")}>
+                                            <Rocket size={20} />
+                                        </div>
+                                        <span className={cn("text-xs font-black uppercase tracking-widest", formData.role === 'owner' ? "text-primary-700" : "text-slate-400")}>Emprendedor</span>
+                                    </label>
+                                </div>
+
+                                {/* Social Registration for Clients */}
+                                {formData.role === 'client' && (
+                                    <div className="space-y-4">
+                                        {/* Social Sign Up */}
+                                        <div className="space-y-3 pt-2">
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                className="w-full h-11 flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50"
+                                                onClick={() => handleSocialLogin('google')}
+                                                disabled={!!socialLoading || loading}
+                                            >
+                                                {socialLoading === 'google' ? (
+                                                    <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                                                ) : (
+                                                    <>
+                                                        <GoogleIcon />
+                                                        Registrarse con Google
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+
+                                        <div className="relative my-6">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <div className="w-full border-t border-slate-200" />
+                                            </div>
+                                            <div className="relative flex justify-center text-xs uppercase">
+                                                <span className="bg-slate-50 px-3 text-slate-400 font-bold">o regístrate con email</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Datos Personales */}
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">1</span>
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Identidad</h3>
+                                    </div>
+                                    <div className={cn("grid gap-4", formData.role === 'owner' ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+                                        <Input
+                                            label="Nombre completo"
+                                            name="fullName"
+                                            placeholder="Juan Pérez"
+                                            required
+                                            value={formData.fullName}
+                                            onChange={handleChange}
+                                            autoComplete="name"
+                                            className="bg-white"
+                                        />
+                                        {formData.role === 'owner' && (
+                                            <Input
+                                                label="RUT"
+                                                name="rut"
+                                                placeholder="12.345.678-9"
+                                                required
+                                                value={formData.rut}
+                                                onChange={handleChange}
+                                                error={formData.rut && !validateRut(formData.rut) ? "RUT inválido" : null}
+                                                className="bg-white"
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Emprendimiento - Block hidden for clients */}
+                                {formData.role === 'owner' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">2</span>
+                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Tu Emprendimiento</h3>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <Input
+                                                label="Nombre de emprendimiento"
+                                                name="businessName"
+                                                placeholder="Mi Tienda Online"
+                                                required={formData.role === 'owner'}
+                                                value={formData.businessName}
+                                                onChange={handleChange}
+                                                className="bg-white"
+                                            />
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-bold text-slate-700">Descripción de la tienda</label>
+                                                <textarea
+                                                    name="description"
+                                                    placeholder="Cuéntanos brevemente sobre tu negocio..."
+                                                    className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-4 text-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-50 outline-none transition-all resize-none shadow-sm bg-white"
+                                                    value={formData.description}
+                                                    onChange={handleChange}
+                                                ></textarea>
+                                            </div>
+                                            <Input
+                                                label="Dirección (Real u Online)"
+                                                name="address"
+                                                placeholder="Calle Falsa 123 o mitienda.cl"
+                                                required={formData.role === 'owner'}
+                                                value={formData.address}
+                                                onChange={handleChange}
+                                                className="bg-white"
+                                            />
+
+                                            <div className="space-y-3">
+                                                <LocationSelector
+                                                    value={formData.location}
+                                                    onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
+                                                    className="gap-4"
+                                                />
+                                                <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="isOnline"
+                                                        name="isOnline"
+                                                        checked={formData.isOnline}
+                                                        onChange={handleChange}
+                                                        className="h-5 w-5 rounded-lg border-slate-300 text-primary-600 focus:ring-primary-500"
+                                                    />
+                                                    <label htmlFor="isOnline" className="text-xs font-bold text-slate-600 cursor-pointer">
+                                                        Mi tienda es 100% Online (No publicar ubicación)
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-6">
+                                                <div className="space-y-4">
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-sm font-bold text-slate-700">Tienda de Ventas</label>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                            {[
+                                                                { id: 'retail', label: 'Detalle' },
+                                                                { id: 'wholesale', label: 'Mayorista' },
+                                                                { id: 'mixed', label: 'Detalle y Mayorista' }
+                                                            ].map((type) => (
+                                                                <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="businessType"
+                                                                        value={type.id}
+                                                                        className="sr-only"
+                                                                        checked={formData.businessType === type.id}
+                                                                        onChange={handleChange}
+                                                                    />
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                                        {type.label}
+                                                                    </span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-sm font-bold text-slate-700">Negocios</label>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                            {[
+                                                                { id: 'restaurant', label: 'Restaurante' }
+                                                            ].map((type) => (
+                                                                <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="businessType"
+                                                                        value={type.id}
+                                                                        className="sr-only"
+                                                                        checked={formData.businessType === type.id}
+                                                                        onChange={handleChange}
+                                                                    />
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                                        {type.label}
+                                                                    </span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Presencia Digital */}
+                                {formData.role === 'owner' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">3</span>
+                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Presencia Digital</h3>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <Input
+                                                label="Web"
+                                                name="website"
+                                                placeholder="https://su-tienda.com"
+                                                icon={<Globe size={16} />}
+                                                value={formData.website}
+                                                onChange={handleChange}
+                                                error={formData.website && !isValidUrl(formData.website) ? "Debe usar https://" : null}
+                                                className="bg-white"
+                                            />
+                                            <Input
+                                                label="Instagram"
+                                                name="instagram"
+                                                placeholder="https://instagram.com/su-cuenta"
+                                                icon={<Instagram size={16} />}
+                                                value={formData.instagram}
+                                                onChange={handleChange}
+                                                error={formData.instagram && !isValidUrl(formData.instagram) ? "Debe usar https://" : null}
+                                                className="bg-white"
+                                            />
+                                            <Input
+                                                label="TikTok"
+                                                name="tiktok"
+                                                placeholder="https://tiktok.com/@su-cuenta"
+                                                icon={<TikTokIcon />}
+                                                value={formData.tiktok}
+                                                onChange={handleChange}
+                                                error={formData.tiktok && !isValidUrl(formData.tiktok) ? "Debe usar https://" : null}
+                                                className="bg-white"
+                                            />
+                                            <Input
+                                                label="WhatsApp"
+                                                name="whatsapp"
+                                                placeholder="+56..."
+                                                icon={<Phone size={16} />}
+                                                value={formData.whatsapp}
+                                                onChange={handleChange}
+                                                error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
+                                                className="bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Credenciales */}
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">
+                                            {formData.role === 'owner' ? '4' : '2'}
+                                        </span>
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Credenciales</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Input
+                                            label="Email"
+                                            name="email"
+                                            placeholder="tu@email.com"
+                                            type="email"
+                                            required
+                                            value={formData.email}
+                                            onChange={handleChange}
+                                            autoComplete="email"
+                                            className="bg-white"
+                                        />
+                                        <Input
+                                            label="Contraseña"
+                                            name="password"
+                                            placeholder="••••••••"
+                                            type="password"
+                                            required
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            autoComplete="new-password"
+                                            className="bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Bot Protection */}
+                                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Protección</h3>
+                                            <p className="text-[10px] font-bold text-slate-400">Toca el/la <span className="text-primary-600 underline">{captcha.target?.label}</span></p>
+                                        </div>
+                                        <button type="button" onClick={generateCaptcha} className="text-[10px] font-black text-primary-600 hover:underline">REGENERAR</button>
+                                    </div>
+
+                                    <div className="grid grid-cols-5 gap-2">
+                                        {captcha.options.map((item) => {
+                                            const Icon = item.component;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedIconId(item.id)}
+                                                    className={cn(
+                                                        "h-14 flex items-center justify-center rounded-xl border-2 transition-all active:scale-95",
+                                                        selectedIconId === item.id
+                                                            ? "bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-200"
+                                                            : "bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300"
+                                                    )}
+                                                >
+                                                    <Icon size={24} />
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 pt-4">
+                                    <Button type="submit" className="w-full h-14 text-lg font-black shadow-xl shadow-primary-200 rounded-2xl transition-all hover:-translate-y-1 active:scale-95" disabled={loading || (user && !profile && authLoading)}>
+                                        {loading || (user && !profile && authLoading) ? (
                                             <>
-                                                <GoogleIcon />
-                                                Registrarse con Google
+                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                Iniciando...
                                             </>
+                                        ) : (
+                                            formData.role === 'owner' ? 'CREAR MI CATÁLOGO' : 'UNIRME AHORA'
                                         )}
                                     </Button>
-                                </div>
 
-                                <div className="relative my-6">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t border-slate-200" />
-                                    </div>
-                                    <div className="relative flex justify-center text-xs uppercase">
-                                        <span className="bg-slate-50 px-3 text-slate-400 font-bold">o regístrate con email</span>
+                                    <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                        <Link to="/login" className="hover:text-primary-600 transition-colors">¿Ya tienes cuenta? Inicia Sesión</Link>
+                                        <span>•</span>
+                                        <Link to="/" className="hover:text-primary-600 transition-colors">Volver al Inicio</Link>
                                     </div>
                                 </div>
-                            </div>
-                        )}
-
-                        {/* Datos Personales */}
-                        <div className="space-y-6">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">1</span>
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Identidad</h3>
-                            </div>
-                            <div className={cn("grid gap-4", formData.role === 'owner' ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
-                                <Input
-                                    label="Nombre completo"
-                                    name="fullName"
-                                    placeholder="Juan Pérez"
-                                    required
-                                    value={formData.fullName}
-                                    onChange={handleChange}
-                                    autoComplete="name"
-                                    className="bg-white"
-                                />
-                                {formData.role === 'owner' && (
-                                    <Input
-                                        label="RUT"
-                                        name="rut"
-                                        placeholder="12.345.678-9"
-                                        required
-                                        value={formData.rut}
-                                        onChange={handleChange}
-                                        error={formData.rut && !validateRut(formData.rut) ? "RUT inválido" : null}
-                                        className="bg-white"
-                                    />
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Emprendimiento - Block hidden for clients */}
-                        {formData.role === 'owner' && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">2</span>
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Tu Emprendimiento</h3>
-                                </div>
-                                <div className="space-y-4">
-                                    <Input
-                                        label="Nombre de emprendimiento"
-                                        name="businessName"
-                                        placeholder="Mi Tienda Online"
-                                        required={formData.role === 'owner'}
-                                        value={formData.businessName}
-                                        onChange={handleChange}
-                                        className="bg-white"
-                                    />
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-slate-700">Descripción de la tienda</label>
-                                        <textarea
-                                            name="description"
-                                            placeholder="Cuéntanos brevemente sobre tu negocio..."
-                                            className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-4 text-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-50 outline-none transition-all resize-none shadow-sm bg-white"
-                                            value={formData.description}
-                                            onChange={handleChange}
-                                        ></textarea>
-                                    </div>
-                                    <Input
-                                        label="Dirección (Real u Online)"
-                                        name="address"
-                                        placeholder="Calle Falsa 123 o mitienda.cl"
-                                        required={formData.role === 'owner'}
-                                        value={formData.address}
-                                        onChange={handleChange}
-                                        className="bg-white"
-                                    />
-
-                                    <div className="space-y-3">
-                                        <LocationSelector
-                                            value={formData.location}
-                                            onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
-                                            className="gap-4"
-                                        />
-                                        <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                                            <input
-                                                type="checkbox"
-                                                id="isOnline"
-                                                name="isOnline"
-                                                checked={formData.isOnline}
-                                                onChange={handleChange}
-                                                className="h-5 w-5 rounded-lg border-slate-300 text-primary-600 focus:ring-primary-500"
-                                            />
-                                            <label htmlFor="isOnline" className="text-xs font-bold text-slate-600 cursor-pointer">
-                                                Mi tienda es 100% Online (No publicar ubicación)
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-6">
-                                        <div className="space-y-4">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-sm font-bold text-slate-700">Tienda de Ventas</label>
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                    {[
-                                                        { id: 'retail', label: 'Detalle' },
-                                                        { id: 'wholesale', label: 'Mayorista' },
-                                                        { id: 'mixed', label: 'Detalle y Mayorista' }
-                                                    ].map((type) => (
-                                                        <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
-                                                            <input
-                                                                type="radio"
-                                                                name="businessType"
-                                                                value={type.id}
-                                                                className="sr-only"
-                                                                checked={formData.businessType === type.id}
-                                                                onChange={handleChange}
-                                                            />
-                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
-                                                                {type.label}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-sm font-bold text-slate-700">Negocios</label>
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                    {[
-                                                        { id: 'restaurant', label: 'Restaurante' }
-                                                    ].map((type) => (
-                                                        <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
-                                                            <input
-                                                                type="radio"
-                                                                name="businessType"
-                                                                value={type.id}
-                                                                className="sr-only"
-                                                                checked={formData.businessType === type.id}
-                                                                onChange={handleChange}
-                                                            />
-                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
-                                                                {type.label}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Presencia Digital */}
-                        {formData.role === 'owner' && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">3</span>
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Presencia Digital</h3>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Input
-                                        label="Web"
-                                        name="website"
-                                        placeholder="https://su-tienda.com"
-                                        icon={<Globe size={16} />}
-                                        value={formData.website}
-                                        onChange={handleChange}
-                                        error={formData.website && !isValidUrl(formData.website) ? "Debe usar https://" : null}
-                                        className="bg-white"
-                                    />
-                                    <Input
-                                        label="Instagram"
-                                        name="instagram"
-                                        placeholder="https://instagram.com/su-cuenta"
-                                        icon={<Instagram size={16} />}
-                                        value={formData.instagram}
-                                        onChange={handleChange}
-                                        error={formData.instagram && !isValidUrl(formData.instagram) ? "Debe usar https://" : null}
-                                        className="bg-white"
-                                    />
-                                    <Input
-                                        label="TikTok"
-                                        name="tiktok"
-                                        placeholder="https://tiktok.com/@su-cuenta"
-                                        icon={<TikTokIcon />}
-                                        value={formData.tiktok}
-                                        onChange={handleChange}
-                                        error={formData.tiktok && !isValidUrl(formData.tiktok) ? "Debe usar https://" : null}
-                                        className="bg-white"
-                                    />
-                                    <Input
-                                        label="WhatsApp"
-                                        name="whatsapp"
-                                        placeholder="+56..."
-                                        icon={<Phone size={16} />}
-                                        value={formData.whatsapp}
-                                        onChange={handleChange}
-                                        error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
-                                        className="bg-white"
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Credenciales */}
-                        <div className="space-y-6">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">
-                                    {formData.role === 'owner' ? '4' : '2'}
-                                </span>
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Credenciales</h3>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Input
-                                    label="Email"
-                                    name="email"
-                                    placeholder="tu@email.com"
-                                    type="email"
-                                    required
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    autoComplete="email"
-                                    className="bg-white"
-                                />
-                                <Input
-                                    label="Contraseña"
-                                    name="password"
-                                    placeholder="••••••••"
-                                    type="password"
-                                    required
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    autoComplete="new-password"
-                                    className="bg-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Bot Protection */}
-                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Protección</h3>
-                                    <p className="text-[10px] font-bold text-slate-400">Toca el/la <span className="text-primary-600 underline">{captcha.target?.label}</span></p>
-                                </div>
-                                <button type="button" onClick={generateCaptcha} className="text-[10px] font-black text-primary-600 hover:underline">REGENERAR</button>
-                            </div>
-
-                            <div className="grid grid-cols-5 gap-2">
-                                {captcha.options.map((item) => {
-                                    const Icon = item.component;
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={() => setSelectedIconId(item.id)}
-                                            className={cn(
-                                                "h-14 flex items-center justify-center rounded-xl border-2 transition-all active:scale-95",
-                                                selectedIconId === item.id
-                                                    ? "bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-200"
-                                                    : "bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300"
-                                            )}
-                                        >
-                                            <Icon size={24} />
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 pt-4">
-                            <Button type="submit" className="w-full h-14 text-lg font-black shadow-xl shadow-primary-200 rounded-2xl transition-all hover:-translate-y-1 active:scale-95" disabled={loading || (user && !profile && authLoading)}>
-                                {loading || (user && !profile && authLoading) ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        Iniciando...
-                                    </>
-                                ) : (
-                                    formData.role === 'owner' ? 'CREAR MI CATÁLOGO' : 'UNIRME AHORA'
-                                )}
-                            </Button>
-
-                            <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                                <Link to="/login" className="hover:text-primary-600 transition-colors">¿Ya tienes cuenta? Inicia Sesión</Link>
-                                <span>•</span>
-                                <Link to="/" className="hover:text-primary-600 transition-colors">Volver al Inicio</Link>
-                            </div>
-                        </div>
-                    </form>
+                            </form>
+                        </>
+                    )}
                 </div>
             </div>
 

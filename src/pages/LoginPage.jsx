@@ -7,6 +7,8 @@ import { Card, CardContent } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { translateAuthError } from '../utils/authErrors';
+import { CAPTCHA_ICONS } from '../constants/auth';
+import { cn } from '../utils';
 
 // --- Branded SVG Icons for Social Providers ---
 const GoogleIcon = () => (
@@ -20,14 +22,41 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
     const navigate = useNavigate();
-    const { signIn, signInWithSocial, user, profile, loading: authLoading } = useAuth();
+    const { signIn, signInWithSocial, resendConfirmationEmail, user, profile, loading: authLoading } = useAuth();
     const { showToast } = useToast();
     const [localLoading, setLocalLoading] = useState(false);
+    const [resendLoading, setResendLoading] = useState(false);
+    const [countdown, setCountdown] = useState(0);
+    const [isUnconfirmed, setIsUnconfirmed] = useState(false);
     const [socialLoading, setSocialLoading] = useState(null); // Track which provider is loading
     const [formData, setFormData] = useState({
         email: '',
         password: ''
     });
+    const [captcha, setCaptcha] = useState({ target: null, options: [] });
+    const [selectedIconId, setSelectedIconId] = useState(null);
+
+    const generateCaptcha = () => {
+        const shuffled = [...CAPTCHA_ICONS].sort(() => 0.5 - Math.random());
+        const options = shuffled.slice(0, 5);
+        const target = options[Math.floor(Math.random() * options.length)];
+        setCaptcha({ target, options });
+        setSelectedIconId(null);
+    };
+
+    useEffect(() => {
+        generateCaptcha();
+    }, []);
+
+    useEffect(() => {
+        let timer;
+        if (countdown > 0) {
+            timer = setInterval(() => {
+                setCountdown(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [countdown]);
 
     // Handle redirection once we have the user and their profile
     useEffect(() => {
@@ -53,6 +82,18 @@ export default function LoginPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!selectedIconId) {
+            showToast("Por favor selecciona el ícono solicitado", "error");
+            return;
+        }
+
+        if (selectedIconId !== captcha.target.id) {
+            showToast("Ícono incorrecto. Inténtalo de nuevo.", "error");
+            generateCaptcha();
+            return;
+        }
+
         setLocalLoading(true);
 
         try {
@@ -73,7 +114,14 @@ export default function LoginPage() {
                 showToast("Sesión iniciada correctamente", "success");
             }
         } catch (error) {
-            showToast(translateAuthError(error), "error");
+            const translatedMessage = translateAuthError(error);
+            showToast(translatedMessage, "error");
+
+            // Check if error is about confirmation
+            if (error.message?.includes('Email not confirmed') || translatedMessage.includes('confirmado')) {
+                setIsUnconfirmed(true);
+            }
+
             setLocalLoading(false);
         }
     };
@@ -102,7 +150,7 @@ export default function LoginPage() {
     ];
 
     return (
-        <div className="flex min-h-[80vh] items-center justify-center px-4">
+        <div className="flex min-h-screen items-center justify-center px-4 py-10 sm:py-12">
             <Card className="w-full max-w-md border-none shadow-xl">
                 <CardContent className="p-8">
                     <div className="flex flex-col items-center text-center">
@@ -175,10 +223,79 @@ export default function LoginPage() {
                             <Lock className="absolute left-3 top-9 h-4 w-4 text-slate-400" />
                         </div>
 
-                        <div className="flex items-center justify-end">
-                            <button type="button" className="text-xs font-semibold text-primary-600 hover:text-primary-700">
+                        <div className="flex items-center justify-between">
+                            {isUnconfirmed ? (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (countdown > 0 || resendLoading) return;
+                                        setResendLoading(true);
+                                        try {
+                                            const { error } = await resendConfirmationEmail(formData.email);
+                                            if (error) throw error;
+                                            showToast("Correo de confirmación re-enviado", "success");
+                                            setCountdown(60);
+                                        } catch (error) {
+                                            showToast("Error al reenviar: " + error.message, "error");
+                                        } finally {
+                                            setResendLoading(false);
+                                        }
+                                    }}
+                                    disabled={countdown > 0 || resendLoading}
+                                    className={cn(
+                                        "text-xs font-bold uppercase tracking-widest transition-colors",
+                                        countdown > 0 || resendLoading
+                                            ? "text-slate-300 cursor-not-allowed"
+                                            : "text-primary-600 hover:text-primary-700 underline"
+                                    )}
+                                >
+                                    {resendLoading ? "Enviando..." : countdown > 0 ? `Reenviar en ${countdown}s` : "Reenviar correo de confirmación"}
+                                </button>
+                            ) : (
+                                <div />
+                            )}
+                            <Link
+                                to="/forgot-password"
+                                className="text-xs font-semibold text-primary-600 hover:text-primary-700 transition-colors"
+                            >
                                 ¿Olvidaste tu contraseña?
-                            </button>
+                            </Link>
+                        </div>
+
+                        {/* CAPTCHA Section */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    Verificación: Selecciona el <span className="text-primary-600">{captcha.target?.label}</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={generateCaptcha}
+                                    className="text-[10px] font-black text-primary-600 uppercase tracking-tighter hover:underline"
+                                >
+                                    Cambiar
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-5 gap-2">
+                                {captcha.options.map((option) => {
+                                    const Icon = option.component;
+                                    return (
+                                        <button
+                                            key={option.id}
+                                            type="button"
+                                            onClick={() => setSelectedIconId(option.id)}
+                                            className={cn(
+                                                "flex aspect-square items-center justify-center rounded-xl border-2 transition-all",
+                                                selectedIconId === option.id
+                                                    ? "border-primary-600 bg-primary-50 text-primary-600 shadow-md"
+                                                    : "border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50"
+                                            )}
+                                        >
+                                            <Icon size={20} />
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
                         <Button type="submit" className="w-full h-12 text-lg" disabled={isActuallyLoading}>
@@ -193,11 +310,23 @@ export default function LoginPage() {
                         </Button>
                     </form>
 
-                    <div className="mt-8 text-center text-sm text-slate-500">
-                        ¿No tienes una cuenta?{' '}
-                        <Link to="/registro" className="font-bold text-primary-600 hover:text-primary-700">
-                            Regístrate gratis
-                        </Link>
+                    <div className="mt-8 flex flex-col items-center gap-4">
+                        {!isUnconfirmed && (
+                            <button
+                                type="button"
+                                onClick={() => setIsUnconfirmed(true)}
+                                className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-primary-600 transition-colors"
+                            >
+                                ¿No recibiste tu correo de confirmación?
+                            </button>
+                        )}
+
+                        <p className="text-sm text-slate-500">
+                            ¿No tienes una cuenta?{' '}
+                            <Link to="/registro" className="font-bold text-primary-600 hover:text-primary-700">
+                                Regístrate gratis
+                            </Link>
+                        </p>
                     </div>
                 </CardContent>
             </Card>
