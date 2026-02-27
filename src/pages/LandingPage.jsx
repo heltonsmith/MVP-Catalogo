@@ -242,6 +242,19 @@ export default function LandingPage() {
                         ))}
                     </div>
 
+                    {/* Demo Notice */}
+                    <div className="mt-10 max-w-2xl mx-auto bg-teal-900/40 backdrop-blur-sm border border-teal-500/30 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                        <div className="h-10 w-10 bg-teal-500/20 rounded-full flex items-center justify-center shrink-0">
+                            <Sparkles className="text-teal-300" size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-white">
+                                ¡Prueba gratis! Solicita una cuenta <span className="font-black text-teal-300">Demo por {getSetting('demo_plan_days', '7')} días</span> y accede a funciones premium.
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">Disponible una única vez por tienda.</p>
+                        </div>
+                    </div>
+
                     <div className="mt-20 text-center animate-pulse-slow">
                         <Link to="/precios">
                             <Button variant="link" className="text-primary-400 hover:text-primary-300 font-black gap-2 group text-xl tracking-tight transition-all">

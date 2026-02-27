@@ -213,6 +213,18 @@ export default function RegisterPage() {
                 showToast("El RUT ingresado no es válido.", "error");
                 return;
             }
+            if (!formData.businessName.trim()) {
+                showToast("El nombre de emprendimiento es obligatorio.", "error");
+                return;
+            }
+            if (!formData.description.trim()) {
+                showToast("La descripción de la tienda es obligatoria.", "error");
+                return;
+            }
+            if (!formData.address.trim()) {
+                showToast("La dirección física es obligatoria.", "error");
+                return;
+            }
             if (!validatePhone(formData.whatsapp)) {
                 showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
                 return;
@@ -285,6 +297,7 @@ export default function RegisterPage() {
                                 whatsapp: formData.whatsapp,
                                 business_type: formData.businessType,
                                 description: formData.description || `Bienvenidos a ${formData.businessName}`,
+                                address: formData.address,
                                 features: {
                                     cartEnabled: formData.businessType !== 'restaurant'
                                 },
@@ -303,6 +316,13 @@ export default function RegisterPage() {
                             }]);
 
                         if (companyError) throw companyError;
+
+                        // Also save RUT to profiles table
+                        const { error: rutError } = await supabase
+                            .from('profiles')
+                            .update({ rut: formData.rut })
+                            .eq('id', authData.user.id);
+                        if (rutError) console.error('Error saving RUT to profile:', rutError);
                     }
                     // IF CLIENT -> Update profile role if needed (handled by trigger usually, else manual update)
                     else {
@@ -573,19 +593,20 @@ export default function RegisterPage() {
                                                     className="bg-white"
                                                 />
                                                 <div className="space-y-1.5">
-                                                    <label className="text-sm font-bold text-slate-700">Descripción de la tienda</label>
+                                                    <label className="text-sm font-bold text-slate-700">Descripción de la tienda <span className="text-red-500">*</span></label>
                                                     <textarea
                                                         name="description"
                                                         placeholder="Cuéntanos brevemente sobre tu negocio..."
+                                                        required
                                                         className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-4 text-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-50 outline-none transition-all resize-none shadow-sm bg-white"
                                                         value={formData.description}
                                                         onChange={handleChange}
                                                     ></textarea>
                                                 </div>
                                                 <Input
-                                                    label="Dirección (Real u Online)"
+                                                    label="Dirección Física"
                                                     name="address"
-                                                    placeholder="Calle Falsa 123 o mitienda.cl"
+                                                    placeholder="Av. Principal 123, Local 5"
                                                     required={formData.role === 'owner'}
                                                     value={formData.address}
                                                     onChange={handleChange}

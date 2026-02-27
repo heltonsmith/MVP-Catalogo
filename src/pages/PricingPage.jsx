@@ -144,6 +144,19 @@ export default function PricingPage() {
                     </p>
                 </div>
 
+                {/* Demo Notice */}
+                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl p-5 mb-10 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left max-w-3xl mx-auto">
+                    <div className="h-10 w-10 bg-teal-100 rounded-full flex items-center justify-center shrink-0">
+                        <Sparkles className="text-teal-600" size={20} />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-sm font-bold text-teal-800">
+                            ¡Prueba gratis! Solicita una cuenta <span className="font-black">Demo por {getSetting('demo_plan_days', '7')} días</span> y conoce todas las funciones premium sin costo.
+                        </p>
+                        <p className="text-xs text-teal-600 mt-0.5">Disponible una única vez por tienda.</p>
+                    </div>
+                </div>
+
                 {/* Launch Offers Banner */}
                 <div className="bg-white rounded-3xl shadow-xl p-8 mb-16 border border-primary-100 relative overflow-hidden">
                     <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary-50 rounded-full opacity-50" />

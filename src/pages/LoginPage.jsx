@@ -61,18 +61,24 @@ export default function LoginPage() {
 
     // Handle redirection once we have the user and their profile
     useEffect(() => {
-        if (!authLoading && user && profile) {
-            const role = profile.role || user?.user_metadata?.role;
-            console.log('LoginPage: Auth ready, redirecting based on role:', role);
-            if (role === 'admin') {
-                navigate('/admin');
-            } else if (role === 'owner') {
-                navigate('/dashboard');
-            } else if (role === 'client' || role === 'user') {
-                navigate('/dashboard/cliente');
-            } else {
-                navigate('/');
-            }
+        if (authLoading || !user) return;
+
+        // Use profile if available, otherwise fallback to user_metadata
+        const role = profile?.role || user?.user_metadata?.role;
+        if (!role && !profile) {
+            // Profile not loaded yet, wait a bit more but not forever
+            return;
+        }
+
+        console.log('LoginPage: Auth ready, redirecting based on role:', role);
+        if (role === 'admin') {
+            navigate('/admin');
+        } else if (role === 'owner') {
+            navigate('/dashboard');
+        } else if (role === 'client' || role === 'user') {
+            navigate('/dashboard/cliente');
+        } else {
+            navigate('/');
         }
     }, [user, profile, authLoading, navigate]);
 
@@ -113,6 +119,10 @@ export default function LoginPage() {
             if (data?.user && !error) {
                 console.log('LoginPage: Sign-in successful, waiting for profile...');
                 showToast("Sesión iniciada correctamente", "success");
+                // Safety: if redirect via useEffect doesn't happen within 8s, reset loading
+                setTimeout(() => {
+                    setLocalLoading(false);
+                }, 8000);
             }
         } catch (error) {
             const translatedMessage = translateAuthError(error);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Globe, Shield, Cloud, Save, Loader2, Package, Camera, Zap, Sparkles, Crown, DollarSign } from 'lucide-react';
+import { Globe, Shield, Cloud, Save, Loader2, Package, Camera, Zap, Sparkles, Crown, DollarSign, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -30,7 +30,11 @@ export default function AdminSettings() {
         pro_plan_price_semester: '18000',
         pro_plan_price_annual: '16000',
         custom_plan_product_limit: '1000',
-        custom_plan_image_limit: '10'
+        custom_plan_image_limit: '10',
+        demo_plan_days: '7',
+        demo_plan_product_limit: '10',
+        demo_plan_image_limit: '3',
+        demo_plan_price: '0'
     });
 
     useEffect(() => {
@@ -52,7 +56,11 @@ export default function AdminSettings() {
                 pro_plan_price_semester: settings.pro_plan_price_semester || '18000',
                 pro_plan_price_annual: settings.pro_plan_price_annual || '16000',
                 custom_plan_product_limit: settings.custom_plan_product_limit || '1000',
-                custom_plan_image_limit: settings.custom_plan_image_limit || '10'
+                custom_plan_image_limit: settings.custom_plan_image_limit || '10',
+                demo_plan_days: settings.demo_plan_days || '7',
+                demo_plan_product_limit: settings.demo_plan_product_limit || '10',
+                demo_plan_image_limit: settings.demo_plan_image_limit || '3',
+                demo_plan_price: settings.demo_plan_price || '0'
             });
         }
     }, [settings]);
@@ -106,6 +114,7 @@ export default function AdminSettings() {
                 {[
                     { id: 'general', label: 'General', icon: Globe },
                     { id: 'free', label: 'Plan Gratis', icon: Shield },
+                    { id: 'demo', label: 'Plan Demo', icon: Clock },
                     { id: 'plus', label: 'Plan Plus', icon: Zap },
                     { id: 'pro', label: 'Plan Pro', icon: Sparkles },
                     { id: 'custom', label: 'Plan Custom', icon: Crown },
@@ -193,6 +202,61 @@ export default function AdminSettings() {
                                         type="number"
                                         value={formData.free_plan_image_limit}
                                         onChange={(e) => handleInputChange('free_plan_image_limit', e.target.value)}
+                                        className="bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {activeTab === 'demo' && (
+                    <Card className="border-none shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <CardHeader className="border-b border-slate-50">
+                            <div className="flex items-center gap-2">
+                                <Clock size={20} className="text-teal-600" />
+                                <CardTitle>Configuración Plan Demo</CardTitle>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Las tiendas con plan gratuito podrán solicitar una cuenta demo por única vez.</p>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100">
+                                    <p className="font-bold text-slate-900 text-sm mb-4">Duración (Días)</p>
+                                    <Input
+                                        type="number"
+                                        value={formData.demo_plan_days}
+                                        onChange={(e) => handleInputChange('demo_plan_days', e.target.value)}
+                                        className="bg-white"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-2">Cantidad de días que durará la demo</p>
+                                </div>
+                                <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100">
+                                    <p className="font-bold text-slate-900 text-sm mb-4">Precio Referencial</p>
+                                    <Input
+                                        type="number"
+                                        value={formData.demo_plan_price}
+                                        onChange={(e) => handleInputChange('demo_plan_price', e.target.value)}
+                                        className="bg-white"
+                                        placeholder="0"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-2">Precio en CLP (0 = Gratis)</p>
+                                </div>
+                                <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100">
+                                    <p className="font-bold text-slate-900 text-sm mb-4">Productos Máximos</p>
+                                    <Input
+                                        type="number"
+                                        value={formData.demo_plan_product_limit}
+                                        onChange={(e) => handleInputChange('demo_plan_product_limit', e.target.value)}
+                                        className="bg-white"
+                                    />
+                                </div>
+                                <div className="p-4 bg-teal-50/30 rounded-2xl border border-teal-100">
+                                    <p className="font-bold text-slate-900 text-sm mb-4">Imágenes por Producto</p>
+                                    <Input
+                                        type="number"
+                                        value={formData.demo_plan_image_limit}
+                                        onChange={(e) => handleInputChange('demo_plan_image_limit', e.target.value)}
                                         className="bg-white"
                                     />
                                 </div>

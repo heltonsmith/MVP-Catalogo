@@ -417,6 +417,13 @@ export default function AdminUsers() {
                 const d = new Date(); d.setMonth(d.getMonth() + 1);
                 updates.renewal_date = d.toISOString();
             }
+            // Demo-specific fields
+            if (newPlan === 'demo') {
+                updates.demo_used = true;
+                updates.demo_start_date = new Date().toISOString();
+                updates.demo_expired_shown = false;
+                updates.renewal_date = null; // Demo uses its own countdown
+            }
             const { error } = await supabase.from('companies').update(updates).eq('id', company.id);
             if (error) throw error;
             showToast(`Plan de ${company.name} actualizado`, 'success');
@@ -613,12 +620,14 @@ export default function AdminUsers() {
                                                             user.plan === 'pro' ? "border-amber-200 text-amber-700 bg-amber-50 shadow-sm" :
                                                                 user.plan === 'plus' ? "border-blue-200 text-blue-700 bg-blue-50 shadow-sm" :
                                                                     user.plan === 'custom' ? "border-slate-300 text-slate-700 bg-slate-100 shadow-sm" :
-                                                                        "border-slate-200 text-slate-500 bg-white"
+                                                                        user.plan === 'demo' ? "border-teal-200 text-teal-700 bg-teal-50 shadow-sm" :
+                                                                            "border-slate-200 text-slate-500 bg-white"
                                                         )}
                                                     >
                                                         {user.plan === 'plus' && <Zap size={12} className="text-blue-500 fill-blue-500" />}
                                                         {user.plan === 'pro' && <Sparkles size={12} className="text-amber-500 fill-amber-500" />}
                                                         {user.plan === 'custom' && <Shield size={12} className="text-slate-700 fill-slate-700" />}
+                                                        {user.plan === 'demo' && <Clock size={12} className="text-teal-500" />}
                                                         {(user.plan || 'free').toUpperCase()}
                                                     </Badge>
                                                 </td>
@@ -661,7 +670,7 @@ export default function AdminUsers() {
                                                                     <Button size="xs" variant="outline" className="h-6 px-1 text-[9px] font-bold border-emerald-100 text-emerald-600 hover:bg-emerald-50" onClick={() => setRenewalPreset(user, 'monthly')} title="+1 Mes">+M</Button>
                                                                     <Button size="xs" variant="outline" className="h-6 px-1 text-[9px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50" onClick={() => setRenewalPreset(user, 'semiannual')} title="+6 Meses">+S</Button>
                                                                     <Button size="xs" variant="outline" className="h-6 px-1 text-[9px] font-bold border-indigo-100 text-indigo-600 hover:bg-indigo-50" onClick={() => setRenewalPreset(user, 'annual')} title="+1 Año">+A</Button>
-                                                                    <Button size="xs" variant="outline" className="h-6 px-1 text-[9px] font-bold border-amber-100 text-amber-600 hover:bg-amber-50" onClick={() => setRenewalPreset(user, 'demo')} title="+7 Días Demo">+D</Button>
+
                                                                 </div>
                                                             )}
                                                         </div>
@@ -693,6 +702,7 @@ export default function AdminUsers() {
                                                             className="bg-white border border-slate-200 text-slate-700 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer disabled:opacity-50"
                                                         >
                                                             <option value="free">FREE</option>
+                                                            <option value="demo">DEMO</option>
                                                             <option value="plus">PLUS</option>
                                                             <option value="pro">PRO</option>
                                                             <option value="custom">CUSTOM</option>
@@ -777,7 +787,7 @@ export default function AdminUsers() {
                                             <Button size="xs" variant="outline" className="flex-1 h-7 text-[9px] font-bold" onClick={() => setRenewalPreset(user, 'monthly')}>+M</Button>
                                             <Button size="xs" variant="outline" className="flex-1 h-7 text-[9px] font-bold" onClick={() => setRenewalPreset(user, 'semiannual')}>+S</Button>
                                             <Button size="xs" variant="outline" className="flex-1 h-7 text-[9px] font-bold" onClick={() => setRenewalPreset(user, 'annual')}>+A</Button>
-                                            <Button size="xs" variant="outline" className="flex-1 h-7 text-[9px] font-bold" onClick={() => setRenewalPreset(user, 'demo')}>+D</Button>
+
                                         </div>
                                     </div>
                                 )}
@@ -787,6 +797,7 @@ export default function AdminUsers() {
                                         <select value={user.plan || 'free'} onChange={(e) => changePlan(user, e.target.value)} disabled={actionId === user.id}
                                             className="w-full bg-slate-100 border-none text-slate-700 text-xs font-bold rounded-xl px-3 py-2.5 outline-none cursor-pointer disabled:opacity-50">
                                             <option value="free">FREE</option>
+                                            <option value="demo">DEMO</option>
                                             <option value="plus">PLUS</option>
                                             <option value="pro">PRO</option>
                                             <option value="custom">CUSTOM</option>

@@ -297,14 +297,20 @@ export const AuthProvider = ({ children }) => {
         let channelRef = null;
         let reconnectTimer = null;
         let isMounted = true;
+        let tearingDown = false; // Flag to prevent CLOSED events during teardown from triggering reconnect
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
 
         const setupChannel = () => {
             if (!isMounted) return;
 
-            // Remove old channel if exists
+            // Remove old channel if exists — set teardown flag to ignore CLOSED callback
             if (channelRef) {
+                tearingDown = true;
                 supabase.removeChannel(channelRef);
                 channelRef = null;
+                // Reset teardown flag after a tick so the new channel's events work normally
+                setTimeout(() => { tearingDown = false; }, 100);
             }
 
             channelRef = supabase
@@ -325,8 +331,12 @@ export const AuthProvider = ({ children }) => {
                     setTimeout(() => refreshUnreadNotifications(user.id), 300);
                 })
                 .subscribe((status) => {
+                    // Ignore status events during intentional teardown
+                    if (tearingDown) return;
+
                     console.log('Auth: Notification channel status:', status);
                     if (status === 'SUBSCRIBED') {
+                        retryCount = 0; // Reset on success
                         refreshUnreadNotifications(user.id);
                         // Clear any pending reconnect timer
                         if (reconnectTimer) {
@@ -334,7 +344,12 @@ export const AuthProvider = ({ children }) => {
                             reconnectTimer = null;
                         }
                     } else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                        console.warn('Auth: Channel failed with status:', status, '— scheduling reconnect in 5s');
+                        if (retryCount >= MAX_RETRIES) {
+                            console.warn('Auth: Max reconnect retries reached, falling back to polling only');
+                            return;
+                        }
+                        retryCount++;
+                        console.warn('Auth: Channel failed with status:', status, `— retry ${retryCount}/${MAX_RETRIES} in 5s`);
                         // Immediately poll to ensure count is fresh
                         refreshUnreadNotifications(user.id);
                         // Schedule reconnect
@@ -358,6 +373,7 @@ export const AuthProvider = ({ children }) => {
 
         return () => {
             isMounted = false;
+            tearingDown = true; // Prevent any more reconnects during cleanup
             if (reconnectTimer) clearTimeout(reconnectTimer);
             clearInterval(pollInterval);
             if (channelRef) {

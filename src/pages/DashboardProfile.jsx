@@ -7,7 +7,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
-import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, resizeImage } from '../utils';
+import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, formatRut as sharedFormatRut, validateRut as sharedValidateRut, resizeImage } from '../utils';
+import { LocationSelector } from '../components/ui/LocationSelector';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 
@@ -19,7 +20,7 @@ import { useNotifications } from '../hooks/useNotifications';
 export default function DashboardProfile() {
     const { showToast } = useToast();
     const { getSetting } = useSettings();
-    const { company: authCompany, refreshCompany } = useAuth();
+    const { company: authCompany, refreshCompany, profile } = useAuth();
     const location = useLocation();
     const [searchParams] = useSearchParams();
 
@@ -100,11 +101,18 @@ export default function DashboardProfile() {
         instagram: '',
         tiktok: '',
         website: '',
-        menuMode: false
+        menuMode: false,
+        rut: '',
+        full_name: '',
+        address: '',
+        location: ''
     });
 
     const validatePhone = (value) => sharedValidatePhone(value);
     const isValidUrl = (url) => sharedIsValidUrl(url);
+    const formatRut = (rut) => sharedFormatRut(rut);
+    const validateRut = (rut) => sharedValidateRut(rut);
+    const formatPhone = (phone) => sharedFormatPhone(phone);
     const [passwords, setPasswords] = useState({
         current: '',
         new: '',
@@ -118,6 +126,9 @@ export default function DashboardProfile() {
 
     useEffect(() => {
         if (company) {
+            const locationStr = company.commune && company.region
+                ? `${company.commune}, ${company.region}`
+                : company.region || '';
             setFormData({
                 name: company.name || '',
                 slug: company.slug || '',
@@ -127,10 +138,14 @@ export default function DashboardProfile() {
                 instagram: company.socials?.instagram || '',
                 tiktok: company.socials?.tiktok || '',
                 website: company.socials?.website || company.website || '',
-                menuMode: company.menu_mode || false
+                menuMode: company.menu_mode || false,
+                rut: profile?.rut || '',
+                full_name: profile?.full_name || '',
+                address: company.address || '',
+                location: locationStr
             });
         }
-    }, [company?.id, demoCompany.id]);
+    }, [company?.id, demoCompany.id, profile?.rut]);
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -299,22 +314,57 @@ export default function DashboardProfile() {
 
         setLoading(true);
         try {
-            const { error } = await supabase
+            // 1. Save RUT and full_name to profiles table FIRST (always works)
+            if (company.user_id) {
+                const { error: profError } = await supabase
+                    .from('profiles')
+                    .update({ rut: formData.rut, full_name: formData.full_name })
+                    .eq('id', company.user_id);
+                if (profError) console.error('Error updating profile:', profError);
+            }
+
+            // 2. Build company update
+            const companyUpdate = {
+                name: formData.name,
+                slug: formData.slug,
+                description: formData.description,
+                whatsapp: formData.whatsapp,
+                business_type: formData.businessType,
+                socials: {
+                    instagram: formData.instagram,
+                    tiktok: formData.tiktok,
+                    website: formData.website
+                },
+                menu_mode: formData.menuMode,
+                address: formData.address
+            };
+
+            // Parse location into region/commune
+            if (formData.location) {
+                if (formData.location.includes(',')) {
+                    companyUpdate.commune = formData.location.split(',')[0].trim();
+                    companyUpdate.region = formData.location.split(',')[1].trim();
+                } else {
+                    companyUpdate.region = formData.location;
+                }
+            }
+
+            // 3. Try saving company with address
+            let { error } = await supabase
                 .from('companies')
-                .update({
-                    name: formData.name,
-                    slug: formData.slug,
-                    description: formData.description,
-                    whatsapp: formData.whatsapp,
-                    business_type: formData.businessType,
-                    socials: {
-                        instagram: formData.instagram,
-                        tiktok: formData.tiktok,
-                        website: formData.website
-                    },
-                    menu_mode: formData.menuMode
-                })
+                .update(companyUpdate)
                 .eq('id', company.id);
+
+            // If address column doesn't exist, retry without it
+            if (error && error.message?.includes('address')) {
+                console.warn('address column not found, saving without it');
+                delete companyUpdate.address;
+                const retry = await supabase
+                    .from('companies')
+                    .update(companyUpdate)
+                    .eq('id', company.id);
+                error = retry.error;
+            }
 
             if (error) throw error;
 
@@ -1013,6 +1063,34 @@ export default function DashboardProfile() {
                                         </div>
                                     </div>
 
+                                    {/* Owner Identity Fields */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nombre Completo del Titular</label>
+                                            <Input
+                                                value={formData.full_name}
+                                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                                                placeholder="Juan Pérez"
+                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">RUT</label>
+                                            <Input
+                                                value={formData.rut}
+                                                onChange={(e) => {
+                                                    const clean = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
+                                                    if (clean.length <= 9) {
+                                                        setFormData({ ...formData, rut: formatRut(e.target.value) });
+                                                    }
+                                                }}
+                                                placeholder="12.345.678-9"
+                                                error={formData.rut && !validateRut(formData.rut) ? "RUT inválido" : null}
+                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
+                                        </div>
+                                    </div>
+
                                     {/* Form Fields */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -1057,6 +1135,26 @@ export default function DashboardProfile() {
                                                 placeholder="+56XXXXXXXXX"
                                                 error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Address & Location */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Dirección Física</label>
+                                            <Input
+                                                value={formData.address}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                                placeholder="Av. Principal 123, Local 5"
+                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Ubicación (Región y Comuna)</label>
+                                            <LocationSelector
+                                                value={formData.location}
+                                                onChange={(val) => setFormData({ ...formData, location: val })}
                                             />
                                         </div>
                                     </div>

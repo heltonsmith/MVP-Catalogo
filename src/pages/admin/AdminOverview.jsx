@@ -55,13 +55,40 @@ export default function AdminOverview() {
                         name,
                         logo,
                         plan,
-                        user_id
+                        user_id,
+                        whatsapp
                     )
                 `)
                 .eq('status', 'pending')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            // Enrich with profile rut from profiles table
+            if (data && data.length > 0) {
+                const userIds = data.map(r => r.companies?.user_id).filter(Boolean);
+                console.log('Upgrade requests user_ids:', userIds);
+                if (userIds.length > 0) {
+                    const { data: profiles, error: profError } = await supabase
+                        .from('profiles')
+                        .select('id, rut')
+                        .in('id', userIds);
+
+                    console.log('Profiles fetched for RUT:', profiles, 'Error:', profError);
+
+                    const profileMap = {};
+                    (profiles || []).forEach(p => { profileMap[p.id] = p; });
+
+                    data.forEach(r => {
+                        const userId = r.companies?.user_id;
+                        if (userId && profileMap[userId]) {
+                            r.profile_rut = profileMap[userId].rut;
+                        }
+                        console.log('Request', r.id, 'user_id:', userId, 'profile_rut:', r.profile_rut);
+                    });
+                }
+            }
+
             setRequests(data || []);
         } catch (error) {
             console.error('Error fetching pending upgrades:', error);
@@ -87,12 +114,21 @@ export default function AdminOverview() {
             if (reqError) throw reqError;
 
             // 2. Update company plan
+            const companyUpdate = {
+                plan: request.requested_plan,
+                subscription_date: new Date().toISOString()
+            };
+
+            // If demo plan, set demo-specific fields
+            if (request.requested_plan === 'demo') {
+                companyUpdate.demo_used = true;
+                companyUpdate.demo_start_date = new Date().toISOString();
+                companyUpdate.demo_expired_shown = false;
+            }
+
             const { error: compError } = await supabase
                 .from('companies')
-                .update({
-                    plan: request.requested_plan,
-                    subscription_date: new Date().toISOString()
-                })
+                .update(companyUpdate)
                 .eq('id', request.company_id);
 
             if (compError) throw compError;
@@ -321,7 +357,7 @@ export default function AdminOverview() {
                                         <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
                                             <CreditCard size={10} /> RUT
                                         </p>
-                                        <p className="text-xs font-bold text-slate-700">{request.rut}</p>
+                                        <p className="text-xs font-bold text-slate-700">{request.profile_rut || request.rut || 'Sin RUT'}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
@@ -329,9 +365,18 @@ export default function AdminOverview() {
                                         </p>
                                         <p className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full inline-block">
                                             {request.billing_period === 'monthly' ? 'Mensual' :
-                                                request.billing_period === 'semestral' ? 'Semestral' : 'Anual'}
+                                                request.billing_period === 'semester' || request.billing_period === 'semestral' ? 'Semestral' :
+                                                    request.billing_period === 'demo' ? 'Demo' : 'Anual'}
                                         </p>
                                     </div>
+                                    {request.companies?.whatsapp && (
+                                        <div className="space-y-1 col-span-2">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                                                <MessageSquare size={10} /> WhatsApp
+                                            </p>
+                                            <p className="text-xs font-bold text-slate-700">{request.companies.whatsapp}</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Admin Message Area */}

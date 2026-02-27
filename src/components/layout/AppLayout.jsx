@@ -39,7 +39,7 @@ export function AppLayout() {
     const hideBrandingOnMobile = isCatalogRoute && isPaidPlan && isLandingRoute && !hideBranding;
 
     return (
-        <div className="flex min-h-screen flex-col overflow-x-hidden">
+        <div id="main-scroll-container" className="flex min-h-screen flex-col overflow-x-hidden">
             <Navbar isLandingMode={hideBranding || hideBrandingOnMobile} />
             <main className="flex-1">
                 <Outlet />

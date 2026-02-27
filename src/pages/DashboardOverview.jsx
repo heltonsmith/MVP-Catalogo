@@ -94,7 +94,7 @@ function PeriodSelector({ value, onChange }) {
 }
 
 export default function DashboardOverview() {
-    const { company: authCompany, user, profile, loading: authLoading } = useAuth();
+    const { company: authCompany, user, profile, loading: authLoading, refreshCompany } = useAuth();
     const { showToast } = useToast();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -129,6 +129,8 @@ export default function DashboardOverview() {
     const { getSetting } = useSettings();
 
     const [topProducts, setTopProducts] = useState({ viewed: [], quoted: [] });
+    const [requestingDemo, setRequestingDemo] = useState(false);
+    const [demoExpiredMessage, setDemoExpiredMessage] = useState(false);
 
     const isExpired = (date) => {
         if (!date) return false;
@@ -149,7 +151,79 @@ export default function DashboardOverview() {
         return diffDays > 0 && diffDays <= 3;
     };
 
-    const isQuotesEnabled = getSetting(`${company?.plan}_plan_quotes_enabled`, company?.plan !== 'free' ? 'true' : 'false') === 'true';
+    const isQuotesEnabled = getSetting(`${company?.plan}_plan_quotes_enabled`, company?.plan !== 'free' && company?.plan !== 'demo' ? 'true' : 'false') === 'true';
+
+    // Demo plan calculations
+    const demoDays = parseInt(getSetting('demo_plan_days', '7'));
+    const demoProductLimit = getSetting('demo_plan_product_limit', '10');
+    const demoImageLimit = getSetting('demo_plan_image_limit', '3');
+
+    const getDemoRemainingDays = () => {
+        if (!company?.demo_start_date) return 0;
+        const start = new Date(company.demo_start_date);
+        const now = new Date();
+        const elapsed = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+        return Math.max(0, demoDays - elapsed);
+    };
+
+    const demoRemainingDays = company?.plan === 'demo' ? getDemoRemainingDays() : 0;
+
+    // Auto-revert demo to free when expired
+    useEffect(() => {
+        if (isDemo || !company?.id || company.plan !== 'demo') return;
+        if (demoRemainingDays <= 0) {
+            const revertDemo = async () => {
+                try {
+                    const { error } = await supabase.from('companies')
+                        .update({ plan: 'free' })
+                        .eq('id', company.id);
+                    if (error) throw error;
+
+                    // Show one time message if not already shown
+                    if (!company.demo_expired_shown) {
+                        setDemoExpiredMessage(true);
+                        await supabase.from('companies')
+                            .update({ demo_expired_shown: true })
+                            .eq('id', company.id);
+                    }
+
+                    await refreshCompany();
+                } catch (err) {
+                    console.error('Error reverting demo:', err);
+                }
+            };
+            revertDemo();
+        }
+    }, [company?.id, company?.plan, demoRemainingDays, isDemo]);
+
+    // Demo request handler
+    const handleRequestDemo = async () => {
+        if (!company?.id || requestingDemo) return;
+        setRequestingDemo(true);
+        try {
+            const { error } = await supabase
+                .from('upgrade_requests')
+                .insert([{
+                    company_id: company.id,
+                    requested_plan: 'demo',
+                    billing_period: 'demo',
+                    rut: profile?.rut || 'Sin RUT',
+                    full_name: profile?.full_name || 'Tienda',
+                    email: profile?.email || '',
+                    store_name: company?.name || 'Tienda',
+                    status: 'pending'
+                }]);
+
+            if (error) throw error;
+            showToast('¡Solicitud de Demo enviada! Te avisaremos cuando sea activada.', 'success');
+            await refreshCompany();
+        } catch (err) {
+            console.error('Error requesting demo:', err);
+            showToast('No se pudo enviar la solicitud de demo.', 'error');
+        } finally {
+            setRequestingDemo(false);
+        }
+    };
 
     // Fetch product count once
     useEffect(() => {
@@ -413,6 +487,60 @@ export default function DashboardOverview() {
                 </div>
             )}
 
+            {/* Demo Expired Message — one-time */}
+            {demoExpiredMessage && (
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 flex items-center gap-4 text-orange-800 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="h-10 w-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+                        <Clock className="text-orange-600" size={20} />
+                    </div>
+                    <div className="flex-1">
+                        <h4 className="text-sm font-black uppercase tracking-wider">Tu Demo ha Terminado</h4>
+                        <p className="text-xs font-medium opacity-90">Tu período de demostración de {demoDays} días ha finalizado. Tu cuenta ha vuelto al plan Gratis. ¡Mejora tu plan para seguir disfrutando de todas las funciones!</p>
+                    </div>
+                    <Button size="sm" className="font-black text-[10px] bg-orange-600 hover:bg-orange-700 shrink-0" onClick={() => setShowUpgradeModal(true)}>MEJORAR PLAN</Button>
+                </div>
+            )}
+
+            {/* Demo Request Banner — only for free plans that haven't used demo */}
+            {!isDemo && displayCompany.plan === 'free' && !displayCompany.demo_used && !pendingRequest && (
+                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border-2 border-teal-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 text-teal-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div className="h-12 w-12 bg-teal-100 rounded-full flex items-center justify-center shrink-0">
+                        <Sparkles className="text-teal-600" size={24} />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left">
+                        <h4 className="text-sm font-black uppercase tracking-wider">¡Prueba Gratis por {demoDays} Días!</h4>
+                        <p className="text-xs font-medium opacity-90 mt-0.5">Solicita una cuenta Demo y accede a hasta {demoProductLimit} productos y {demoImageLimit} imágenes por producto. Solo por una vez.</p>
+                    </div>
+                    <Button
+                        onClick={handleRequestDemo}
+                        disabled={requestingDemo}
+                        className="shrink-0 font-black text-xs bg-teal-600 hover:bg-teal-700 text-white px-6 h-11 rounded-xl shadow-lg shadow-teal-200 transition-all hover:-translate-y-0.5 active:scale-95 gap-2"
+                    >
+                        {requestingDemo ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="fill-current" />}
+                        Solicitar Demo
+                    </Button>
+                </div>
+            )}
+
+            {/* Demo Active Banner with Countdown */}
+            {!isDemo && displayCompany.plan === 'demo' && demoRemainingDays > 0 && (
+                <div className="bg-gradient-to-r from-teal-500 to-emerald-500 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 text-white shadow-xl shadow-teal-200/50 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div className="h-12 w-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 backdrop-blur-sm">
+                        <Clock className="text-white" size={24} />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left">
+                        <h4 className="text-sm font-black uppercase tracking-wider">Demo Activa</h4>
+                        <p className="text-xs font-medium opacity-90 mt-0.5">Disfruta de todas las funciones premium durante tu período de demostración.</p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl px-5 py-3 shrink-0">
+                        <div className="text-center">
+                            <p className="text-2xl font-black">{demoRemainingDays}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-widest opacity-80">{demoRemainingDays === 1 ? 'día' : 'días'} restante{demoRemainingDays !== 1 ? 's' : ''}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Store Header */}
             <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group">
                 {/* Decorative Elements */}
@@ -447,10 +575,11 @@ export default function DashboardOverview() {
                                         "inline-flex items-center gap-2 px-4 py-1.5 rounded-full border-2 text-[10px] font-black uppercase tracking-[0.1em] shadow-sm",
                                         displayCompany.plan === 'pro' && "bg-amber-50 border-amber-200 text-amber-600 shadow-amber-100",
                                         displayCompany.plan === 'plus' && "bg-blue-50 border-blue-200 text-blue-600 shadow-blue-100",
+                                        displayCompany.plan === 'demo' && "bg-teal-50 border-teal-200 text-teal-600 shadow-teal-100",
                                         displayCompany.plan === 'free' && "bg-slate-50 border-slate-200 text-slate-500"
                                     )}>
-                                        <Zap size={14} className={cn("fill-current", displayCompany.plan === 'free' && "text-slate-400")} />
-                                        Plan {displayCompany.plan === 'pro' ? 'Pro' : displayCompany.plan === 'plus' ? 'Plus' : 'Gratis'}
+                                        <Zap size={14} className={cn("fill-current", displayCompany.plan === 'free' && "text-slate-400", displayCompany.plan === 'demo' && "text-teal-500")} />
+                                        Plan {displayCompany.plan === 'pro' ? 'Pro' : displayCompany.plan === 'plus' ? 'Plus' : displayCompany.plan === 'demo' ? 'Demo' : 'Gratis'}
                                     </div>
                                 </div>
 
@@ -465,9 +594,11 @@ export default function DashboardOverview() {
                                         <span className="text-xs font-bold text-slate-600">
                                             Límite: <span className="text-slate-900">
                                                 {displayCompany.plan === 'custom' ? 'Ilimitado' :
-                                                    getSetting(`${displayCompany.plan}_plan_product_limit`,
+                                                    getSetting(
+                                                        displayCompany.plan === 'demo' ? 'demo_plan_product_limit' : `${displayCompany.plan}_plan_product_limit`,
                                                         displayCompany.plan === 'free' ? '5' :
-                                                            displayCompany.plan === 'plus' ? '100' : '500'
+                                                            displayCompany.plan === 'demo' ? '10' :
+                                                                displayCompany.plan === 'plus' ? '100' : '500'
                                                     )} productos
                                             </span>
                                         </span>
@@ -477,8 +608,10 @@ export default function DashboardOverview() {
                                         <span className="text-xs font-bold text-slate-600">
                                             Fotos: <span className="text-slate-900">
                                                 {displayCompany.plan === 'custom' ? 'Ilimitadas' :
-                                                    getSetting(`${displayCompany.plan}_plan_image_limit`,
-                                                        displayCompany.plan === 'free' ? '1' : '5'
+                                                    getSetting(
+                                                        displayCompany.plan === 'demo' ? 'demo_plan_image_limit' : `${displayCompany.plan}_plan_image_limit`,
+                                                        displayCompany.plan === 'free' ? '1' :
+                                                            displayCompany.plan === 'demo' ? '3' : '5'
                                                     )} por producto
                                             </span>
                                         </span>
