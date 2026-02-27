@@ -1123,7 +1123,7 @@ export default function CatalogPage() {
                                     {!isOwner && currentCart.length > 0 && !company?.menu_mode && (
                                         <Link
                                             to="/carrito"
-                                            className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white rounded-xl shadow-[0_10px_30px_rgba(5,145,100,0.3)] p-2 pr-4 flex items-center gap-3 hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-12"
+                                            className="fixed bottom-6 right-6 z-[999] bg-emerald-600 text-white rounded-xl shadow-[0_10px_30px_rgba(5,145,100,0.3)] p-2 pr-4 flex items-center gap-3 hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-12"
                                         >
                                             <div className="bg-rose-500 text-white text-xs font-black h-7 w-7 rounded-lg flex items-center justify-center shadow-sm shrink-0 border border-white/20">
                                                 {currentCart.length}

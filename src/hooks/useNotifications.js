@@ -1,12 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 export function useNotifications() {
-    const { user, setUnreadNotifications, unreadNotifications } = useAuth();
+    const { user, setUnreadNotifications, unreadNotifications, suppressGlobalRefreshRef } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
+
+    // Flag to suppress re-fetches triggered by our own optimistic updates
+    const suppressRefetchRef = useRef(false);
+    // Flag to suppress realtime events right after an optimistic update
+    const suppressRealtimeRef = useRef(false);
 
     const fetchNotifications = useCallback(async (silent = false) => {
         if (!user) return;
@@ -21,7 +26,6 @@ export function useNotifications() {
 
             if (error) throw error;
             const fetchedNotifications = data || [];
-            console.log(`[useNotifications] Fetched ${fetchedNotifications.length} notifications raw`);
 
             // FILTER: Separate Inbox notifications from Bell notifications
             const bellNotifications = fetchedNotifications.filter(n => n.type !== 'message' && n.type !== 'chat');
@@ -46,10 +50,14 @@ export function useNotifications() {
         fetchNotifications();
     }, [user, fetchNotifications]);
 
-    // Re-fetch when global count changes (essential for cross-component sync)
-    // We fetch silently to avoid UI "blinking" while ensuring list stays fresh.
+    // Re-fetch when global count changes from EXTERNAL sources (not our own optimistic updates)
     useEffect(() => {
         if (!user || loading) return;
+        // Skip if this change was triggered by our own optimistic update
+        if (suppressRefetchRef.current) {
+            suppressRefetchRef.current = false;
+            return;
+        }
         fetchNotifications(true);
     }, [unreadNotifications]);
 
@@ -65,19 +73,33 @@ export function useNotifications() {
                 table: 'notifications',
                 filter: `user_id=eq.${user.id}`
             }, (payload) => {
-                console.log('[useNotifications] Realtime event captured:', payload.eventType);
+                // Skip realtime events that were triggered by our own optimistic updates
+                if (suppressRealtimeRef.current) {
+                    return;
+                }
 
                 if (payload.eventType === 'INSERT') {
-                    fetchNotifications(true);
+                    // Only fetch for truly new notifications (not our own actions)
+                    const newNotification = payload.new;
+                    if (newNotification.type !== 'message' && newNotification.type !== 'chat') {
+                        setNotifications(prev => {
+                            // Avoid duplicates
+                            if (prev.some(n => n.id === newNotification.id)) return prev;
+                            return [newNotification, ...prev];
+                        });
+                        if (!newNotification.is_read) {
+                            setUnreadCount(prev => prev + 1);
+                            if (setUnreadNotifications) {
+                                suppressRefetchRef.current = true;
+                                setUnreadNotifications(prev => prev + 1);
+                            }
+                        }
+                    }
                 } else if (payload.eventType === 'UPDATE') {
-                    // Gradual update for single item
                     setNotifications(prev => {
                         const newList = prev.map(n => n.id === payload.new.id ? { ...n, ...payload.new } : n);
-                        // Sync derived counts
                         const newCount = newList.filter(n => n.is_read === false || n.is_read === 'f').length;
                         setUnreadCount(newCount);
-                        // We DON'T setUnreadNotifications here to avoid immediate double-triggering 
-                        // the unreadNotifications effect, although AuthContext will catch it anyway.
                         return newList;
                     });
                 } else if (payload.eventType === 'DELETE') {
@@ -92,13 +114,31 @@ export function useNotifications() {
             .subscribe();
 
         return () => supabase.removeChannel(channel);
-    }, [user, fetchNotifications]);
+    }, [user, setUnreadNotifications]);
+
+    // Helper: suppress realtime events temporarily after an optimistic update
+    const withSuppressedRealtime = (fn) => {
+        suppressRealtimeRef.current = true;
+        // Also suppress AuthContext's global realtime refresh
+        if (suppressGlobalRefreshRef) suppressGlobalRefreshRef.current = true;
+        fn();
+        // Allow realtime events again after the server has time to process
+        setTimeout(() => {
+            suppressRealtimeRef.current = false;
+            if (suppressGlobalRefreshRef) suppressGlobalRefreshRef.current = false;
+        }, 3000);
+    };
 
     const markAsRead = async (id) => {
-        // Optimistic update
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-        setUnreadCount(prev => Math.max(0, prev - 1));
-        if (setUnreadNotifications) setUnreadNotifications(prev => Math.max(0, prev - 1));
+        // Optimistic update with suppression
+        withSuppressedRealtime(() => {
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+            if (setUnreadNotifications) {
+                suppressRefetchRef.current = true;
+                setUnreadNotifications(prev => Math.max(0, prev - 1));
+            }
+        });
 
         try {
             const { error } = await supabase
@@ -116,10 +156,14 @@ export function useNotifications() {
     };
 
     const markAsUnread = async (id) => {
-        // Optimistic update
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
-        setUnreadCount(prev => prev + 1);
-        if (setUnreadNotifications) setUnreadNotifications(prev => prev + 1);
+        withSuppressedRealtime(() => {
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+            setUnreadCount(prev => prev + 1);
+            if (setUnreadNotifications) {
+                suppressRefetchRef.current = true;
+                setUnreadNotifications(prev => prev + 1);
+            }
+        });
 
         try {
             const { error } = await supabase
@@ -139,12 +183,16 @@ export function useNotifications() {
     const deleteNotification = async (id) => {
         const notification = notifications.find(n => n.id === id);
 
-        // Optimistic update
-        setNotifications(prev => prev.filter(n => n.id !== id));
-        if (notification && !notification.is_read) {
-            setUnreadCount(prev => Math.max(0, prev - 1));
-            if (setUnreadNotifications) setUnreadNotifications(prev => Math.max(0, prev - 1));
-        }
+        withSuppressedRealtime(() => {
+            setNotifications(prev => prev.filter(n => n.id !== id));
+            if (notification && !notification.is_read) {
+                setUnreadCount(prev => Math.max(0, prev - 1));
+                if (setUnreadNotifications) {
+                    suppressRefetchRef.current = true;
+                    setUnreadNotifications(prev => Math.max(0, prev - 1));
+                }
+            }
+        });
 
         try {
             const { error } = await supabase
@@ -164,10 +212,14 @@ export function useNotifications() {
     const markAllAsRead = async () => {
         if (!user) return;
 
-        // Optimistic update
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
-        if (setUnreadNotifications) setUnreadNotifications(0);
+        withSuppressedRealtime(() => {
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            setUnreadCount(0);
+            if (setUnreadNotifications) {
+                suppressRefetchRef.current = true;
+                setUnreadNotifications(0);
+            }
+        });
 
         try {
             const { error } = await supabase
@@ -188,10 +240,14 @@ export function useNotifications() {
     const clearAll = async () => {
         if (!user) return;
 
-        // Optimistic update
-        setNotifications([]);
-        setUnreadCount(0);
-        if (setUnreadNotifications) setUnreadNotifications(0);
+        withSuppressedRealtime(() => {
+            setNotifications([]);
+            setUnreadCount(0);
+            if (setUnreadNotifications) {
+                suppressRefetchRef.current = true;
+                setUnreadNotifications(0);
+            }
+        });
 
         try {
             const { error } = await supabase
@@ -222,18 +278,21 @@ export function useNotifications() {
     const markTicketNotificationsAsRead = async (ticketId) => {
         if (!user || !ticketId) return;
 
-        // Find relevant notification IDs
         const relevantIds = notifications
             .filter(n => n.metadata?.ticket_id === ticketId && (n.is_read === false || n.is_read === 'f'))
             .map(n => n.id);
 
         if (relevantIds.length === 0) return;
 
-        // Optimistic update
-        setNotifications(prev => prev.map(n => relevantIds.includes(n.id) ? { ...n, is_read: true } : n));
-        const countReduced = relevantIds.length;
-        setUnreadCount(prev => Math.max(0, prev - countReduced));
-        if (setUnreadNotifications) setUnreadNotifications(prev => Math.max(0, prev - countReduced));
+        withSuppressedRealtime(() => {
+            setNotifications(prev => prev.map(n => relevantIds.includes(n.id) ? { ...n, is_read: true } : n));
+            const countReduced = relevantIds.length;
+            setUnreadCount(prev => Math.max(0, prev - countReduced));
+            if (setUnreadNotifications) {
+                suppressRefetchRef.current = true;
+                setUnreadNotifications(prev => Math.max(0, prev - countReduced));
+            }
+        });
 
         try {
             const { error } = await supabase

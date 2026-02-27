@@ -25,6 +25,8 @@ export const AuthProvider = ({ children }) => {
     const [pendingUpgrade, setPendingUpgrade] = useState(null);
     const isCheckingRenewalRef = useRef(false);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
+    // Flag to suppress AuthContext's realtime refresh after optimistic updates from useNotifications
+    const suppressGlobalRefreshRef = useRef(false);
 
     // Observer Mode / Impersonation
     const [isObserving, setIsObserving] = useState(false);
@@ -314,6 +316,11 @@ export const AuthProvider = ({ children }) => {
                     filter: `user_id=eq.${user.id}`
                 }, (payload) => {
                     console.log('Auth: Notification event captured!', payload.eventType, payload.new?.id);
+                    // Skip if useNotifications is handling this optimistically
+                    if (suppressGlobalRefreshRef.current) {
+                        console.log('Auth: Skipping refresh — suppressed by optimistic update');
+                        return;
+                    }
                     // Add a tiny delay to ensure DB consistency across nodes before fetching count
                     setTimeout(() => refreshUnreadNotifications(user.id), 300);
                 })
@@ -568,6 +575,7 @@ export const AuthProvider = ({ children }) => {
         unreadNotifications,
         setUnreadNotifications, // Exposed for optimistic updates
         refreshUnreadNotifications,
+        suppressGlobalRefreshRef, // Used by useNotifications to suppress AuthContext realtime
         refreshUpgradeStatus,
         startObserving,
         startObservingUser,
