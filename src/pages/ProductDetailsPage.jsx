@@ -15,7 +15,6 @@ import NotFoundPage from './NotFoundPage';
 import { useSettings } from '../hooks/useSettings';
 
 import { useAuth } from '../context/AuthContext';
-import { SEO } from '../components/layout/SEO';
 
 export default function ProductDetailsPage() {
     const { showToast } = useToast();
@@ -367,15 +366,7 @@ export default function ProductDetailsPage() {
 
     return (
         <div className="bg-white min-h-screen pb-20">
-            <SEO
-                title={product?.name}
-                description={product?.description ? product.description.slice(0, 160) : `Compra ${product?.name} en ${company?.name}. Encuentra los mejores precios en Ktaloog.com.`}
-                image={product?.images?.[0] || company?.logo || company?.banner}
-                url={`https://www.ktaloog.com/catalogo/${companySlug}/producto/${productSlug}`}
-                type="product"
-                keywords={`${product?.name}, ${company?.name}, catálogo digital, ${product?.categoryName || ''}`}
-            />
-            {/* Mobile Header Nav */}
+                        {/* Mobile Header Nav */}
             <div className="sticky top-16 z-30 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
                     <ChevronLeft className="mr-1 h-5 w-5" />

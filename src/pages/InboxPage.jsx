@@ -26,7 +26,6 @@ import {
 import { Modal } from '../components/ui/Modal';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { Zap } from 'lucide-react';
-import { SEO } from '../components/layout/SEO';
 
 export default function InboxPage() {
     const { user, company, profile, loading: authLoading } = useAuth();
@@ -631,12 +630,7 @@ export default function InboxPage() {
 
     return (
         <>
-            <SEO
-                title="Bandeja de Entrada | Ktaloog"
-                description="Gestiona tus conversaciones con tiendas y clientes en Ktaloog."
-                noindex={true}
-            />
-            <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
+                        <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
                 {/* Simple Top Bar */}
                 <header className="bg-white border-b border-slate-200 h-16 sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">

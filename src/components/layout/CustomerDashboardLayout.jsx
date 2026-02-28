@@ -15,7 +15,6 @@ import {
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils';
-import { SEO } from '../layout/SEO';
 
 export function CustomerDashboardLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -57,8 +56,7 @@ export function CustomerDashboardLayout() {
 
     return (
         <>
-            <SEO noindex={true} />
-            <div className="h-full bg-slate-50 flex overflow-x-hidden relative">
+                        <div className="h-full bg-slate-50 flex overflow-x-hidden relative">
                 {/* Desktop Sidebar */}
                 <aside className="w-72 bg-white border-r border-slate-200 fixed h-full hidden md:flex flex-col">
                     <div className="p-6 border-b border-slate-100">

@@ -20,7 +20,6 @@ import { TooltipCard } from '../ui/Tooltip';
 
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { useNotifications } from '../../hooks/useNotifications';
-import { SEO } from '../layout/SEO';
 
 export function DashboardLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -135,8 +134,7 @@ export function DashboardLayout() {
 
     return (
         <div className="h-full bg-slate-50 flex overflow-x-hidden relative">
-            <SEO title="Panel de Control" noindex={true} />
-
+            
             {/* Desktop Sidebar */}
             <aside className="w-72 bg-white border-r border-slate-200 fixed h-full hidden md:flex flex-col">
                 <div className="p-6 border-b border-slate-100">

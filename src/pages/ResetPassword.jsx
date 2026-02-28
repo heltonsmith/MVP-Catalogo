@@ -7,7 +7,6 @@ import { Card, CardContent } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { translateAuthError } from '../utils/authErrors';
-import { SEO } from '../components/layout/SEO';
 
 export default function ResetPassword() {
     const { updatePassword, session } = useAuth();
@@ -56,12 +55,7 @@ export default function ResetPassword() {
 
     return (
         <>
-            <SEO
-                title="Restablecer Contraseña | Ktaloog"
-                description="Establece una nueva contraseña para tu cuenta de Ktaloog."
-                noindex={true}
-            />
-            <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
+                        <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
                 <Card className="w-full max-w-md border-none shadow-xl rounded-[2rem] overflow-hidden">
                     <CardContent className="p-8 sm:p-12">
                         <div className="flex flex-col items-center text-center">

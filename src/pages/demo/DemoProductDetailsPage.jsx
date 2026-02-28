@@ -13,7 +13,6 @@ import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../hooks/useSettings';
 import NotFoundPage from '../NotFoundPage';
-import { SEO } from '../../components/layout/SEO';
 
 
 export default function DemoProductDetailsPage({ overrideSlug }) {
@@ -108,14 +107,7 @@ export default function DemoProductDetailsPage({ overrideSlug }) {
 
     return (
         <div className="bg-white min-h-screen pb-20">
-            <SEO
-                title={`Demo: ${product.name} — ${company.name}`}
-                description={`Producto demo "${product.name}" de ${company.name}. ${product.description?.substring(0, 120) || 'Explora este ejemplo de producto en Ktaloog.com.'}`}
-                url={`https://www.ktaloog.com/catalogo/${company.slug}/producto/${product.slug}`}
-                image={product.images?.[0]}
-                keywords={`demo producto, ${product.name}, ${company.name}, ejemplo catálogo digital`}
-            />
-            {/* Mobile Header Nav */}
+                        {/* Mobile Header Nav */}
             <div className="sticky top-16 z-30 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
                     <ChevronLeft className="mr-1 h-5 w-5" />

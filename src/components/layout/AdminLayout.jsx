@@ -7,7 +7,6 @@ import { cn } from '../../utils';
 import { useNotifications } from '../../hooks/useNotifications';
 
 import { NotificationCenter } from '../notifications/NotificationCenter';
-import { SEO } from '../layout/SEO';
 
 export function AdminLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -48,8 +47,7 @@ export function AdminLayout() {
 
     return (
         <div className="h-full bg-slate-50 flex overflow-x-hidden relative">
-            <SEO title="Panel de Administración" noindex={true} />
-            {/* Sidebar */}
+                        {/* Sidebar */}
             <aside className="w-64 bg-slate-900 text-white fixed h-full hidden md:flex flex-col">
                 <div className="p-6 border-b border-slate-800">
                     <div className="flex items-center gap-2 text-xl font-bold">

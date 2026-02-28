@@ -3,7 +3,6 @@ import { Button } from '../components/ui/Button';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../hooks/useSettings';
 import { Loader2 } from 'lucide-react';
-import { SEO } from '../components/layout/SEO';
 
 export default function PricingPage() {
     const { getSetting, loading } = useSettings();
@@ -128,12 +127,7 @@ export default function PricingPage() {
 
     return (
         <div className="bg-slate-50 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-            <SEO
-                title="Planes y Precios"
-                description="Descubre los planes de Ktaloog.com. Desde opciones gratuitas para empezar hasta planes Pro para grandes inventarios con catálogos digitales inteligentes."
-                keywords="precios catálogo digital, planes suscripción ktaloog, ventas online chile, ecommerce para emprendedores"
-            />
-            <div className="max-w-7xl mx-auto">
+                        <div className="max-w-7xl mx-auto">
                 <div className="text-center mb-16">
                     <h2 className="text-base font-semibold text-primary-600 tracking-wide uppercase">Precios</h2>
                     <p className="mt-2 text-3xl font-extrabold text-slate-900 sm:text-4xl lg:text-5xl">

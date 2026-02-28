@@ -27,7 +27,6 @@ import { StoreSearch } from '../components/search/StoreSearch';
 import { supabase } from '../lib/supabase';
 import { cn } from '../utils';
 import { Link } from 'react-router-dom';
-import { SEO } from '../components/layout/SEO';
 
 const BUSINESS_FILTERS = [
     { id: 'all', label: 'Todo', icon: <LayoutGrid size={16} /> },
@@ -258,13 +257,7 @@ export default function PublicExplorer() {
 
     return (
         <div className="min-h-screen bg-slate-50 pt-20 pb-12">
-            <SEO
-                title="Explora Tiendas, Restaurantes y Mayoristas en Chile"
-                description="Encuentra tus tiendas favoritas, restaurantes con carta digital y mayoristas cerca de ti. Filtra por ubicación, categoría y tipo de negocio en Ktaloog.com."
-                url="https://www.ktaloog.com/explorar"
-                keywords="explorar tiendas chile, restaurantes carta digital, mayoristas cerca de mi, buscador de tiendas, tiendas favoritas, catálogos digitales"
-            />
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Hero Header */}
                 <div className="flex flex-col items-center text-center mb-12">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-600 text-xs font-black uppercase tracking-widest mb-4">

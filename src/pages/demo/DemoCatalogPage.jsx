@@ -16,7 +16,6 @@ import { useCart } from '../../hooks/useCart';
 import { NotificationCenter } from '../../components/notifications/NotificationCenter';
 import { cn, formatCurrency } from '../../utils';
 import NotFoundPage from '../NotFoundPage';
-import { SEO } from '../../components/layout/SEO';
 
 export default function DemoCatalogPage({ overrideSlug }) {
     const { showToast } = useToast();
@@ -280,13 +279,7 @@ export default function DemoCatalogPage({ overrideSlug }) {
 
     return (
         <div className="bg-slate-50 min-h-screen">
-            <SEO
-                title={`Demo: ${company.name} — Ejemplo de Catálogo Digital`}
-                description={`Explora la tienda demo "${company.name}" en Ktaloog.com. Este es un ejemplo interactivo de cómo se ve un catálogo digital profesional con productos, reseñas y más.`}
-                url={`https://www.ktaloog.com/catalogo/${company.slug}`}
-                keywords={`demo catálogo digital, ejemplo tienda online, ${company.name}, ktaloog demo`}
-            />
-            {/* Company Header */}
+                        {/* Company Header */}
             <div
                 ref={editMode === 'banner' ? containerRef : null}
                 className={cn(

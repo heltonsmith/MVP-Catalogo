@@ -11,7 +11,6 @@ import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
 import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, titleCase, cleanTextInput, slugify } from '../utils';
 import { CAPTCHA_ICONS } from '../constants/auth';
-import { SEO } from '../components/layout/SEO';
 
 // --- Branded SVG Icons for Social Providers ---
 const GoogleIcon = () => (
@@ -293,14 +292,31 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            // 1. Sign up user
+            // 1. Sign up user (Pass all data into user_metadata for the trigger)
             const { data: authData, error: authError } = await signUp({
                 email: cleanedData.email,
                 password: cleanedData.password,
                 options: {
                     data: {
                         full_name: cleanedData.fullName,
-                        role: cleanedData.role
+                        role: cleanedData.role,
+                        // Append store info to metadata so Postgres Trigger can use it securely
+                        businessName: cleanedData.role === 'owner' ? cleanedData.businessName : null,
+                        whatsapp: cleanedData.role === 'owner' ? cleanedData.whatsapp : null,
+                        businessType: cleanedData.role === 'owner' ? cleanedData.businessType : null,
+                        description: cleanedData.role === 'owner' ? cleanedData.description : null,
+                        address: cleanedData.role === 'owner' ? cleanedData.address : null,
+                        rut: cleanedData.role === 'owner' ? cleanedData.rut : null,
+                        region: cleanedData.role === 'owner' ? (cleanedData.location.includes(',') ? cleanedData.location.split(',')[1].trim() : cleanedData.location) : null,
+                        city: cleanedData.role === 'owner' ? (cleanedData.location.includes(',') ? cleanedData.location.split(',')[0].trim() : '') : null,
+                        commune: cleanedData.role === 'owner' ? (cleanedData.location.includes(',') ? cleanedData.location.split(',')[0].trim() : '') : null,
+                        isOnline: cleanedData.role === 'owner' ? cleanedData.isOnline : null,
+                        // Socials
+                        instagram: cleanedData.role === 'owner' ? normalizeSocial(cleanedData.instagram, 'instagram') : null,
+                        tiktok: cleanedData.role === 'owner' ? normalizeSocial(cleanedData.tiktok, 'tiktok') : null,
+                        twitter: cleanedData.role === 'owner' ? normalizeSocial(cleanedData.twitter, 'twitter') : null,
+                        linkedin: cleanedData.role === 'owner' ? normalizeSocial(cleanedData.linkedin, 'linkedin') : null,
+                        website: cleanedData.role === 'owner' ? normalizeUrl(cleanedData.website) : null
                     }
                 }
             });
@@ -308,65 +324,21 @@ export default function RegisterPage() {
             if (authError) throw authError;
 
             if (authData?.user) {
-                // Check if this is the designated admin account
                 const isAdmin = formData.email.toLowerCase() === 'heltonsmith@hotmail.com';
 
-                if (!isAdmin) {
-                    // Update user metadata with role if it wasn't set correctly during signup (Supabase specific)
-                    // Note: In a real app we might want to use a trigger or edge function, 
-                    // but for now we'll rely on the profile creation trigger or initial metadata.
+                // Note: We used to manually insert into companies here.
+                // However, doing so immediately after signup before email confirmation
+                // violates RLS because the user is not authenticated yet.
+                // It has been replaced by a reliable Postgres trigger on `auth.users` 
+                // that safely fires once the user is confirmed and created.
+                if (!isAdmin && cleanedData.role !== 'owner') {
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .update({ role: 'client' })
+                        .eq('id', authData.user.id);
 
-                    // IF ENTREPRENEUR -> Create Company
-                    if (cleanedData.role === 'owner') {
-                        const slug = slugify(cleanedData.businessName);
-
-                        const { error: companyError } = await supabase
-                            .from('companies')
-                            .insert([{
-                                user_id: authData.user.id,
-                                name: cleanedData.businessName,
-                                slug: slug,
-                                whatsapp: cleanedData.whatsapp,
-                                business_type: cleanedData.businessType,
-                                description: cleanedData.description || `Bienvenidos a ${cleanedData.businessName}`,
-                                address: cleanedData.address,
-                                features: {
-                                    cartEnabled: cleanedData.businessType !== 'restaurant'
-                                },
-                                socials: {
-                                    instagram: normalizeSocial(cleanedData.instagram, 'instagram'),
-                                    tiktok: normalizeSocial(cleanedData.tiktok, 'tiktok'),
-                                    twitter: normalizeSocial(cleanedData.twitter, 'twitter'),
-                                    linkedin: normalizeSocial(cleanedData.linkedin, 'linkedin'),
-                                    website: normalizeUrl(cleanedData.website)
-                                },
-                                // Add geographic data
-                                region: cleanedData.location.includes(',') ? cleanedData.location.split(',')[1].trim() : cleanedData.location,
-                                city: cleanedData.location.includes(',') ? cleanedData.location.split(',')[0].trim() : '',
-                                commune: cleanedData.location.includes(',') ? cleanedData.location.split(',')[0].trim() : '',
-                                is_online: cleanedData.isOnline
-                            }]);
-
-                        if (companyError) throw companyError;
-
-                        // Also save RUT to profiles table
-                        const { error: rutError } = await supabase
-                            .from('profiles')
-                            .update({ rut: cleanedData.rut })
-                            .eq('id', authData.user.id);
-                        if (rutError) console.error('Error saving RUT to profile:', rutError);
-                    }
-                    // IF CLIENT -> Update profile role if needed (handled by trigger usually, else manual update)
-                    else {
-                        const { error: profileError } = await supabase
-                            .from('profiles')
-                            .update({ role: 'client' })
-                            .eq('id', authData.user.id);
-
-                        if (profileError) {
-                            console.error("Error updating profile role:", profileError);
-                            // continue anyway, default might be null or user
-                        }
+                    if (profileError) {
+                        console.error("Error updating profile role:", profileError);
                     }
                 }
 
@@ -410,12 +382,6 @@ export default function RegisterPage() {
 
     return (
         <>
-            <SEO
-                title="Registra tu Tienda o Crea tu Cuenta"
-                description="Únete a Ktaloog.com: registra tu tienda y publica tu catálogo digital gratis, o crea tu cuenta como cliente para descubrir las mejores tiendas de Chile."
-                url="https://www.ktaloog.com/registro"
-                keywords="registrar tienda online, crear catálogo digital gratis, registro cliente ktaloog, abrir tienda chile, vender por whatsapp"
-            />
             <div className="flex-1 flex flex-col lg:flex-row bg-white">
                 {/* Left Side: Form Section */}
                 <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 bg-slate-50/50">

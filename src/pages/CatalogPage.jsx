@@ -17,7 +17,6 @@ import { useCart } from '../hooks/useCart';
 import { NotificationCenter } from '../components/notifications/NotificationCenter';
 import { cn, formatCurrency } from '../utils';
 import NotFoundPage from './NotFoundPage';
-import { SEO } from '../components/layout/SEO';
 
 export default function CatalogPage() {
     const { showToast } = useToast();
@@ -773,15 +772,7 @@ export default function CatalogPage() {
 
     return (
         <div className="bg-slate-50 min-h-screen">
-            <SEO
-                title={company?.name || "Catálogo"}
-                description={company?.description || `Explora el catálogo de productos de ${company?.name} en Ktaloog.com. Encuentra los mejores precios y haz tu pedido por WhatsApp.`}
-                image={company?.logo || company?.banner}
-                url={`https://www.ktaloog.com/catalogo/${companySlug}`}
-                type="profile"
-                keywords={`${company?.name}, catálogo digital, ${company?.business_type === 'wholesale' ? 'mayorista' : 'tienda'}, chile, ktaloog`}
-            />
-            {/* Company Header */}
+                        {/* Company Header */}
             <div
                 ref={editMode === 'banner' ? containerRef : null}
                 className={cn(

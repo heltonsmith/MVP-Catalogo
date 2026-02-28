@@ -12,7 +12,6 @@ import { formatCurrency, generateWhatsAppLink } from '../utils';
 import { COMPANIES } from '../data/mock';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toast';
-import { SEO } from '../components/layout/SEO';
 
 export default function CartPage() {
     const { carts, updateQuantity, removeFromCart, clearCart, getCartTotal, companyInfo, getEffectivePrice } = useCart();
@@ -285,12 +284,7 @@ export default function CartPage() {
 
     return (
         <>
-            <SEO
-                title="Carrito de Cotización | Ktaloog"
-                description="Revisa y envía tu cotización a las tiendas de Ktaloog.com directamente por WhatsApp."
-                noindex={true}
-            />
-            <div className="bg-slate-50 min-h-screen pb-20">
+                        <div className="bg-slate-50 min-h-screen pb-20">
                 <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                     <h1 className="text-2xl font-bold text-slate-900 mb-8">Carrito de Cotización</h1>
 

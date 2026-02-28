@@ -1,17 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Home, ArrowLeft, Search } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { SEO } from '../components/layout/SEO';
 
 export default function NotFoundPage() {
     return (
         <>
-            <SEO
-                title="Página no encontrada | Ktaloog"
-                description="La página que buscas no existe o ha sido movida."
-                noindex={true}
-            />
-            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+                        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
                 <div className="max-w-md w-full text-center">
                     <div className="mb-4 flex flex-col items-center">
                         <img

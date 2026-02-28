@@ -39,7 +39,6 @@ import { useNotifications } from '../hooks/useNotifications';
 import { supabase } from '../lib/supabase';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { SEO } from '../components/layout/SEO';
 
 export default function HelpPage() {
     const { getSetting, loading: settingsLoading } = useSettings();
@@ -302,12 +301,7 @@ export default function HelpPage() {
 
     return (
         <div className="bg-slate-50 min-h-screen pb-20 overflow-x-hidden">
-            <SEO
-                title="Centro de Ayuda"
-                description="¿Tienes dudas sobre cómo usar Ktaloog.com? Encuentra respuestas a preguntas frecuentes, soporte técnico y gestiona tus tickets de ayuda aquí."
-                keywords="ayuda ktaloog, soporte técnico, preguntas frecuentes, tickets soporte, cómo crear catálogo"
-            />
-            {/* Simple Header */}
+                        {/* Simple Header */}
             <div className="bg-white border-b border-slate-200 pt-16 pb-8 px-4">
                 <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
                     <div className="h-14 w-14 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600 mb-4">
