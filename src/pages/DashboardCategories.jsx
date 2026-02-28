@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { titleCase, cleanTextInput } from '../utils';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { CATEGORIES as MOCK_CATEGORIES, COMPANIES } from '../data/mock';
@@ -108,12 +109,18 @@ export default function DashboardCategories() {
 
         setIsAdding(true);
         try {
-            const slug = newCategoryName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            const cleanedName = titleCase(cleanTextInput(newCategoryName, 50));
+            if (!cleanedName) {
+                showToast("El nombre de la categoría no es válido", "error");
+                setIsAdding(false);
+                return;
+            }
+            const slug = cleanedName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
             const { data, error } = await supabase
                 .from('categories')
                 .insert([{
                     company_id: company.id,
-                    name: newCategoryName.trim(),
+                    name: cleanedName,
                     slug,
                     order: categories.length
                 }])
@@ -177,11 +184,17 @@ export default function DashboardCategories() {
 
         setIsUpdating(true);
         try {
-            const slug = editName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            const cleanedName = titleCase(cleanTextInput(editName, 50));
+            if (!cleanedName) {
+                showToast("El nombre de la categoría no es válido", "error");
+                setIsUpdating(false);
+                return;
+            }
+            const slug = cleanedName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
             const { error } = await supabase
                 .from('categories')
                 .update({
-                    name: editName.trim(),
+                    name: cleanedName,
                     slug
                 })
                 .eq('id', editingCategory.id);
@@ -224,6 +237,7 @@ export default function DashboardCategories() {
                             placeholder="Categoría..."
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
+                            maxLength={50}
                             className="bg-white border-slate-200 h-11 flex-1 sm:min-w-[200px] text-sm"
                             disabled={isAdding}
                         />
@@ -329,6 +343,7 @@ export default function DashboardCategories() {
                                 placeholder="Ej. Accesorios"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
+                                maxLength={50}
                                 className="font-bold text-slate-700"
                                 autoFocus
                             />

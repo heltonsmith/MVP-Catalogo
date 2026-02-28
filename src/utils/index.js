@@ -111,3 +111,19 @@ export function isValidUrl(url) {
     if (!url) return true; // Links are optional
     return url.startsWith('https://');
 }
+
+export function titleCase(text) {
+    if (!text) return '';
+    return text
+        .toString()
+        .toLowerCase()
+        .split(' ')
+        .filter(word => word.length > 0)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+export function cleanTextInput(text, maxLength = 255) {
+    if (!text) return '';
+    return text.toString().trim().slice(0, maxLength);
+}

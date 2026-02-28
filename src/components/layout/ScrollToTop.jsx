@@ -9,7 +9,7 @@ export default function ScrollToTop() {
         window.scrollTo(0, 0);
 
         // Scroll the app's main container (which has overflow-y-auto)
-        const mainContainer = document.getElementById('main-scroll-container');
+        const mainContainer = document.getElementById('app-main-scroll');
         if (mainContainer) {
             mainContainer.scrollTo(0, 0);
         }

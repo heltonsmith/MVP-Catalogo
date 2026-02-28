@@ -122,15 +122,6 @@ export function Navbar({ isLandingMode = false }) {
     const navLinks = [
         { name: 'Inicio', path: '/' },
         { name: 'Buscador Tiendas', path: '/explorar' },
-        {
-            name: 'Tiendas Demo',
-            path: '#',
-            submenu: [
-                { name: 'Tienda', path: '/catalogo/ecoverde-spa' },
-                { name: 'Restaurante', path: '/catalogo/restaurante-delicias' }
-            ]
-        },
-        // { name: 'Ayuda', path: '/ayuda' },
     ];
 
     return (

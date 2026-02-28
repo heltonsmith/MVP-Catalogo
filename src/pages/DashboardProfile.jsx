@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
-import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, formatRut as sharedFormatRut, validateRut as sharedValidateRut, resizeImage } from '../utils';
+import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, formatRut as sharedFormatRut, validateRut as sharedValidateRut, resizeImage, titleCase, cleanTextInput } from '../utils';
 import { LocationSelector } from '../components/ui/LocationSelector';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
@@ -294,20 +294,34 @@ export default function DashboardProfile() {
             return;
         }
 
-        if (formData.whatsapp && !validatePhone(formData.whatsapp)) {
+        // 0. Clean and Capitalize Data
+        const cleanedData = {
+            full_name: titleCase(cleanTextInput(formData.full_name, 100)),
+            name: titleCase(cleanTextInput(formData.name, 100)),
+            description: cleanTextInput(formData.description, 1000),
+            address: titleCase(cleanTextInput(formData.address, 255)),
+            whatsapp: cleanTextInput(formData.whatsapp, 20),
+            website: cleanTextInput(formData.website, 255),
+            instagram: cleanTextInput(formData.instagram, 255),
+            tiktok: cleanTextInput(formData.tiktok, 255),
+            rut: cleanTextInput(formData.rut, 12),
+            slug: formData.slug // Slug remains as is or re-slugified if name changed, but user didn't ask for slug change
+        };
+
+        if (cleanedData.whatsapp && !validatePhone(cleanedData.whatsapp)) {
             showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
             return;
         }
 
-        if (formData.website && !isValidUrl(formData.website)) {
+        if (cleanedData.website && !isValidUrl(cleanedData.website)) {
             showToast("El enlace de la web debe comenzar con https://", "error");
             return;
         }
-        if (formData.instagram && !isValidUrl(formData.instagram)) {
+        if (cleanedData.instagram && !isValidUrl(cleanedData.instagram)) {
             showToast("El enlace de Instagram debe comenzar con https://", "error");
             return;
         }
-        if (formData.tiktok && !isValidUrl(formData.tiktok)) {
+        if (cleanedData.tiktok && !isValidUrl(cleanedData.tiktok)) {
             showToast("El enlace de TikTok debe comenzar con https://", "error");
             return;
         }
@@ -318,25 +332,25 @@ export default function DashboardProfile() {
             if (company.user_id) {
                 const { error: profError } = await supabase
                     .from('profiles')
-                    .update({ rut: formData.rut, full_name: formData.full_name })
+                    .update({ rut: cleanedData.rut, full_name: cleanedData.full_name })
                     .eq('id', company.user_id);
                 if (profError) console.error('Error updating profile:', profError);
             }
 
             // 2. Build company update
             const companyUpdate = {
-                name: formData.name,
-                slug: formData.slug,
-                description: formData.description,
-                whatsapp: formData.whatsapp,
+                name: cleanedData.name,
+                slug: cleanedData.slug,
+                description: cleanedData.description,
+                whatsapp: cleanedData.whatsapp,
                 business_type: formData.businessType,
                 socials: {
-                    instagram: formData.instagram,
-                    tiktok: formData.tiktok,
-                    website: formData.website
+                    instagram: cleanedData.instagram,
+                    tiktok: cleanedData.tiktok,
+                    website: cleanedData.website
                 },
                 menu_mode: formData.menuMode,
-                address: formData.address
+                address: cleanedData.address
             };
 
             // Parse location into region/commune
@@ -1071,6 +1085,7 @@ export default function DashboardProfile() {
                                                 value={formData.full_name}
                                                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                                                 placeholder="Juan Pérez"
+                                                maxLength={100}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1080,12 +1095,13 @@ export default function DashboardProfile() {
                                                 value={formData.rut}
                                                 onChange={(e) => {
                                                     const clean = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
-                                                    if (clean.length <= 9) {
-                                                        setFormData({ ...formData, rut: formatRut(e.target.value) });
+                                                    if (clean.length <= 12) {
+                                                        setFormData({ ...formData, rut: sharedFormatRut(e.target.value) });
                                                     }
                                                 }}
                                                 placeholder="12.345.678-9"
-                                                error={formData.rut && !validateRut(formData.rut) ? "RUT inválido" : null}
+                                                maxLength={12}
+                                                error={formData.rut && !sharedValidateRut(formData.rut) ? "RUT inválido" : null}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1104,6 +1120,7 @@ export default function DashboardProfile() {
                                                         .replace(/(^-|-$)+/g, '');
                                                     setFormData({ ...formData, name, slug });
                                                 }}
+                                                maxLength={100}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1124,6 +1141,7 @@ export default function DashboardProfile() {
                                             <Input
                                                 value={formData.description}
                                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                maxLength={1000}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1131,9 +1149,10 @@ export default function DashboardProfile() {
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">WhatsApp</label>
                                             <Input
                                                 value={formData.whatsapp}
-                                                onChange={(e) => setFormData({ ...formData, whatsapp: formatPhone(e.target.value) })}
+                                                onChange={(e) => setFormData({ ...formData, whatsapp: sharedFormatPhone(e.target.value) })}
                                                 placeholder="+56XXXXXXXXX"
-                                                error={formData.whatsapp && formData.whatsapp.length > 3 && !validatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
+                                                maxLength={20}
+                                                error={formData.whatsapp && formData.whatsapp.length > 3 && !sharedValidatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1147,6 +1166,7 @@ export default function DashboardProfile() {
                                                 value={formData.address}
                                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                                 placeholder="Av. Principal 123, Local 5"
+                                                maxLength={255}
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1169,7 +1189,8 @@ export default function DashboardProfile() {
                                                     value={formData.instagram}
                                                     onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
                                                     placeholder="https://instagram.com/su-cuenta"
-                                                    error={formData.instagram && !isValidUrl(formData.instagram) ? "Debe usar https://" : null}
+                                                    maxLength={255}
+                                                    error={formData.instagram && !sharedIsValidUrl(formData.instagram) ? "Debe usar https://" : null}
                                                     className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                                 />
                                             </div>
@@ -1179,7 +1200,8 @@ export default function DashboardProfile() {
                                                     value={formData.tiktok}
                                                     onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
                                                     placeholder="https://tiktok.com/@su-cuenta"
-                                                    error={formData.tiktok && !isValidUrl(formData.tiktok) ? "Debe usar https://" : null}
+                                                    maxLength={255}
+                                                    error={formData.tiktok && !sharedIsValidUrl(formData.tiktok) ? "Debe usar https://" : null}
                                                     className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                                 />
                                             </div>
@@ -1189,7 +1211,8 @@ export default function DashboardProfile() {
                                                     value={formData.website}
                                                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                                                     placeholder="https://su-tienda.com"
-                                                    error={formData.website && !isValidUrl(formData.website) ? "Debe usar https://" : null}
+                                                    maxLength={255}
+                                                    error={formData.website && !sharedIsValidUrl(formData.website) ? "Debe usar https://" : null}
                                                     className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                                 />
                                             </div>

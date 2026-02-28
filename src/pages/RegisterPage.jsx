@@ -9,7 +9,7 @@ import { LocationSelector } from '../components/ui/LocationSelector';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
-import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl } from '../utils';
+import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, titleCase, cleanTextInput } from '../utils';
 import { CAPTCHA_ICONS } from '../constants/auth';
 import { SEO } from '../components/layout/SEO';
 
@@ -104,7 +104,7 @@ export default function RegisterPage() {
         businessName: '',
         description: '',
         address: '',
-        businessType: 'retail',
+        businessType: '', // Changed to empty to force selection
         website: '',
         instagram: '',
         tiktok: '',
@@ -201,57 +201,88 @@ export default function RegisterPage() {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
+
+        // 0. Clean and Capitalize Data
+        const cleanedData = {
+            ...formData,
+            fullName: titleCase(cleanTextInput(formData.fullName, 100)),
+            email: cleanTextInput(formData.email, 100).toLowerCase(),
+            password: formData.password, // Don't clean password
+            businessName: titleCase(cleanTextInput(formData.businessName, 100)),
+            description: cleanTextInput(formData.description, 80),
+            address: titleCase(cleanTextInput(formData.address, 255)),
+            website: cleanTextInput(formData.website, 255),
+            instagram: cleanTextInput(formData.instagram, 255),
+            tiktok: cleanTextInput(formData.tiktok, 255),
+            twitter: cleanTextInput(formData.twitter, 255),
+            linkedin: cleanTextInput(formData.linkedin, 255),
+            whatsapp: cleanTextInput(formData.whatsapp, 20)
+        };
 
         if (selectedIconId !== captcha.target?.id) {
             showToast("Por favor selecciona la figura correcta.", "error");
             return;
         }
 
-        if (formData.role === 'owner') {
-            if (!validateRut(formData.rut)) {
-                showToast("El RUT ingresado no es válido.", "error");
+        // 1. Mandatory Fields Validation (BEFORE SIGNUP)
+        if (!cleanedData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanedData.email)) {
+            showToast("Por favor ingresa un correo electrónico válido.", "error");
+            return;
+        }
+
+        if (!cleanedData.password || cleanedData.password.length < 6) {
+            showToast("La contraseña debe tener al menos 6 caracteres.", "error");
+            return;
+        }
+
+        if (!cleanedData.fullName) {
+            showToast("El nombre completo es obligatorio.", "error");
+            return;
+        }
+
+        if (cleanedData.role === 'owner') {
+            if (!cleanedData.rut || !validateRut(cleanedData.rut)) {
+                showToast("El RUT es obligatorio y debe ser válido.", "error");
                 return;
             }
-            if (!formData.businessName.trim()) {
+            if (!cleanedData.businessName) {
                 showToast("El nombre de emprendimiento es obligatorio.", "error");
                 return;
             }
-            if (!formData.description.trim()) {
+            if (!cleanedData.description) {
                 showToast("La descripción de la tienda es obligatoria.", "error");
                 return;
             }
-            if (!formData.address.trim()) {
+            if (!cleanedData.address) {
                 showToast("La dirección física es obligatoria.", "error");
                 return;
             }
-            if (!validatePhone(formData.whatsapp)) {
+            if (!cleanedData.location) {
+                showToast("La ubicación (Región y Comuna) es obligatoria.", "error");
+                return;
+            }
+            if (!cleanedData.businessType) {
+                showToast("Debes seleccionar un tipo de venta o negocio.", "error");
+                return;
+            }
+            if (!validatePhone(cleanedData.whatsapp)) {
                 showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
                 return;
             }
-            if (formData.website && !isValidUrl(formData.website)) {
-                showToast("El enlace de la web debe comenzar con https://", "error");
-                return;
-            }
-            if (formData.instagram && !isValidUrl(formData.instagram)) {
-                showToast("El enlace de Instagram debe comenzar con https://", "error");
-                return;
-            }
-            if (formData.tiktok && !isValidUrl(formData.tiktok)) {
-                showToast("El enlace de TikTok debe comenzar con https://", "error");
-                return;
-            }
-            if (formData.twitter && !isValidUrl(formData.twitter)) {
-                showToast("El enlace de Twitter debe comenzar con https://", "error");
-                return;
-            }
-            if (formData.linkedin && !isValidUrl(formData.linkedin)) {
-                showToast("El enlace de LinkedIn debe comenzar con https://", "error");
-                return;
-            }
-            if (!formData.location) {
-                showToast("La ubicación (Región y Comuna) es obligatoria.", "error");
-                return;
+            // URL Validations
+            const urls = {
+                website: cleanedData.website,
+                instagram: cleanedData.instagram,
+                tiktok: cleanedData.tiktok,
+                twitter: cleanedData.twitter,
+                linkedin: cleanedData.linkedin
+            };
+            for (const [key, val] of Object.entries(urls)) {
+                if (val && !isValidUrl(val)) {
+                    showToast(`El enlace de ${key} debe comenzar con https://`, "error");
+                    return;
+                }
             }
         }
 
@@ -260,12 +291,12 @@ export default function RegisterPage() {
         try {
             // 1. Sign up user
             const { data: authData, error: authError } = await signUp({
-                email: formData.email,
-                password: formData.password,
+                email: cleanedData.email,
+                password: cleanedData.password,
                 options: {
                     data: {
-                        full_name: formData.fullName,
-                        role: formData.role
+                        full_name: cleanedData.fullName,
+                        role: cleanedData.role
                     }
                 }
             });
@@ -282,37 +313,34 @@ export default function RegisterPage() {
                     // but for now we'll rely on the profile creation trigger or initial metadata.
 
                     // IF ENTREPRENEUR -> Create Company
-                    if (formData.role === 'owner') {
-                        const slug = formData.businessName
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]+/g, '-')
-                            .replace(/(^-|-$)/g, '');
+                    if (cleanedData.role === 'owner') {
+                        const slug = slugify(cleanedData.businessName);
 
                         const { error: companyError } = await supabase
                             .from('companies')
                             .insert([{
                                 user_id: authData.user.id,
-                                name: formData.businessName,
+                                name: cleanedData.businessName,
                                 slug: slug,
-                                whatsapp: formData.whatsapp,
-                                business_type: formData.businessType,
-                                description: formData.description || `Bienvenidos a ${formData.businessName}`,
-                                address: formData.address,
+                                whatsapp: cleanedData.whatsapp,
+                                business_type: cleanedData.businessType,
+                                description: cleanedData.description || `Bienvenidos a ${cleanedData.businessName}`,
+                                address: cleanedData.address,
                                 features: {
-                                    cartEnabled: formData.businessType !== 'restaurant'
+                                    cartEnabled: cleanedData.businessType !== 'restaurant'
                                 },
                                 socials: {
-                                    instagram: normalizeSocial(formData.instagram, 'instagram'),
-                                    tiktok: normalizeSocial(formData.tiktok, 'tiktok'),
-                                    twitter: normalizeSocial(formData.twitter, 'twitter'),
-                                    linkedin: normalizeSocial(formData.linkedin, 'linkedin'),
-                                    website: normalizeUrl(formData.website)
+                                    instagram: normalizeSocial(cleanedData.instagram, 'instagram'),
+                                    tiktok: normalizeSocial(cleanedData.tiktok, 'tiktok'),
+                                    twitter: normalizeSocial(cleanedData.twitter, 'twitter'),
+                                    linkedin: normalizeSocial(cleanedData.linkedin, 'linkedin'),
+                                    website: normalizeUrl(cleanedData.website)
                                 },
                                 // Add geographic data
-                                region: formData.location.includes(',') ? formData.location.split(',')[1].trim() : formData.location,
-                                city: formData.location.includes(',') ? formData.location.split(',')[0].trim() : '',
-                                commune: formData.location.includes(',') ? formData.location.split(',')[0].trim() : '',
-                                is_online: formData.isOnline
+                                region: cleanedData.location.includes(',') ? cleanedData.location.split(',')[1].trim() : cleanedData.location,
+                                city: cleanedData.location.includes(',') ? cleanedData.location.split(',')[0].trim() : '',
+                                commune: cleanedData.location.includes(',') ? cleanedData.location.split(',')[0].trim() : '',
+                                is_online: cleanedData.isOnline
                             }]);
 
                         if (companyError) throw companyError;
@@ -320,7 +348,7 @@ export default function RegisterPage() {
                         // Also save RUT to profiles table
                         const { error: rutError } = await supabase
                             .from('profiles')
-                            .update({ rut: formData.rut })
+                            .update({ rut: cleanedData.rut })
                             .eq('id', authData.user.id);
                         if (rutError) console.error('Error saving RUT to profile:', rutError);
                     }
@@ -384,9 +412,9 @@ export default function RegisterPage() {
                 url="https://www.ktaloog.com/registro"
                 keywords="registrar tienda online, crear catálogo digital gratis, registro cliente ktaloog, abrir tienda chile, vender por whatsapp"
             />
-            <div className="flex min-h-screen bg-white overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row bg-white">
                 {/* Left Side: Form Section */}
-                <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 overflow-y-auto bg-slate-50/50">
+                <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 bg-slate-50/50">
                     <div className="mx-auto w-full max-w-xl lg:w-[500px]">
                         {registrationSuccess ? (
                             <div className="flex flex-col items-center text-center space-y-6 py-12">
@@ -551,23 +579,25 @@ export default function RegisterPage() {
                                         </div>
                                         <div className={cn("grid gap-4", formData.role === 'owner' ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
                                             <Input
-                                                label="Nombre completo"
+                                                label={<span>Nombre completo <span className="text-red-500">*</span></span>}
                                                 name="fullName"
                                                 placeholder="Juan Pérez"
                                                 required
                                                 value={formData.fullName}
                                                 onChange={handleChange}
+                                                maxLength={100}
                                                 autoComplete="name"
                                                 className="bg-white"
                                             />
                                             {formData.role === 'owner' && (
                                                 <Input
-                                                    label="RUT"
+                                                    label={<span>RUT <span className="text-red-500">*</span></span>}
                                                     name="rut"
                                                     placeholder="12.345.678-9"
                                                     required
                                                     value={formData.rut}
                                                     onChange={handleChange}
+                                                    maxLength={12}
                                                     error={formData.rut && !validateRut(formData.rut) ? "RUT inválido" : null}
                                                     className="bg-white"
                                                 />
@@ -584,16 +614,27 @@ export default function RegisterPage() {
                                             </div>
                                             <div className="space-y-4">
                                                 <Input
-                                                    label="Nombre de emprendimiento"
+                                                    label={<span>Nombre de emprendimiento <span className="text-red-500">*</span></span>}
                                                     name="businessName"
                                                     placeholder="Mi Tienda Online"
                                                     required={formData.role === 'owner'}
                                                     value={formData.businessName}
                                                     onChange={handleChange}
+                                                    maxLength={100}
                                                     className="bg-white"
                                                 />
                                                 <div className="space-y-1.5">
-                                                    <label className="text-sm font-bold text-slate-700">Descripción de la tienda <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-sm font-bold text-slate-700">Descripción de la tienda <span className="text-red-500">*</span></label>
+                                                        <span className={cn(
+                                                            "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
+                                                            formData.description.length >= 80
+                                                                ? "text-red-600 bg-red-50 border-red-100"
+                                                                : "text-slate-400 bg-slate-50 border-slate-100"
+                                                        )}>
+                                                            {formData.description.length} / 80
+                                                        </span>
+                                                    </div>
                                                     <textarea
                                                         name="description"
                                                         placeholder="Cuéntanos brevemente sobre tu negocio..."
@@ -601,15 +642,17 @@ export default function RegisterPage() {
                                                         className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-4 text-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-50 outline-none transition-all resize-none shadow-sm bg-white"
                                                         value={formData.description}
                                                         onChange={handleChange}
+                                                        maxLength={80}
                                                     ></textarea>
                                                 </div>
                                                 <Input
-                                                    label="Dirección Física"
+                                                    label={<span>Dirección Física <span className="text-red-500">*</span></span>}
                                                     name="address"
                                                     placeholder="Av. Principal 123, Local 5"
                                                     required={formData.role === 'owner'}
                                                     value={formData.address}
                                                     onChange={handleChange}
+                                                    maxLength={255}
                                                     className="bg-white"
                                                 />
 
@@ -618,6 +661,7 @@ export default function RegisterPage() {
                                                         value={formData.location}
                                                         onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
                                                         className="gap-4"
+                                                        showRequired
                                                     />
                                                     <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                                                         <input
@@ -644,7 +688,12 @@ export default function RegisterPage() {
                                                                     { id: 'wholesale', label: 'Mayorista' },
                                                                     { id: 'mixed', label: 'Detalle y Mayorista' }
                                                                 ].map((type) => (
-                                                                    <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                                    <label key={type.id} className={cn(
+                                                                        "flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer hover:bg-slate-50 transition-all",
+                                                                        formData.businessType === type.id
+                                                                            ? "border-primary-600 bg-primary-50/50 ring-1 ring-primary-600"
+                                                                            : "border-slate-200"
+                                                                    )}>
                                                                         <input
                                                                             type="radio"
                                                                             name="businessType"
@@ -653,7 +702,10 @@ export default function RegisterPage() {
                                                                             checked={formData.businessType === type.id}
                                                                             onChange={handleChange}
                                                                         />
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                                        <span className={cn(
+                                                                            "text-[10px] font-black uppercase tracking-widest text-center",
+                                                                            formData.businessType === type.id ? "text-primary-700" : "text-slate-500"
+                                                                        )}>
                                                                             {type.label}
                                                                         </span>
                                                                     </label>
@@ -667,7 +719,12 @@ export default function RegisterPage() {
                                                                 {[
                                                                     { id: 'restaurant', label: 'Restaurante' }
                                                                 ].map((type) => (
-                                                                    <label key={type.id} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50/50 has-[:checked]:ring-1 has-[:checked]:ring-primary-600">
+                                                                    <label key={type.id} className={cn(
+                                                                        "flex flex-col items-center justify-center p-3 rounded-xl border cursor-pointer hover:bg-slate-50 transition-all",
+                                                                        formData.businessType === type.id
+                                                                            ? "border-primary-600 bg-primary-50/50 ring-1 ring-primary-600"
+                                                                            : "border-slate-200"
+                                                                    )}>
                                                                         <input
                                                                             type="radio"
                                                                             name="businessType"
@@ -676,7 +733,10 @@ export default function RegisterPage() {
                                                                             checked={formData.businessType === type.id}
                                                                             onChange={handleChange}
                                                                         />
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-has-[:checked]:text-primary-700 text-center">
+                                                                        <span className={cn(
+                                                                            "text-[10px] font-black uppercase tracking-widest text-center",
+                                                                            formData.businessType === type.id ? "text-primary-700" : "text-slate-500"
+                                                                        )}>
                                                                             {type.label}
                                                                         </span>
                                                                     </label>
@@ -704,6 +764,7 @@ export default function RegisterPage() {
                                                     icon={<Globe size={16} />}
                                                     value={formData.website}
                                                     onChange={handleChange}
+                                                    maxLength={255}
                                                     error={formData.website && !isValidUrl(formData.website) ? "Debe usar https://" : null}
                                                     className="bg-white"
                                                 />
@@ -714,6 +775,7 @@ export default function RegisterPage() {
                                                     icon={<Instagram size={16} />}
                                                     value={formData.instagram}
                                                     onChange={handleChange}
+                                                    maxLength={255}
                                                     error={formData.instagram && !isValidUrl(formData.instagram) ? "Debe usar https://" : null}
                                                     className="bg-white"
                                                 />
@@ -724,6 +786,7 @@ export default function RegisterPage() {
                                                     icon={<TikTokIcon />}
                                                     value={formData.tiktok}
                                                     onChange={handleChange}
+                                                    maxLength={255}
                                                     error={formData.tiktok && !isValidUrl(formData.tiktok) ? "Debe usar https://" : null}
                                                     className="bg-white"
                                                 />
@@ -751,18 +814,19 @@ export default function RegisterPage() {
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <Input
-                                                label="Email"
+                                                label={<span>Email <span className="text-red-500">*</span></span>}
                                                 name="email"
                                                 placeholder="tu@email.com"
                                                 type="email"
                                                 required
                                                 value={formData.email}
                                                 onChange={handleChange}
+                                                maxLength={100}
                                                 autoComplete="email"
                                                 className="bg-white"
                                             />
                                             <Input
-                                                label="Contraseña"
+                                                label={<span>Contraseña <span className="text-red-500">*</span></span>}
                                                 name="password"
                                                 placeholder="••••••••"
                                                 type="password"
@@ -916,7 +980,7 @@ export default function RegisterPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
         </>
     );
 }

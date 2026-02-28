@@ -7,7 +7,7 @@ import { Input } from '../ui/Input';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../hooks/useSettings';
-import { cn, resizeImage } from '../../utils';
+import { cn, resizeImage, titleCase, cleanTextInput } from '../../utils';
 
 export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSuccess, companyId, categories = [] }) {
     const { showToast } = useToast();
@@ -230,8 +230,17 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 return;
             }
 
+            const cleanedName = titleCase(cleanTextInput(formData.name, 100));
+            const cleanedDescription = titleCase(cleanTextInput(formData.description, 2000));
+            const cleanedWeight = titleCase(cleanTextInput(formData.weight, 50));
+            const cleanedSize = titleCase(cleanTextInput(formData.size, 50));
+
             const productData = {
                 ...formData,
+                name: cleanedName,
+                description: cleanedDescription,
+                weight: cleanedWeight,
+                size: cleanedSize,
                 company_id: companyId,
                 price: parseFloat(formData.price) || 0,
                 stock: parseInt(formData.stock) || 0,
@@ -485,6 +494,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                                 placeholder="Ej. Zapatillas Running"
                                                 value={formData.name}
                                                 onChange={handleChange}
+                                                maxLength={100}
                                                 className="pl-9 font-bold text-slate-700"
                                             />
                                         </div>
@@ -522,6 +532,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                         placeholder="Describe tu producto..."
                                         value={formData.description}
                                         onChange={handleChange}
+                                        maxLength={2000}
                                         className="w-full rounded-xl border-slate-200 bg-slate-50/50 p-3 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none transition-all resize-none"
                                     />
                                 </div>
@@ -574,6 +585,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                                 placeholder={company?.menu_mode ? "Ej: Entrada, Plato Fondo" : "Ej: 500g"}
                                                 value={formData.weight}
                                                 onChange={handleChange}
+                                                maxLength={50}
                                                 className="pl-9"
                                             />
                                         </div>
@@ -589,6 +601,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                                 placeholder={company?.menu_mode ? "Ej: Para 2 personas" : "Ej: M, L, XL"}
                                                 value={formData.size}
                                                 onChange={handleChange}
+                                                maxLength={50}
                                                 className="pl-9"
                                             />
                                         </div>

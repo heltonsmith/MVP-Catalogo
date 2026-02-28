@@ -10,8 +10,8 @@ export function Footer() {
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary-50 rounded-full -ml-16 -mb-16 opacity-30" />
 
             <div className="container mx-auto px-4 relative z-10">
-                <div className="grid grid-cols-1 gap-12 md:grid-cols-3 lg:grid-cols-4">
-                    <div className="col-span-1 md:col-span-1 lg:col-span-2">
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-4 lg:grid-cols-4 text-left">
+                    <div className="col-span-1">
                         <Link to="/" className="flex items-center">
                             <img
                                 src="/logo-transparente.png"
@@ -30,6 +30,14 @@ export function Footer() {
                             <li><Link to="/" className="hover:text-primary-600 transition-colors">Inicio</Link></li>
                             <li><Link to="/precios" className="hover:text-primary-600 transition-colors">Planes y Precios</Link></li>
                             <li><Link to="/explorar" className="hover:text-primary-600 transition-colors">Directorio de Tiendas</Link></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 className="font-bold text-slate-900 text-sm uppercase tracking-wider mb-6">Tiendas Demo</h4>
+                        <ul className="space-y-4 text-sm text-slate-500 font-medium">
+                            <li><Link to="/catalogo/ecoverde-spa" className="hover:text-primary-600 transition-colors">Tienda Demo</Link></li>
+                            <li><Link to="/catalogo/restaurante-delicias" className="hover:text-primary-600 transition-colors">Restaurante Demo</Link></li>
                         </ul>
                     </div>
 
