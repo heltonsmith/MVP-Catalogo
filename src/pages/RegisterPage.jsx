@@ -9,7 +9,7 @@ import { LocationSelector } from '../components/ui/LocationSelector';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
-import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, titleCase, cleanTextInput } from '../utils';
+import { cn, formatRut as sharedFormatRut, validateRut as sharedValidateRut, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePhone, isValidUrl as sharedIsValidUrl, titleCase, cleanTextInput, slugify } from '../utils';
 import { CAPTCHA_ICONS } from '../constants/auth';
 import { SEO } from '../components/layout/SEO';
 
@@ -266,9 +266,13 @@ export default function RegisterPage() {
                 showToast("Debes seleccionar un tipo de venta o negocio.", "error");
                 return;
             }
-            if (!validatePhone(cleanedData.whatsapp)) {
+            const isEmptyWhatsapp = !cleanedData.whatsapp || cleanedData.whatsapp === '+56' || cleanedData.whatsapp.trim() === '';
+            if (!isEmptyWhatsapp && !validatePhone(cleanedData.whatsapp)) {
                 showToast("El número de WhatsApp no es válido. Formato: +56XXXXXXXXX", "error");
                 return;
+            }
+            if (isEmptyWhatsapp) {
+                cleanedData.whatsapp = '';
             }
             // URL Validations
             const urls = {
