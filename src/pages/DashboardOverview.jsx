@@ -12,6 +12,7 @@ import { PRODUCTS as MOCK_PRODUCTS, COMPANIES } from '../data/mock';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 import { useSettings } from '../hooks/useSettings';
+import { TooltipCard } from '../components/ui/Tooltip';
 
 const PERIOD_OPTIONS = [
     { key: 'today', label: 'Hoy' },
@@ -36,7 +37,7 @@ function getDateRange(periodKey) {
     }
 }
 
-function PeriodSelector({ value, onChange }) {
+function PeriodSelector({ value, onChange, disabled, tooltip }) {
     const [open, setOpen] = useState(false);
     const containerRef = useRef(null);
     const selected = PERIOD_OPTIONS.find(o => o.key === value) || PERIOD_OPTIONS[PERIOD_OPTIONS.length - 1];
@@ -55,16 +56,23 @@ function PeriodSelector({ value, onChange }) {
         <div className="relative" ref={containerRef}>
             <button
                 type="button"
+                disabled={disabled}
+                title={disabled ? tooltip : selected.label}
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setOpen(!open);
+                    if (!disabled) setOpen(!open);
                 }}
-                className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer relative z-20"
+                className={cn(
+                    "flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider transition-colors relative z-20",
+                    disabled
+                        ? "text-slate-400 bg-slate-50 cursor-not-allowed opacity-70"
+                        : "text-emerald-600 bg-emerald-50 hover:bg-emerald-100 cursor-pointer"
+                )}
             >
                 <ArrowUpRight size={12} />
                 {selected.label}
-                <ChevronDown size={10} className={cn("transition-transform", open && "rotate-180")} />
+                {!disabled && <ChevronDown size={10} className={cn("transition-transform", open && "rotate-180")} />}
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 z-[100] py-1 min-w-[140px] animate-in fade-in slide-in-from-top-2 duration-200 ring-4 ring-black/5">
@@ -123,7 +131,8 @@ export default function DashboardOverview() {
     const [quotesCount, setQuotesCount] = useState(0);
     const [latestQuote, setLatestQuote] = useState(null);
 
-    const [loading, setLoading] = useState(!isDemo);
+    const [loading, setLoading] = useState(true);
+    const [timedOut, setTimedOut] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const { pendingRequest, loading: loadingUpgrade } = useUpgradeRequest();
     const { getSetting } = useSettings();
@@ -131,6 +140,13 @@ export default function DashboardOverview() {
     const [topProducts, setTopProducts] = useState({ viewed: [], quoted: [] });
     const [requestingDemo, setRequestingDemo] = useState(false);
     const [demoExpiredMessage, setDemoExpiredMessage] = useState(false);
+
+    // Premium access check
+    const hasPremiumAccess = useMemo(() => {
+        if (isDemo) return true;
+        if (!company?.plan) return false;
+        return ['plus', 'pro', 'demo', 'custom'].includes(company.plan);
+    }, [company?.plan, isDemo]);
 
     const isExpired = (date) => {
         if (!date) return false;
@@ -207,10 +223,6 @@ export default function DashboardOverview() {
                     company_id: company.id,
                     requested_plan: 'demo',
                     billing_period: 'demo',
-                    rut: profile?.rut || 'Sin RUT',
-                    full_name: profile?.full_name || 'Tienda',
-                    email: profile?.email || '',
-                    store_name: company?.name || 'Tienda',
                     status: 'pending'
                 }]);
 
@@ -272,7 +284,7 @@ export default function DashboardOverview() {
                     .from('companies')
                     .select('views_count')
                     .eq('id', company.id)
-                    .single();
+                    .maybeSingle();
                 setViewsCount(data?.views_count || 0);
             } else {
                 const { from, to } = getDateRange(viewsPeriod);
@@ -301,7 +313,7 @@ export default function DashboardOverview() {
                     .from('companies')
                     .select('quotes_count')
                     .eq('id', company.id)
-                    .single();
+                    .maybeSingle();
                 setQuotesCount(data?.quotes_count || 0);
             } else {
                 let query = supabase
@@ -386,7 +398,7 @@ export default function DashboardOverview() {
                 .eq('company_id', company.id)
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (!error && data) {
                 setLatestQuote(data);
@@ -395,17 +407,54 @@ export default function DashboardOverview() {
         if (company) fetchLatestQuote();
     }, [company?.id, isDemo]);
 
-    // Loading complete
     useEffect(() => {
-        if (!isDemo && company?.id) {
+        if (isDemo) {
             setLoading(false);
+            return;
         }
+
+        // Safety timeout to prevent infinite loading if company table fails to provide record
+        const timer = setTimeout(() => {
+            if (loading) {
+                console.warn('DashboardOverview: Loading timeout reached');
+                setLoading(false);
+                setTimedOut(true);
+            }
+        }, 5000);
+
+        if (company?.id) {
+            setLoading(false);
+            clearTimeout(timer);
+        }
+
+        return () => clearTimeout(timer);
     }, [company?.id, isDemo]);
 
-    if (authLoading || (!isDemo && !company)) return (
+    if (authLoading || (loading && !timedOut)) return (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary-600" />
             <p className="text-slate-500 font-bold animate-pulse">Cargando tu panel...</p>
+        </div>
+    );
+
+    if (!isDemo && !company) return (
+        <div className="flex flex-col items-center justify-center py-20 gap-6 text-center max-w-md mx-auto">
+            <div className="h-20 w-20 bg-amber-50 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-10 w-10 text-amber-500" />
+            </div>
+            <div className="space-y-2">
+                <h2 className="text-2xl font-black text-slate-900">Tienda no encontrada</h2>
+                <p className="text-slate-500 font-medium"> No hemos podido encontrar la configuración de tu tienda. Es posible que el proceso de creación aún no haya finalizado.</p>
+            </div>
+            <div className="flex flex-col w-full gap-3">
+                <Button onClick={() => window.location.reload()} variant="outline" className="font-bold">
+                    Reintentar Cargar
+                </Button>
+                <Button onClick={() => navigate('/settings')} className="font-bold bg-primary-600">
+                    Ir a Ajustes de Perfil
+                </Button>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium italic">Si el problema persiste, contacta a soporte técnico.</p>
         </div>
     );
 
@@ -683,73 +732,107 @@ export default function DashboardOverview() {
                 </Card>
 
                 {/* Views Card */}
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow !overflow-visible relative z-[4]">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center">
-                                <Eye size={20} className="text-emerald-500" />
-                            </div>
-                            <PeriodSelector value={viewsPeriod} onChange={setViewsPeriod} />
-                        </div>
-                        <div className="mt-4">
-                            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest">Visitas</h3>
-                            <p className="text-3xl font-bold text-slate-900 mt-1">{viewsCount.toLocaleString()}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Quotes Card */}
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow !overflow-visible relative z-[3]">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center">
-                                <DollarSign size={20} className="text-purple-500" />
-                            </div>
-                            <PeriodSelector value={quotesPeriod} onChange={setQuotesPeriod} />
-                        </div>
-                        <div className={cn("mt-4", !isQuotesEnabled && "blur-[3px] select-none pointer-events-none opacity-50")}>
-                            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest">Cotizaciones</h3>
-                            <p className="text-3xl font-bold text-slate-900 mt-1">{quotesCount}</p>
-                        </div>
-
-                        {!isQuotesEnabled && (
-                            <div className="mt-4 pt-4 border-t border-slate-50">
-                                <div className="mb-3 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
-                                    <h5 className="text-[10px] font-black text-purple-900 uppercase tracking-wider mb-1.5">Gestión de Cotizaciones</h5>
-                                    <p className="text-[9px] text-purple-700 leading-relaxed">
-                                        Visualiza las cotizaciones por Whatsapp de clientes con filtros avanzados, marca como respondidas o completadas, y visualiza detalles por fecha y cliente.
-                                    </p>
+                <TooltipCard
+                    title="Analítica de Visitas"
+                    description="Registra cuántas personas visitan tu catálogo. Los planes premium permiten filtrar por fecha y ver estadísticas avanzadas."
+                >
+                    <Card className="border-none shadow-sm hover:shadow-md transition-shadow !overflow-visible relative z-[4]">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center">
+                                    <Eye size={20} className="text-emerald-500" />
                                 </div>
-                                {pendingRequest && (
-                                    <div className="flex items-center justify-center gap-1.5 mb-2 py-1 px-3 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                                        <Clock size={10} />
-                                        Solicitud en revisión por admin
+                                <PeriodSelector
+                                    value={viewsPeriod}
+                                    onChange={setViewsPeriod}
+                                    disabled={!hasPremiumAccess}
+                                    tooltip="Filtra las visitas por fecha (Función Premium)"
+                                />
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest">Visitas</h3>
+                                {hasPremiumAccess ? (
+                                    <p className="text-3xl font-bold text-slate-900 mt-1">{viewsCount.toLocaleString()}</p>
+                                ) : (
+                                    <div className="mt-2 text-slate-400 font-bold text-sm flex items-center gap-2">
+                                        <Zap size={14} className="text-emerald-500 fill-current" />
+                                        Actualiza para ver
                                     </div>
                                 )}
-                                <Button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        if (isDemo) {
-                                            handleDemoAction("Mejorar Plan");
-                                        } else {
-                                            setShowUpgradeModal(true);
-                                        }
-                                    }}
-                                    variant="outline"
-                                    size="default"
-                                    className={cn(
-                                        "w-full text-[10px] font-black h-9 gap-2 transition-all",
-                                        pendingRequest ? "border-amber-200 bg-amber-50 text-amber-700 shadow-none" : "border-primary-200 text-primary-600 hover:bg-primary-50"
-                                    )}
-                                >
-                                    {pendingRequest ? <Clock size={14} /> : <Zap size={14} className="fill-current" />}
-                                    {pendingRequest ? 'Ver Estado' : 'Mejorar Plan'}
-                                </Button>
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                </TooltipCard>
+
+                {/* Quotes Card */}
+                <TooltipCard
+                    title="Control de Cotizaciones"
+                    description="Mide el interés real de tus clientes rastreando cada vez que alguien solicita información por WhatsApp."
+                >
+                    <Card className="border-none shadow-sm hover:shadow-md transition-shadow !overflow-visible relative z-[3]">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center">
+                                    <DollarSign size={20} className="text-purple-500" />
+                                </div>
+                                <PeriodSelector
+                                    value={quotesPeriod}
+                                    onChange={setQuotesPeriod}
+                                    disabled={!hasPremiumAccess}
+                                    tooltip="Filtra las cotizaciones por fecha (Función Premium)"
+                                />
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest">Cotizaciones</h3>
+                                {hasPremiumAccess ? (
+                                    <p className="text-3xl font-bold text-slate-900 mt-1">{quotesCount}</p>
+                                ) : (
+                                    <div className="mt-2 text-slate-400 font-bold text-sm flex items-center gap-2">
+                                        <Zap size={14} className="text-purple-500 fill-current" />
+                                        Actualiza para ver
+                                    </div>
+                                )}
+                            </div>
+
+                            {!isQuotesEnabled && (
+                                <div className="mt-4 pt-4 border-t border-slate-50">
+                                    <div className="mb-3 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
+                                        <h5 className="text-[10px] font-black text-purple-900 uppercase tracking-wider mb-1.5">Gestión de Cotizaciones</h5>
+                                        <p className="text-[9px] text-purple-700 leading-relaxed">
+                                            Visualiza las cotizaciones por Whatsapp de clientes con filtros avanzados, marca como respondidas o completadas, y visualiza detalles por fecha y cliente.
+                                        </p>
+                                    </div>
+                                    {pendingRequest && (
+                                        <div className="flex items-center justify-center gap-1.5 mb-2 py-1 px-3 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                                            <Clock size={10} />
+                                            Solicitud en revisión por admin
+                                        </div>
+                                    )}
+                                    <Button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (isDemo) {
+                                                handleDemoAction("Mejorar Plan");
+                                            } else {
+                                                setShowUpgradeModal(true);
+                                            }
+                                        }}
+                                        variant="outline"
+                                        size="default"
+                                        className={cn(
+                                            "w-full text-[10px] font-black h-9 gap-2 transition-all",
+                                            pendingRequest ? "border-amber-200 bg-amber-50 text-amber-700 shadow-none" : "border-primary-200 text-primary-600 hover:bg-primary-50"
+                                        )}
+                                    >
+                                        {pendingRequest ? <Clock size={14} /> : <Zap size={14} className="fill-current" />}
+                                        {pendingRequest ? 'Ver Estado' : 'Mejorar Plan a Pago'}
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TooltipCard>
             </div>
 
             {/* Catalog Link Card — fixed overflow */}
@@ -803,175 +886,203 @@ export default function DashboardOverview() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Analytics Columns */}
                 <div className="lg:col-span-2 space-y-8">
-
                     {/* Top Products Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="border-none shadow-sm h-full">
-                            <div className="p-4 border-b border-slate-50 font-bold text-sm text-slate-800 flex items-center gap-2">
-                                <Eye size={16} className="text-emerald-500" />
-                                Más Vistos
-                            </div>
-                            <div className="p-4 space-y-4">
-                                {topViewed.map(product => (
-                                    <div key={product.id} className="flex items-center justify-between group cursor-pointer">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-100 bg-slate-50 flex items-center justify-center">
-                                                {product.images && product.images.length > 0 ? (
-                                                    <img src={product.images[0]} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <Package size={16} className="text-slate-300" />
-                                                )}
-                                            </div>
-                                            <span className="text-sm font-semibold text-slate-600 group-hover:text-primary-600 transition-colors line-clamp-1">{product.name}</span>
-                                        </div>
-                                        <span className="text-xs font-bold text-slate-400">{product.views}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-
-                        <Card className="border-none shadow-sm h-full">
-                            <div className="p-4 border-b border-slate-50 font-bold text-sm text-slate-800 flex items-center gap-2">
-                                <DollarSign size={16} className="text-purple-500" />
-                                Más Cotizados
-                            </div>
-                            <div className="p-4 space-y-4 relative">
-                                <div className={cn("space-y-4 transition-all duration-500", !isQuotesEnabled && "blur-[4px] grayscale opacity-40 select-none pointer-events-none")}>
-                                    {topQuoted.length > 0 ? topQuoted.map(product => (
-                                        <div key={product.id} className="flex items-center justify-between group cursor-pointer">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-100 bg-slate-50 flex items-center justify-center">
-                                                    {product.images && product.images.length > 0 ? (
-                                                        <img src={product.images[0]} className="h-full w-full object-cover" />
-                                                    ) : (
-                                                        <Package size={16} className="text-slate-300" />
-                                                    )}
+                        <TooltipCard
+                            title="Productos Más Vistos"
+                            description="Visualiza cuáles de tus productos generan mayor interés y atraen más visitas de clientes potenciales."
+                        >
+                            <Card className="border-none shadow-sm h-full">
+                                <div className="p-4 border-b border-slate-50 font-bold text-sm text-slate-800 flex items-center gap-2">
+                                    <Eye size={16} className="text-emerald-500" />
+                                    Más Vistos
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    {hasPremiumAccess ? (
+                                        topViewed.map(product => (
+                                            <div key={product.id} className="flex items-center justify-between group cursor-pointer">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-100 bg-slate-50 flex items-center justify-center">
+                                                        {product.images && product.images.length > 0 ? (
+                                                            <img src={product.images[0]} className="h-full w-full object-cover" />
+                                                        ) : (
+                                                            <Package size={16} className="text-slate-300" />
+                                                        )}
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-slate-600 group-hover:text-primary-600 transition-colors line-clamp-1">{product.name}</span>
                                                 </div>
-                                                <span className="text-sm font-semibold text-slate-600 group-hover:text-primary-600 transition-colors line-clamp-1">{product.name}</span>
+                                                <span className="text-xs font-bold text-slate-400">{product.views}</span>
                                             </div>
-                                            <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">{product.quotesCount}</span>
-                                        </div>
-                                    )) : (
-                                        <div className="py-8 text-center text-slate-400 text-xs italic font-medium">
-                                            Aún no hay cotizaciones registradas
+                                        ))
+                                    ) : (
+                                        <div className="py-6 flex flex-col items-center text-center">
+                                            <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
+                                                <TrendingUp className="text-emerald-500" size={20} />
+                                            </div>
+                                            <h4 className="font-extrabold text-slate-900 text-xs mb-1">Tendencias de Productos</h4>
+                                            <p className="text-[10px] text-slate-500 mb-4 px-2 leading-relaxed">Analiza cuáles de tus productos están captando más la atención de los visitantes.</p>
+                                            <Button
+                                                onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
+                                                variant="secondary"
+                                                size="sm"
+                                                className="w-full font-bold bg-white border-emerald-100 text-emerald-600 hover:bg-slate-50 shadow-sm text-[10px] h-9"
+                                            >
+                                                <Zap size={14} className="mr-2 fill-current" />
+                                                Mejorar Plan a Pago
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
+                            </Card>
+                        </TooltipCard>
 
-                                {!isQuotesEnabled && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-white/10 backdrop-blur-[1px] z-10">
-                                        <div className="h-10 w-10 bg-purple-50 rounded-xl flex items-center justify-center mb-3">
-                                            <DollarSign className="text-purple-500 fill-purple-500/20" size={20} />
-                                        </div>
-                                        <h4 className="font-bold text-slate-900 text-xs mb-1">Análisis de Productos</h4>
-                                        <p className="text-[10px] text-slate-500 mb-4 px-2 text-center leading-relaxed">Descubre qué productos cotizan más tus clientes y optimiza tu inventario.</p>
-                                        <Button
-                                            onClick={() => isDemo ? handleDemoAction("Ver Analíticas") : setShowUpgradeModal(true)}
-                                            variant="secondary"
-                                            size="sm"
-                                            className="font-bold bg-white/90 border-purple-100 text-purple-600 hover:bg-white shadow-sm text-[10px]"
-                                        >
-                                            <Zap size={14} className="mr-2 fill-current" />
-                                            Ver Analíticas
-                                        </Button>
+                        <TooltipCard
+                            title="Productos Más Cotizados"
+                            description="Identifica los productos más populares basándote en las solicitudes de cotización reales enviadas por WhatsApp."
+                        >
+                            <Card className="border-none shadow-sm h-full overflow-hidden flex flex-col">
+                                <div className="p-4 border-b border-slate-50 font-bold text-sm text-slate-800 flex items-center justify-between bg-white relative z-10">
+                                    <div className="flex items-center gap-2">
+                                        <DollarSign size={16} className="text-purple-500" />
+                                        Más Cotizados
                                     </div>
-                                )}
-                            </div>
-                        </Card>
+                                    {!hasPremiumAccess && (
+                                        <Badge variant="outline" className="text-[9px] border-purple-100 text-purple-600 bg-purple-50 font-black uppercase tracking-wider">PREMIUM</Badge>
+                                    )}
+                                </div>
+                                <div className="p-4 flex-1 flex flex-col min-h-0">
+                                    {hasPremiumAccess ? (
+                                        <div className="space-y-4 mb-4">
+                                            {topQuoted.length > 0 ? topQuoted.map(product => (
+                                                <div key={product.id} className="flex items-center justify-between group cursor-pointer transition-opacity">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-100 bg-slate-50 flex items-center justify-center">
+                                                            {product.images && product.images.length > 0 ? (
+                                                                <img src={product.images[0]} className="h-full w-full object-cover" />
+                                                            ) : (
+                                                                <Package size={16} className="text-slate-300" />
+                                                            )}
+                                                        </div>
+                                                        <span className="text-sm font-semibold text-slate-600 group-hover:text-primary-600 transition-colors line-clamp-1">{product.name}</span>
+                                                    </div>
+                                                    <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">{product.quotesCount}</span>
+                                                </div>
+                                            )) : (
+                                                <div className="py-8 text-center text-slate-400 text-xs italic font-medium">
+                                                    Aún no hay cotizaciones registradas
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="py-6 flex flex-col items-center text-center">
+                                            <div className="h-10 w-10 bg-purple-50 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                                                <DollarSign className="text-purple-500" size={20} />
+                                            </div>
+                                            <h4 className="font-extrabold text-slate-900 text-xs mb-1">Análisis de Productos</h4>
+                                            <p className="text-[10px] text-slate-500 mb-4 px-2 leading-relaxed">Descubre qué productos cotizan más tus clientes y optimiza tu inventario.</p>
+                                            <Button
+                                                onClick={() => isDemo ? handleDemoAction("Ver Analíticas") : setShowUpgradeModal(true)}
+                                                variant="secondary"
+                                                size="sm"
+                                                className="w-full font-bold bg-white border-purple-100 text-purple-600 hover:bg-slate-50 shadow-sm text-[10px] h-9"
+                                            >
+                                                <Zap size={14} className="mr-2 fill-current" />
+                                                Mejorar Plan a Pago
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
+                        </TooltipCard>
                     </div>
                 </div>
 
                 {/* Sidebar Column */}
                 <div className="space-y-6">
                     {/* Recent Interaction Log — with latest quote for real stores */}
-                    <Card className="border-none shadow-sm">
-                        <div className="p-4 border-b border-slate-50 bg-white font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <MessageCircle size={18} className="text-primary-600" />
-                            Actividad Reciente (WhatsApp)
-                        </div>
-                        <div className="p-0 overflow-hidden divide-y divide-slate-50 relative min-h-[200px]">
-                            <div className={cn("transition-all duration-500", !isQuotesEnabled && "blur-[5px] grayscale opacity-30 select-none pointer-events-none")}>
-                                {isDemo && recentActivity.length > 0 ? (
-                                    recentActivity.map(act => (
-                                        <div key={act.id} className="p-4 hover:bg-slate-50/50 transition-all cursor-pointer group">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{act.time}</span>
-                                                <span className={cn(
-                                                    "text-[9px] font-bold px-1.5 py-0.5 rounded-md",
-                                                    act.status === 'Enviado' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-primary-50 text-primary-600 border border-primary-100"
-                                                )}>
-                                                    {act.status}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                                                    <span className="text-[10px] font-bold text-slate-600">{act.user[0]}</span>
-                                                </div>
-                                                <p className="text-xs text-slate-700">
-                                                    <span className="font-bold">{act.user}</span> {act.type === 'quote' ? 'cotizó' : 'escribió'}:
-                                                    <span className="block italic text-slate-500 mt-0.5 truncate group-hover:text-primary-600">
-                                                        {act.type === 'quote' ? act.product : act.text}
-                                                    </span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : !isDemo && latestQuote ? (
-                                    <div className="p-4 hover:bg-slate-50/50 transition-all group">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{formatRelativeTime(latestQuote.created_at)}</span>
-                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                                Cotización
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                                                <FileText size={14} className="text-emerald-600" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-slate-800">{latestQuote.customer_name || 'Cliente'}</p>
-                                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                                    Cotizó {latestQuote.items?.length || 0} producto{latestQuote.items?.length !== 1 ? 's' : ''} por <span className="font-bold text-emerald-600">{formatCurrency(latestQuote.total || 0)}</span>
-                                                </p>
-                                                {latestQuote.items?.length > 0 && (
-                                                    <div className="mt-2 space-y-1">
-                                                        {latestQuote.items.slice(0, 3).map((item, idx) => (
-                                                            <div key={idx} className="flex items-center justify-between text-[10px]">
-                                                                <span className="text-slate-500 truncate max-w-[60%]">{item.name} ×{item.quantity}</span>
-                                                                <span className="font-semibold text-slate-600">{formatCurrency(item.price * item.quantity)}</span>
-                                                            </div>
-                                                        ))}
-                                                        {latestQuote.items.length > 3 && (
-                                                            <p className="text-[10px] text-slate-400 italic">+{latestQuote.items.length - 3} más...</p>
-                                                        )}
+                    <TooltipCard
+                        title="Registro de Actividad"
+                        description="Mantén un historial detallado de todas las interacciones de tus clientes en tiempo real."
+                    >
+                        <Card className="border-none shadow-sm">
+                            <div className="p-4 border-b border-slate-50 bg-white font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <MessageCircle size={18} className="text-primary-600" />
+                                Actividad Reciente (WhatsApp)
+                            </div>
+                            <div className="flex-1 flex flex-col min-h-0">
+                                {hasPremiumAccess ? (
+                                    <div className="space-y-0 divide-y divide-slate-50">
+                                        {isDemo && recentActivity.length > 0 ? (
+                                            recentActivity.map(act => (
+                                                <div key={act.id} className="p-4 hover:bg-slate-50/50 transition-all cursor-pointer group">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{act.time}</span>
+                                                        <span className={cn(
+                                                            "text-[9px] font-bold px-1.5 py-0.5 rounded-md",
+                                                            act.status === 'Enviado' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-primary-50 text-primary-600 border border-primary-100"
+                                                        )}>
+                                                            {act.status}
+                                                        </span>
                                                     </div>
-                                                )}
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                                            <span className="text-[10px] font-bold text-slate-600">{act.user[0]}</span>
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-xs text-slate-700 truncate">
+                                                                <span className="font-bold">{act.user}</span> {act.type === 'quote' ? 'cotizó' : 'escribió'}:
+                                                            </p>
+                                                            <span className="block italic text-slate-500 text-[10px] truncate group-hover:text-primary-600">
+                                                                {act.type === 'quote' ? act.product : act.text}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : !isDemo && latestQuote ? (
+                                            <div className="p-4 hover:bg-slate-50/50 transition-all group">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{formatRelativeTime(latestQuote.created_at)}</span>
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                                        Cotización
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-start gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                                                        <FileText size={14} className="text-emerald-600" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-bold text-slate-800">{latestQuote.customer_name || 'Cliente'}</p>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                                            Cotizó {latestQuote.items?.length || 0} productos
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <div className="py-12 text-center text-slate-400">
+                                                <MessageCircle size={32} className="mx-auto opacity-20 mb-3" />
+                                                <p className="text-xs font-bold uppercase tracking-widest">Sin actividad todavía</p>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
-                                    <div className="p-12 text-center text-slate-400">
-                                        <MessageCircle size={32} className="mx-auto opacity-20 mb-3" />
-                                        <p className="text-xs font-bold uppercase tracking-widest">Sin actividad todavía</p>
+                                    <div className="p-6 text-center bg-slate-50/30 flex-1 flex flex-col items-center justify-center">
+                                        <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                                            <MessageCircle className="text-emerald-500" size={20} />
+                                        </div>
+                                        <h4 className="font-extrabold text-slate-900 text-xs mb-1">Actividad en Tiempo Real</h4>
+                                        <p className="text-[10px] text-slate-500 mb-6 px-2 leading-relaxed">Visualiza todas las cotizaciones y mensajes de tus clientes vía WhatsApp en tiempo real.</p>
+                                        <Button
+                                            onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
+                                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-black h-10 text-[10px] shadow-lg shadow-emerald-100 w-full rounded-xl gap-2"
+                                        >
+                                            <Zap size={14} className="fill-current" />
+                                            Mejorar Plan a Pago
+                                        </Button>
                                     </div>
                                 )}
                             </div>
-
-                            {!isQuotesEnabled && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-white/10 backdrop-blur-[1px]">
-                                    <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
-                                        <MessageCircle className="text-emerald-500 fill-emerald-500/20" size={20} />
-                                    </div>
-                                    <h4 className="font-bold text-slate-900 text-xs mb-1">Actividad en Tiempo Real</h4>
-                                    <p className="text-[10px] text-slate-500 mb-4 px-4 leading-relaxed">Visualiza todas las cotizaciones y mensajes de tus clientes vía WhatsApp, ordenados por fecha con filtros avanzados.</p>
-                                    <Button
-                                        onClick={() => isDemo ? handleDemoAction("Mejorar Plan") : setShowUpgradeModal(true)}
-                                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-8 text-[10px] shadow-lg shadow-emerald-200 px-6 rounded-lg"
-                                    >
-                                        Mejorar Plan
-                                    </Button>
-                                </div>
-                            )}
 
                             <div className="p-3 bg-slate-50/50">
                                 <Button
@@ -990,8 +1101,8 @@ export default function DashboardOverview() {
                                     Ver historial completo
                                 </Button>
                             </div>
-                        </div>
-                    </Card>
+                        </Card>
+                    </TooltipCard>
                 </div>
             </div>
             <PlanUpgradeModal

@@ -10,7 +10,7 @@ export const CHILE_LOCATIONS = [
             "Santiago", "Conchalí", "Huechuraba", "Independencia", "Recoleta", "Quinta Normal", "Renca",
             "Las Condes", "Lo Barnechea", "Vitacura", "La Reina", "Macul", "Ñuñoa", "Peñalolén", "Providencia",
             "Cerro Navia", "Lo Espejo", "Maipú", "Pudahuel", "Quilicura", "San Miguel", "Cerrillos", "Estación Central",
-            "Pedro Aguirre Cerda", "San Joaquín", "La Cisterna", "La Granja", "Lo Espejo", "San Ramón", "La Pintana",
+            "Pedro Aguirre Cerda", "San Joaquín", "La Cisterna", "La Granja", "San Ramón", "La Pintana",
             "El Bosque", "Puente Alto", "Pirque", "San José de Maipo", "San Bernardo", "Calera de Tango", "Buin", "Paine",
             "Melipilla", "Alhué", "Curacaví", "María Pinto", "San Pedro", "Talagante", "El Monte", "Isla de Maipo", "Padre Hurtado", "Peñaflor",
             "Colina", "Lampa", "Tiltil"

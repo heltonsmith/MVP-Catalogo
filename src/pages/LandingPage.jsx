@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, CheckCircle, Smartphone, Zap, ShoppingBag, Store, Utensils, Search, MapPin, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { useSettings } from '../hooks/useSettings';
+import { useAuth } from '../context/AuthContext';
 
 import { motion } from 'framer-motion';
 
 export default function LandingPage() {
+    const navigate = useNavigate();
+    const { user, profile, loading: authLoading } = useAuth();
     const { getSetting } = useSettings();
+
     const freeProductLimit = getSetting('free_plan_product_limit', '5');
     const plusProductLimit = getSetting('plus_plan_product_limit', '100');
     const proProductLimit = getSetting('pro_plan_product_limit', '500');
@@ -68,7 +72,7 @@ export default function LandingPage() {
 
     return (
         <div className="flex flex-col overflow-hidden">
-                        {/* Hero Section */}
+            {/* Hero Section */}
             <section className="relative bg-slate-50 py-20 lg:py-32 overflow-x-hidden">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col items-center text-center">

@@ -56,7 +56,12 @@ export default function AdminOverview() {
                         logo,
                         plan,
                         user_id,
-                        whatsapp
+                        whatsapp,
+                        profiles (
+                            full_name,
+                            email,
+                            rut
+                        )
                     )
                 `)
                 .eq('status', 'pending')
@@ -64,30 +69,6 @@ export default function AdminOverview() {
 
             if (error) throw error;
 
-            // Enrich with profile rut from profiles table
-            if (data && data.length > 0) {
-                const userIds = data.map(r => r.companies?.user_id).filter(Boolean);
-                console.log('Upgrade requests user_ids:', userIds);
-                if (userIds.length > 0) {
-                    const { data: profiles, error: profError } = await supabase
-                        .from('profiles')
-                        .select('id, rut')
-                        .in('id', userIds);
-
-                    console.log('Profiles fetched for RUT:', profiles, 'Error:', profError);
-
-                    const profileMap = {};
-                    (profiles || []).forEach(p => { profileMap[p.id] = p; });
-
-                    data.forEach(r => {
-                        const userId = r.companies?.user_id;
-                        if (userId && profileMap[userId]) {
-                            r.profile_rut = profileMap[userId].rut;
-                        }
-                        console.log('Request', r.id, 'user_id:', userId, 'profile_rut:', r.profile_rut);
-                    });
-                }
-            }
 
             setRequests(data || []);
         } catch (error) {
@@ -330,7 +311,7 @@ export default function AdminOverview() {
                                             </span>
                                         </div>
                                         <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
-                                            <Building2 size={12} /> {request.store_name}
+                                            <Building2 size={12} /> {request.companies?.name || 'Tienda'}
                                         </p>
                                     </div>
                                     <div className="text-right shrink-0">
@@ -345,19 +326,19 @@ export default function AdminOverview() {
                                         <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
                                             <User size={10} /> Solicitante
                                         </p>
-                                        <p className="text-xs font-bold text-slate-700 truncate">{request.full_name}</p>
+                                        <p className="text-xs font-bold text-slate-700 truncate">{request.companies?.profiles?.full_name || 'Sin nombre'}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
                                             <Mail size={10} /> Email
                                         </p>
-                                        <p className="text-xs font-bold text-slate-700 truncate">{request.email}</p>
+                                        <p className="text-xs font-bold text-slate-700 truncate">{request.companies?.profiles?.email || 'Sin email'}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
                                             <CreditCard size={10} /> RUT
                                         </p>
-                                        <p className="text-xs font-bold text-slate-700">{request.profile_rut || request.rut || 'Sin RUT'}</p>
+                                        <p className="text-xs font-bold text-slate-700">{request.companies?.profiles?.rut || 'Sin RUT'}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">

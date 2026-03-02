@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Settings, User, Bell, Shield, Smartphone, Save, Image as ImageIcon, Camera, Crown, Sparkles, QrCode, Download, Loader2, Zap, Rocket, MessageSquare, Clock, CheckCircle2, XCircle, AlertCircle, Mail, MailOpen, Trash2, Link as LinkIcon, Utensils, Megaphone, Users, Send } from 'lucide-react';
 import QRCode from "react-qr-code";
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,7 @@ import { cn, formatPhone as sharedFormatPhone, validatePhone as sharedValidatePh
 import { LocationSelector } from '../components/ui/LocationSelector';
 import { PlanUpgradeModal } from '../components/dashboard/PlanUpgradeModal';
 import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
+import { TooltipCard } from '../components/ui/Tooltip';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { COMPANIES } from '../data/mock';
@@ -123,6 +124,27 @@ export default function DashboardProfile() {
     const [broadcastMsg, setBroadcastMsg] = useState('');
     const [sendingBroadcast, setSendingBroadcast] = useState(false);
     const [followerCount, setFollowerCount] = useState(0);
+
+    const broadcastRef = useRef(null);
+
+    const COMMON_EMOJIS = ['📢', '✨', '🚀', '🔥', '🎁', '⚡', '🆕', '🏷️', '📦', '🛒', '🍔', '🍕', '🍣', '🍦', '👗', '👟', '💎', '🎨', '🎉', '👋'];
+
+    const handleEmojiClick = (emoji) => {
+        if (!broadcastRef.current) return;
+
+        const start = broadcastRef.current.selectionStart;
+        const end = broadcastRef.current.selectionEnd;
+        const text = broadcastMsg;
+        const newText = text.substring(0, start) + emoji + text.substring(end);
+
+        setBroadcastMsg(newText);
+
+        // Reset focus and position cursor after the emoji
+        setTimeout(() => {
+            broadcastRef.current.focus();
+            broadcastRef.current.setSelectionRange(start + emoji.length, start + emoji.length);
+        }, 0);
+    };
 
     useEffect(() => {
         if (company) {
@@ -296,10 +318,10 @@ export default function DashboardProfile() {
 
         // 0. Clean and Capitalize Data
         const cleanedData = {
-            full_name: titleCase(cleanTextInput(formData.full_name, 100)),
-            name: titleCase(cleanTextInput(formData.name, 100)),
+            full_name: titleCase(cleanTextInput(formData.full_name, 40)),
+            name: titleCase(cleanTextInput(formData.name, 30)),
             description: cleanTextInput(formData.description, 1000),
-            address: titleCase(cleanTextInput(formData.address, 255)),
+            address: titleCase(cleanTextInput(formData.address, 50)),
             whatsapp: cleanTextInput(formData.whatsapp, 20),
             website: cleanTextInput(formData.website, 255),
             instagram: cleanTextInput(formData.instagram, 255),
@@ -501,12 +523,38 @@ export default function DashboardProfile() {
             return;
         }
 
+        if (!passwords.current) {
+            showToast("Debes ingresar tu contraseña actual", "error");
+            return;
+        }
+
         setLoading(true);
         try {
-            const { error } = await supabase.auth.updateUser({
+            // 0. Get current user's email reliably
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            const email = currentUser?.email;
+
+            if (!email) {
+                throw new Error("No se pudo obtener el correo del usuario");
+            }
+
+            // 1. Verify current password
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: passwords.current,
+            });
+
+            if (signInError) {
+                console.error('Verification failed:', signInError);
+                throw new Error("La contraseña actual es incorrecta");
+            }
+
+            // 2. Update to new password
+            const { error: updateError } = await supabase.auth.updateUser({
                 password: passwords.new
             });
-            if (error) throw error;
+            if (updateError) throw updateError;
+
             showToast("Contraseña actualizada correctamente", "success");
             setPasswords({ current: '', new: '', confirm: '' });
         } catch (error) {
@@ -646,73 +694,133 @@ export default function DashboardProfile() {
                 return (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <Card className="border-none shadow-xl bg-white overflow-hidden">
-                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center gap-2">
-                                <Megaphone size={18} className="text-primary-500" />
-                                Canal de Difusión Seguidores
+                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Megaphone size={18} className="text-primary-500" />
+                                    Canal de Difusión Seguidores
+                                </div>
+                                {(!isPro && !isDemo) && (
+                                    <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-1 rounded-full border border-primary-200 uppercase tracking-widest">
+                                        Planes de Pago
+                                    </span>
+                                )}
                             </div>
-                            <CardContent className="p-8">
-                                <div className="max-w-xl mx-auto text-center space-y-6">
-                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm font-black shadow-sm ring-1 ring-primary-100">
-                                        <Users size={16} />
-                                        <span>{followerCount.toLocaleString()} Seguidores Activos</span>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <h3 className="text-xl font-black text-slate-900 leading-tight">Envía novedades a tus clientes</h3>
-                                        <p className="text-sm text-slate-500 font-bold leading-relaxed">
-                                            Tus seguidores recibirán una notificación inmediata con el mensaje que escribas abajo.
-                                            ¡Úsalo para ofertas relámpago, nuevos ingresos o anuncios importantes!
-                                        </p>
-                                    </div>
-
-                                    <div className="relative group">
-                                        <textarea
-                                            value={broadcastMsg}
-                                            onChange={(e) => setBroadcastMsg(e.target.value)}
-                                            placeholder="Ej: ¡Hola! Tenemos 10 productos nuevos en oferta por tiempo limitado. ¡No te los pierdas! 🚀"
-                                            rows={5}
-                                            className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-5 text-sm font-bold text-slate-700 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all resize-none shadow-inner"
-                                        />
-                                        <div className="absolute bottom-4 right-4 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
-                                            {broadcastMsg.length} caracteres
+                            <CardContent className="p-8 relative">
+                                <div className={cn("transition-all duration-500", (!isPro && !isDemo) && "blur-[2px] opacity-50 pointer-events-none")}>
+                                    <div className="max-w-xl mx-auto text-center space-y-6">
+                                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm font-black shadow-sm ring-1 ring-primary-100">
+                                            <Users size={16} />
+                                            <span>{followerCount.toLocaleString()} Seguidores Activos</span>
                                         </div>
-                                    </div>
 
-                                    <Button
-                                        onClick={handleSendBroadcast}
-                                        disabled={sendingBroadcast || !broadcastMsg.trim()}
-                                        className="w-full h-14 rounded-2xl text-base font-black shadow-xl shadow-primary-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                    >
-                                        {sendingBroadcast ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                                Enviando a {followerCount} seguidores...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Send className="mr-2 h-5 w-5" />
-                                                Enviar Notificación de Difusión
-                                            </>
-                                        )}
-                                    </Button>
+                                        <div className="space-y-3">
+                                            <h3 className="text-xl font-black text-slate-900 leading-tight">Envía novedades a tus clientes</h3>
+                                            <p className="text-sm text-slate-500 font-bold leading-relaxed">
+                                                Tus seguidores recibirán una notificación inmediata con el mensaje que escribas abajo.
+                                                ¡Úsalo para ofertas relámpago, nuevos ingresos o anuncios importantes!
+                                            </p>
+                                        </div>
 
-                                    <div className="pt-4 flex items-center justify-center gap-6 border-t border-slate-100">
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Alcance</span>
-                                            <span className="text-xs font-bold text-slate-700">Inmediato</span>
+                                        <div className="space-y-4">
+                                            {/* Emoji Palette */}
+                                            <div className="flex flex-wrap items-center justify-center gap-1.5 p-2 bg-slate-50/80 rounded-xl border border-slate-100/50 backdrop-blur-sm">
+                                                {COMMON_EMOJIS.map((emoji, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => handleEmojiClick(emoji)}
+                                                        className="w-8 h-8 flex items-center justify-center text-lg hover:bg-white hover:scale-125 hover:shadow-sm rounded-lg transition-all duration-200 active:scale-95"
+                                                        title="Click para insertar"
+                                                    >
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <div className="relative group">
+                                                <textarea
+                                                    ref={broadcastRef}
+                                                    value={broadcastMsg}
+                                                    onChange={(e) => setBroadcastMsg(e.target.value)}
+                                                    placeholder="Ej: ¡Hola! Tenemos 10 productos nuevos en oferta por tiempo limitado. ¡No te los pierdas! 🚀"
+                                                    rows={5}
+                                                    className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-5 text-sm font-bold text-slate-700 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all resize-none shadow-inner"
+                                                />
+                                                <div className="absolute bottom-4 right-4 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                                                    {broadcastMsg.length} caracteres
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="h-4 w-px bg-slate-200" />
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Tipo</span>
-                                            <span className="text-xs font-bold text-slate-700">Directo</span>
-                                        </div>
-                                        <div className="h-4 w-px bg-slate-200" />
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Botón CTA</span>
-                                            <span className="text-xs font-bold text-slate-700">Ir a Tienda</span>
+
+                                        <Button
+                                            onClick={handleSendBroadcast}
+                                            disabled={sendingBroadcast || !broadcastMsg.trim()}
+                                            className="w-full h-14 rounded-2xl text-base font-black shadow-xl shadow-primary-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                        >
+                                            {sendingBroadcast ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                    Enviando a {followerCount} seguidores...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Send className="mr-2 h-5 w-5" />
+                                                    Enviar Notificación de Difusión
+                                                </>
+                                            )}
+                                        </Button>
+
+                                        <div className="pt-4 flex items-center justify-center gap-6 border-t border-slate-100">
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Alcance</span>
+                                                <span className="text-xs font-bold text-slate-700">Inmediato</span>
+                                            </div>
+                                            <div className="h-4 w-px bg-slate-200" />
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Tipo</span>
+                                                <span className="text-xs font-bold text-slate-700">Directo</span>
+                                            </div>
+                                            <div className="h-4 w-px bg-slate-200" />
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Botón CTA</span>
+                                                <span className="text-xs font-bold text-slate-700">Ir a Tienda</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                {(!isPro && !isDemo) && (
+                                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                                        <div className="flex flex-col items-center gap-3">
+                                            {pendingRequest && (
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
+                                                    <Clock size={12} />
+                                                    Solicitud en Revisión
+                                                </div>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowUpgradeModal(true)}
+                                                className={cn(
+                                                    "bg-white/80 backdrop-blur-sm border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 font-black rounded-xl shadow-lg",
+                                                    pendingRequest && "border-amber-200 shadow-none opacity-90"
+                                                )}
+                                            >
+                                                {pendingRequest ? (
+                                                    <>
+                                                        <Clock size={16} className="mr-2" />
+                                                        Ver Estado de Mejora
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Crown size={16} className="mr-2" />
+                                                        Habilitar Canal de Difusión
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -807,6 +915,17 @@ export default function DashboardProfile() {
                         <CardContent className="p-6 space-y-6">
                             <form className="space-y-4" onSubmit={handleUpdatePassword}>
                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Contraseña Actual</label>
+                                    <Input
+                                        type="password"
+                                        placeholder="••••••••"
+                                        className="bg-slate-50 border-slate-100"
+                                        value={passwords.current}
+                                        onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nueva Contraseña</label>
                                     <Input
                                         type="password"
@@ -848,14 +967,9 @@ export default function DashboardProfile() {
                                     <Smartphone size={18} className="text-emerald-500" />
                                     Conexión WhatsApp
                                 </div>
-                                {!isPro && (
-                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-200 uppercase tracking-widest">
-                                        Planes de Pago
-                                    </span>
-                                )}
                             </div>
                             <CardContent className="p-6 relative">
-                                <div className={cn("space-y-6 transition-all duration-500", !isPro && "blur-[2px] opacity-50 pointer-events-none")}>
+                                <div className="space-y-6 transition-all duration-500">
                                     {/* Edit Number Section */}
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Número de WhatsApp</label>
@@ -968,38 +1082,6 @@ export default function DashboardProfile() {
                                     </div>
                                 </div>
 
-                                {!isPro && (
-                                    <div className="absolute inset-0 flex items-center justify-center z-10">
-                                        <div className="flex flex-col items-center gap-3">
-                                            {pendingRequest && (
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
-                                                    <Clock size={12} />
-                                                    Solicitud en Revisión
-                                                </div>
-                                            )}
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => isDemo ? handleDemoAction("Activar WhatsApp") : setShowUpgradeModal(true)}
-                                                className={cn(
-                                                    "bg-white/80 backdrop-blur-sm border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-black rounded-xl",
-                                                    pendingRequest && "border-amber-200 shadow-none opacity-90"
-                                                )}
-                                            >
-                                                {pendingRequest ? (
-                                                    <>
-                                                        <Clock size={16} className="mr-2" />
-                                                        Ver Estado
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Sparkles size={16} className="mr-2" />
-                                                        Habilitar conexión WhatsApp
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -1085,7 +1167,8 @@ export default function DashboardProfile() {
                                                 value={formData.full_name}
                                                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                                                 placeholder="Juan Pérez"
-                                                maxLength={100}
+                                                maxLength={40}
+                                                showCounter
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1120,7 +1203,8 @@ export default function DashboardProfile() {
                                                         .replace(/(^-|-$)+/g, '');
                                                     setFormData({ ...formData, name, slug });
                                                 }}
-                                                maxLength={100}
+                                                maxLength={30}
+                                                showCounter
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1139,9 +1223,11 @@ export default function DashboardProfile() {
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Descripción corta</label>
                                             <Input
+                                                type="textarea"
                                                 value={formData.description}
                                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                                maxLength={1000}
+                                                maxLength={80}
+                                                showCounter
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1166,7 +1252,8 @@ export default function DashboardProfile() {
                                                 value={formData.address}
                                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                                 placeholder="Av. Principal 123, Local 5"
-                                                maxLength={255}
+                                                maxLength={50}
+                                                showCounter
                                                 className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
                                             />
                                         </div>
@@ -1536,29 +1623,45 @@ export default function DashboardProfile() {
                             },
                             { id: 'security', name: 'Seguridad', fullName: 'Seguridad', icon: <Shield size={18} /> },
                             { id: 'whatsapp', name: 'WhatsApp', fullName: 'Integración WhatsApp', icon: <Smartphone size={18} /> },
-                        ].map((item, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setActiveTab(item.id)}
-                                className={cn(
-                                    "flex items-center justify-between px-4 py-2.5 lg:py-3 rounded-2xl text-[11px] lg:text-sm font-bold transition-all whitespace-nowrap shrink-0 lg:shrink",
-                                    activeTab === item.id
-                                        ? "bg-primary-50 text-primary-600 shadow-sm ring-1 ring-primary-100"
-                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                                )}
-                            >
-                                <div className="flex items-center gap-2 lg:gap-3">
-                                    {item.icon}
-                                    <span className="lg:hidden">{item.name}</span>
-                                    <span className="hidden lg:inline">{item.fullName}</span>
-                                </div>
-                                {item.badge && (
-                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white ml-2 lg:ml-0">
-                                        {item.badge}
-                                    </span>
-                                )}
-                            </button>
-                        ))}
+                        ].map((item, i) => {
+                            const button = (
+                                <button
+                                    key={i}
+                                    onClick={() => setActiveTab(item.id)}
+                                    className={cn(
+                                        "flex items-center justify-between px-4 py-2.5 lg:py-3 rounded-2xl text-[11px] lg:text-sm font-bold transition-all whitespace-nowrap shrink-0 lg:shrink w-full",
+                                        activeTab === item.id
+                                            ? "bg-primary-50 text-primary-600 shadow-sm ring-1 ring-primary-100"
+                                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-2 lg:gap-3">
+                                        {item.icon}
+                                        <span className="lg:hidden">{item.name}</span>
+                                        <span className="hidden lg:inline">{item.fullName}</span>
+                                    </div>
+                                    {item.badge && (
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white ml-2 lg:ml-0">
+                                            {item.badge}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+
+                            if (item.id === 'broadcast' && company?.plan === 'free') {
+                                return (
+                                    <TooltipCard
+                                        key={i}
+                                        title="Canal de Difusión"
+                                        description="Comunícate directamente con tus seguidores. Envía notificaciones instantáneas sobre ofertas, nuevos productos o noticias importantes directamente a su panel."
+                                    >
+                                        {button}
+                                    </TooltipCard>
+                                );
+                            }
+
+                            return button;
+                        })}
                     </div>
 
                     <div className="hidden lg:block">

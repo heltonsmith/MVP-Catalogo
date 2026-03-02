@@ -8,7 +8,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
-import { formatCurrency, generateWhatsAppLink } from '../utils';
+import { formatCurrency, formatProductPrice, generateWhatsAppLink } from '../utils';
 import { COMPANIES } from '../data/mock';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/Toast';
@@ -135,11 +135,11 @@ export default function CartPage() {
                 const subtotal = unitPrice * item.quantity;
 
                 message += `${index + 1}. *${item.name}*\n`;
-                message += `   SKU: ${item.sku || 'N/A'}\n`;
+                message += `   SKU: ${(item.sku && item.show_sku !== false) ? item.sku : 'N/A'}\n`;
                 if (isWholesale) {
-                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (por mayor, ${tierMinQty}+ un.)\n`;
+                    message += `   Cantidad: ${item.quantity} × ${formatProductPrice(unitPrice)} (por mayor, ${tierMinQty}+ un.)\n`;
                 } else {
-                    message += `   Cantidad: ${item.quantity} × ${formatCurrency(unitPrice)} (unitario)\n`;
+                    message += `   Cantidad: ${item.quantity} × ${formatProductPrice(unitPrice)} (unitario)\n`;
                 }
                 message += `   Subtotal: ${formatCurrency(subtotal)}\n\n`;
             });
@@ -162,7 +162,7 @@ export default function CartPage() {
                     customer_id: user?.id || null
                 }])
                 .select()
-                .single();
+                .maybeSingle();
 
             if (quoteError) throw quoteError;
 
@@ -201,7 +201,7 @@ export default function CartPage() {
                         name: item.name,
                         quantity: item.quantity,
                         price: unitPrice,
-                        sku: item.sku,
+                        sku: (item.sku && item.show_sku !== false) ? item.sku : 'N/A',
                         image: item.images?.[0]
                     };
                 });
@@ -219,7 +219,7 @@ export default function CartPage() {
                         status: 'pending'
                     }])
                     .select()
-                    .single();
+                    .maybeSingle();
 
                 if (whatsappError) {
                     console.error('Error saving WhatsApp history:', whatsappError);
@@ -284,7 +284,7 @@ export default function CartPage() {
 
     return (
         <>
-                        <div className="bg-slate-50 min-h-screen pb-20">
+            <div className="bg-slate-50 min-h-screen pb-20">
                 <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                     <h1 className="text-2xl font-bold text-slate-900 mb-8">Carrito de Cotización</h1>
 
@@ -339,10 +339,10 @@ export default function CartPage() {
                                                             />
                                                             <div className="ml-4 flex-1">
                                                                 <h4 className="text-sm font-bold text-slate-800 line-clamp-1">{item.name}</h4>
-                                                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {item.sku || 'N/A'}</p>
+                                                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {(item.sku && item.show_sku !== false) ? item.sku : 'N/A'}</p>
 
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <p className="text-sm font-semibold text-primary-600">{formatCurrency(unitPrice)}</p>
+                                                                    <p className="text-sm font-semibold text-primary-600">{formatProductPrice(unitPrice)}</p>
                                                                     {isWholesale && (
                                                                         <Badge variant="success" className="text-[9px] px-1.5 py-0">
                                                                             <Tag size={10} className="mr-0.5" />
@@ -374,7 +374,7 @@ export default function CartPage() {
                                                                         </button>
                                                                     </div>
                                                                     <div className="flex items-center gap-3">
-                                                                        <span className="text-sm font-bold text-slate-700">{formatCurrency(subtotal)}</span>
+                                                                        <span className="text-sm font-bold text-slate-700">{formatProductPrice(subtotal)}</span>
                                                                         <button
                                                                             className="p-2 text-red-400 hover:text-red-600"
                                                                             onClick={() => removeFromCart(companyId, item.id)}

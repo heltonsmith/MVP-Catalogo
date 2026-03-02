@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { StarRating } from '../components/ui/StarRating';
 import { Modal } from '../components/ui/Modal';
-import { formatCurrency } from '../utils';
+import { formatCurrency, formatProductPrice } from '../utils';
 import { useCart } from '../hooks/useCart';
 import { useToast } from '../components/ui/Toast';
 import { motion } from 'framer-motion';
@@ -47,7 +47,7 @@ export default function ProductDetailsPage() {
                     .from('companies')
                     .select('*')
                     .eq('slug', companySlug)
-                    .single();
+                    .maybeSingle();
 
                 if (companyError || !companyData) throw new Error('Company not found');
                 setCompany(companyData);
@@ -64,7 +64,7 @@ export default function ProductDetailsPage() {
                     `)
                     .eq('slug', productSlug)
                     .eq('company_id', companyData.id)
-                    .single();
+                    .maybeSingle();
 
                 if (productError || !productData) throw new Error('Product not found');
 
@@ -333,6 +333,10 @@ export default function ProductDetailsPage() {
             showToast("No puedes agregar tus propios productos al carrito", "warning");
             return;
         }
+        if (!product.available) {
+            showToast("Este producto no está disponible actualmente", "info");
+            return;
+        }
         addToCart(product, quantity);
         showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
     };
@@ -362,11 +366,11 @@ export default function ProductDetailsPage() {
     };
 
     const isOwner = user?.id === company?.user_id;
-    const isRestaurant = company?.menu_mode;
+    const isRestaurant = company?.menu_mode || company?.business_type === 'restaurant';
 
     return (
         <div className="bg-white min-h-screen pb-20">
-                        {/* Mobile Header Nav */}
+            {/* Mobile Header Nav */}
             <div className="sticky top-16 z-30 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
                     <ChevronLeft className="mr-1 h-5 w-5" />
@@ -405,7 +409,7 @@ export default function ProductDetailsPage() {
 
                             {isRestaurant ? (
                                 <Badge variant={product.available ? 'success' : 'destructive'}>
-                                    {product.available ? 'Disponible Hoy' : 'Agotado'}
+                                    {product.available ? 'Disponible' : 'No disponible'}
                                 </Badge>
                             ) : company.features?.cartEnabled !== false ? (
                                 <Badge variant={product.stock > 0 ? 'success' : 'destructive'}>
@@ -428,11 +432,13 @@ export default function ProductDetailsPage() {
                         </div>
 
                         <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">{product.name}</h1>
-                        <p className="text-sm font-mono text-slate-400 mt-2">SKU: {product.sku}</p>
+                        <p className="text-sm font-mono text-slate-400 mt-2">
+                            {(product.sku && product.show_sku !== false) ? `SKU: ${product.sku}` : 'SKU: N/A'}
+                        </p>
 
                         <div className="mt-6">
                             <p className="text-3xl font-bold text-emerald-600">
-                                {formatCurrency(product.price)}
+                                {formatProductPrice(product.price)}
                                 <span className="text-sm text-slate-400 font-medium ml-2 font-normal">x unidad</span>
                             </p>
 
@@ -472,7 +478,7 @@ export default function ProductDetailsPage() {
                                     <Utensils className="h-5 w-5 text-slate-400" />
                                     <div>
                                         <p className="text-xs font-medium uppercase text-slate-400">
-                                            {isRestaurant ? 'Tipo' : 'Tamaño'}
+                                            {isRestaurant ? 'Porción' : 'Tamaño'}
                                         </p>
                                         <p className="text-sm font-semibold">{isRestaurant ? product.weight : product.size}</p>
                                     </div>
@@ -481,7 +487,7 @@ export default function ProductDetailsPage() {
                                     <Package className="h-5 w-5 text-slate-400" />
                                     <div>
                                         <p className="text-xs font-medium uppercase text-slate-400">
-                                            {isRestaurant ? 'Porción' : 'Peso'}
+                                            {isRestaurant ? 'Tamaño' : 'Peso'}
                                         </p>
                                         <p className="text-sm font-semibold">{isRestaurant ? product.size : product.weight}</p>
                                     </div>
@@ -489,7 +495,7 @@ export default function ProductDetailsPage() {
                             </div>
 
                             {/* Quantity and CTA */}
-                            {isRestaurant ? (
+                            {company?.menu_mode ? (
                                 <div className="pt-4 border-t border-slate-100">
                                     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
                                         <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
@@ -501,7 +507,7 @@ export default function ProductDetailsPage() {
                                         </div>
                                     </div>
                                 </div>
-                            ) : (company.features?.cartEnabled !== false && !company?.menu_mode) ? (
+                            ) : (isRestaurant || company.features?.cartEnabled !== false) ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center space-x-4">
                                         <div className="flex h-12 items-center rounded-xl border border-slate-200 px-2">

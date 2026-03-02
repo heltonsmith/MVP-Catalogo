@@ -25,7 +25,7 @@ export function DemoRestaurantDashboardLayout() {
         { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/demo/restaurante/dashboard' },
         { name: 'Mis Productos', icon: <Package size={20} />, path: '/demo/restaurante/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/demo/restaurante/dashboard/categorias' },
-        // Note: No Cotizaciones for restaurant
+        { name: 'Ver Catálogo', icon: <Store size={20} />, path: `/demo/catalogo/${company.slug}` },
         { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/demo/restaurante/dashboard/perfil' },
     ];
 

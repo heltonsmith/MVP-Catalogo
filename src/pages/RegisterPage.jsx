@@ -205,12 +205,12 @@ export default function RegisterPage() {
         // 0. Clean and Capitalize Data
         const cleanedData = {
             ...formData,
-            fullName: titleCase(cleanTextInput(formData.fullName, 100)),
+            fullName: titleCase(cleanTextInput(formData.fullName, 40)),
             email: cleanTextInput(formData.email, 100).toLowerCase(),
             password: formData.password, // Don't clean password
-            businessName: titleCase(cleanTextInput(formData.businessName, 100)),
+            businessName: titleCase(cleanTextInput(formData.businessName, 30)),
             description: cleanTextInput(formData.description, 80),
-            address: titleCase(cleanTextInput(formData.address, 255)),
+            address: titleCase(cleanTextInput(formData.address, 50)),
             website: cleanTextInput(formData.website, 255),
             instagram: cleanTextInput(formData.instagram, 255),
             tiktok: cleanTextInput(formData.tiktok, 255),
@@ -292,6 +292,23 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
+            // Check if email already exists in profiles
+            const { data: existingUser, error: checkError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', cleanedData.email)
+                .maybeSingle();
+
+            if (checkError) {
+                console.error('Error checking if email exists:', checkError);
+            }
+
+            if (existingUser) {
+                showToast("Este correo electrónico ya está registrado. Por favor, inicia sesión o usa otro correo.", "error");
+                setLoading(false);
+                return;
+            }
+
             // 1. Sign up user (Pass all data into user_metadata for the trigger)
             const { data: authData, error: authError } = await signUp({
                 email: cleanedData.email,
@@ -555,7 +572,8 @@ export default function RegisterPage() {
                                                 required
                                                 value={formData.fullName}
                                                 onChange={handleChange}
-                                                maxLength={100}
+                                                maxLength={40}
+                                                showCounter
                                                 autoComplete="name"
                                                 className="bg-white"
                                             />
@@ -590,31 +608,22 @@ export default function RegisterPage() {
                                                     required={formData.role === 'owner'}
                                                     value={formData.businessName}
                                                     onChange={handleChange}
-                                                    maxLength={100}
+                                                    maxLength={30}
+                                                    showCounter
                                                     className="bg-white"
                                                 />
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-sm font-bold text-slate-700">Descripción de la tienda <span className="text-red-500">*</span></label>
-                                                        <span className={cn(
-                                                            "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
-                                                            formData.description.length >= 80
-                                                                ? "text-red-600 bg-red-50 border-red-100"
-                                                                : "text-slate-400 bg-slate-50 border-slate-100"
-                                                        )}>
-                                                            {formData.description.length} / 80
-                                                        </span>
-                                                    </div>
-                                                    <textarea
-                                                        name="description"
-                                                        placeholder="Cuéntanos brevemente sobre tu negocio..."
-                                                        required
-                                                        className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-4 text-sm focus:border-primary-600 focus:ring-4 focus:ring-primary-50 outline-none transition-all resize-none shadow-sm bg-white"
-                                                        value={formData.description}
-                                                        onChange={handleChange}
-                                                        maxLength={80}
-                                                    ></textarea>
-                                                </div>
+                                                <Input
+                                                    type="textarea"
+                                                    label={<span>Descripción de la tienda <span className="text-red-500">*</span></span>}
+                                                    name="description"
+                                                    placeholder="Cuéntanos brevemente sobre tu negocio..."
+                                                    required
+                                                    value={formData.description}
+                                                    onChange={handleChange}
+                                                    maxLength={80}
+                                                    showCounter
+                                                    className="bg-white"
+                                                />
                                                 <Input
                                                     label={<span>Dirección Física <span className="text-red-500">*</span></span>}
                                                     name="address"
@@ -622,7 +631,8 @@ export default function RegisterPage() {
                                                     required={formData.role === 'owner'}
                                                     value={formData.address}
                                                     onChange={handleChange}
-                                                    maxLength={255}
+                                                    maxLength={50}
+                                                    showCounter
                                                     className="bg-white"
                                                 />
 

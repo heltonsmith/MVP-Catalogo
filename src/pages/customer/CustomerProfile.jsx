@@ -162,10 +162,10 @@ export default function CustomerProfile() {
                 .upsert({
                     id: targetUserId,
                     email: profile?.email || user?.email,
-                    full_name: formData.fullName,
+                    full_name: String(formData.fullName || '').substring(0, 40),
                     rut: formData.rut,
                     phone: formData.phone,
-                    shipping_address: formData.address
+                    shipping_address: String(formData.address || '').substring(0, 50)
                 });
 
             if (profileError) throw profileError;
@@ -274,6 +274,8 @@ export default function CustomerProfile() {
                                         placeholder="Tu nombre"
                                         value={formData.fullName}
                                         onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                                        maxLength={40}
+                                        showCounter
                                         required
                                         className="h-12 bg-slate-50 border-transparent focus:bg-white"
                                     />
@@ -325,6 +327,8 @@ export default function CustomerProfile() {
                                     placeholder="Calle Ejemplo 123, Comuna, Región"
                                     value={formData.address}
                                     onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                                    maxLength={50}
+                                    showCounter
                                     className="h-12 bg-slate-50 border-transparent focus:bg-white"
                                 />
                             </div>

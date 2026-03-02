@@ -511,7 +511,7 @@ export default function InboxPage() {
                 customer_id: activeTab === 'buying' ? user.id : selectedChatId
             };
 
-            const { data, error } = await supabase.from('messages').insert(msgData).select().single();
+            const { data, error } = await supabase.from('messages').insert(msgData).select().maybeSingle();
             if (error) throw error;
 
             // Restoration Logic: If this conversation was "deleted" (hidden), restore visibility for all previous messages
@@ -630,7 +630,7 @@ export default function InboxPage() {
 
     return (
         <>
-                        <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
+            <div className="bg-slate-50 flex flex-col h-[calc(100dvh-64px)] overflow-hidden">
                 {/* Simple Top Bar */}
                 <header className="bg-white border-b border-slate-200 h-16 sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">

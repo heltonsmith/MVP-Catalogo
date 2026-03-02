@@ -48,7 +48,7 @@ export function Tooltip({ children, content }) {
     );
 }
 
-export function TooltipCard({ children, title, description }) {
+export function TooltipCard({ children, title, description, side = 'left' }) {
     const [isVisible, setIsVisible] = useState(false);
     const triggerRef = useRef(null);
     const [coords, setCoords] = useState(null);
@@ -56,10 +56,17 @@ export function TooltipCard({ children, title, description }) {
     const updateCoords = () => {
         if (triggerRef.current) {
             const rect = triggerRef.current.getBoundingClientRect();
-            setCoords({
-                top: rect.top,
-                left: rect.left + rect.width
-            });
+            if (side === 'left') {
+                setCoords({
+                    top: rect.top,
+                    left: rect.left - 300 // 288px (w-72) + 12px margin
+                });
+            } else {
+                setCoords({
+                    top: rect.top,
+                    left: rect.left + rect.width + 12
+                });
+            }
         }
     };
 
@@ -79,7 +86,7 @@ export function TooltipCard({ children, title, description }) {
                     className="fixed z-[999999] w-72 p-4 bg-white border-2 border-slate-900 rounded-xl shadow-2xl pointer-events-none"
                     style={{
                         top: `${coords.top}px`,
-                        left: `${coords.left + 15}px`
+                        left: `${coords.left}px`
                     }}
                 >
                     <div className="flex items-center gap-2 mb-2">
@@ -90,7 +97,11 @@ export function TooltipCard({ children, title, description }) {
                         {description}
                     </p>
 
-                    <div className="absolute w-4 h-4 bg-white border-l-2 border-t-2 border-slate-900 rotate-45 -left-[10px] top-6" />
+                    {side === 'left' ? (
+                        <div className="absolute w-4 h-4 bg-white border-r-2 border-b-2 border-slate-900 rotate-45 -right-[10px] top-6" />
+                    ) : (
+                        <div className="absolute w-4 h-4 bg-white border-l-2 border-t-2 border-slate-900 rotate-45 -left-[10px] top-6" />
+                    )}
 
                     <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
                         <span className="text-[10px] font-black text-amber-600 uppercase">Premium</span>

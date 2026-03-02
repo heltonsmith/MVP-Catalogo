@@ -28,6 +28,7 @@ export function DemoStoreDashboardLayout() {
         { name: 'Mis Productos', icon: <Package size={20} />, path: '/demo/tienda/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/demo/tienda/dashboard/categorias' },
         { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/demo/tienda/dashboard/cotizaciones' },
+        { name: 'Ver Catálogo', icon: <Store size={20} />, path: `/demo/catalogo/${company.slug}` },
         { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/demo/tienda/dashboard/perfil' },
     ];
 

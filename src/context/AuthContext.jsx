@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }) => {
                             console.warn('Auth: Renewal interval exceeded. Downgrading to FREE');
                             await handleAutoDowngrade(data);
                             // Refresh company data after downgrade
-                            const { data: updatedCompany } = await supabase.from('companies').select('*').eq('id', data.id).single();
+                            const { data: updatedCompany } = await supabase.from('companies').select('*').eq('id', data.id).maybeSingle();
                             setCompany(updatedCompany);
                         } else if (isExpired) {
                             // In grace period - create notification if not already sent for this date
@@ -198,13 +198,21 @@ export const AuthProvider = ({ children }) => {
                 console.log('Auth: Global safety timeout reached');
                 setLoading(false);
             }
-        }, 10000);
+        }, 5000);
 
         const init = async () => {
             console.log('Auth: Running initialization...');
             try {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) throw error;
+                // Safety: Session fetch timeout
+                const { data: { session }, error } = await withTimeout(
+                    supabase.auth.getSession(),
+                    5000,
+                    { data: { session: null }, error: null }
+                );
+                if (error) {
+                    console.error('Auth: getSession error:', error);
+                    // Don't throw, just continue as guest
+                }
 
                 if (isMounted) {
                     const currentUser = session?.user ?? null;

@@ -11,7 +11,7 @@ import { COMPANIES } from '../../data/mock';
 
 export function Navbar({ isLandingMode = false }) {
     const [isOpen, setIsOpen] = useState(false);
-    const { carts } = useCart();
+    const { carts, companyInfo } = useCart();
     const { user, company, signOut, profile, unreadNotifications, refreshUnreadNotifications, isObserving } = useAuth();
     const [localCompany, setLocalCompany] = useState(null);
     const location = useLocation();
@@ -105,14 +105,24 @@ export function Navbar({ isLandingMode = false }) {
 
     // Detect current company from URL and check if cart is enabled
     const cartVisible = useMemo(() => {
-        if (isViewOnly) return false;
+        // Always hide on checkout/cart pages
+        if (location.pathname === '/carrito' || location.pathname === '/checkout' || location.pathname === '/pedido-confirmado') {
+            return false;
+        }
 
-        const match = location.pathname.match(/^\/catalogo\/([^/]+)/) || location.pathname.match(/^\/demo\/catalogo\/([^/]+)/);
-        if (!match) return true; // Not on a catalog page, show cart by default
-        const slug = match[1];
-        const company = COMPANIES.find(c => c.slug === slug);
-        return company ? company.features?.cartEnabled !== false : true;
-    }, [location.pathname, isViewOnly]);
+        // If we are in a catalog, show the cart icon if the company has it enabled (regardless of menu_mode)
+        const isCatalog = location.pathname.startsWith('/catalogo/');
+        if (isCatalog) {
+            const pathParts = location.pathname.split('/');
+            const slug = pathParts[2];
+
+            // If we are in a catalog, we usually want to show the cart icon
+            // unless we specifically know it's a store with cart disabled.
+            return true;
+        }
+
+        return false;
+    }, [location.pathname, companyInfo]);
 
     // Calculate total items across all carts
     const totalItems = Object.values(carts).reduce((total, cartItems) => {

@@ -4,7 +4,7 @@ import { ShoppingCart, Eye, Star, Plus, Minus, Check } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { formatCurrency } from '../../utils';
+import { formatCurrency, formatProductPrice } from '../../utils';
 import { useCart } from '../../hooks/useCart';
 import { useToast } from '../ui/Toast';
 import { StarRating } from '../ui/StarRating';
@@ -26,6 +26,10 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                 showToast("No puedes agregar tus propios productos al carrito", "warning");
                 return;
             }
+            if (!product.available) {
+                showToast("Este producto no está disponible actualmente", "info");
+                return;
+            }
             addToCart(product, quantity);
             showToast(`✅ ${product.name} (x${quantity}) agregado al carrito`, 'success');
             setQuantity(1);
@@ -42,7 +46,11 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
-                        {cartEnabled ? (
+                        {product.business_type === 'restaurant' || product.company?.business_type === 'restaurant' ? (
+                            <Badge variant={product.available ? 'success' : 'destructive'}>
+                                {product.available ? 'Disponible' : 'No disponible'}
+                            </Badge>
+                        ) : cartEnabled ? (
                             <Badge variant="success">Stock: {product.stock}</Badge>
                         ) : (
                             <Badge variant={product.available ? 'success' : 'destructive'}>
@@ -79,14 +87,14 @@ export function ProductCard({ product, companySlug, cartEnabled = true, isDemo =
                 <div className="flex items-start justify-between mt-2">
                     <div className="flex flex-col w-full">
                         <span className="text-lg font-bold text-primary-600">
-                            {formatCurrency(product.price)}
+                            {formatProductPrice(product.price)}
                         </span>
                         {product.wholesale_prices && product.wholesale_prices.length > 0 && (
                             <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1 w-full">
                                 {product.wholesale_prices.sort((a, b) => a.min_qty - b.min_qty).slice(0, 3).map((tier, idx) => (
                                     <div key={idx} className="flex justify-between items-center text-[10px]">
                                         <span className="text-slate-500 font-medium">{tier.min_qty}+ un.</span>
-                                        <span className="font-bold text-emerald-600">{formatCurrency(tier.price)}</span>
+                                        <span className="font-bold text-emerald-600">{formatProductPrice(tier.price)}</span>
                                     </div>
                                 ))}
                                 {product.wholesale_prices.length > 3 && (

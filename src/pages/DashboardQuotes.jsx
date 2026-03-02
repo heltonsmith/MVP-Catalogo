@@ -419,8 +419,10 @@ export default function DashboardQuotes() {
                                                                             <span className="text-slate-600 font-medium block truncate">
                                                                                 <span className="font-bold text-primary-600">{item.quantity}x</span> {item.products?.name}
                                                                             </span>
-                                                                            {item.products?.sku && (
+                                                                            {item.products?.sku ? (
                                                                                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{item.products.sku}</span>
+                                                                            ) : (
+                                                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SKU: N/A</span>
                                                                             )}
                                                                         </div>
                                                                         <span className="font-bold text-slate-800 tabular-nums">{formatCurrency(item.price_at_time * item.quantity)}</span>

@@ -156,10 +156,6 @@ export function PlanUpgradeModal({ isOpen, onClose, companyId }) {
                     company_id: companyId,
                     requested_plan: selectedPlan,
                     billing_period: billingPeriod,
-                    rut: details.rut,
-                    full_name: details.fullName,
-                    email: details.email,
-                    store_name: company?.name || 'Tienda',
                     status: 'pending'
                 }]);
 

@@ -77,7 +77,7 @@ export default function CatalogPage() {
                     .from('companies')
                     .select('*')
                     .eq('slug', companySlug)
-                    .single();
+                    .maybeSingle();
 
                 if (companyError || !companyData) {
                     throw new Error('Company not found');
@@ -158,7 +158,9 @@ export default function CatalogPage() {
                     user_id: companyData.user_id,
                     whatsapp_enabled: companyData.whatsapp_enabled,
                     plan: companyData.plan,
-                    landing_enabled: companyData.landing_enabled
+                    cartEnabled: companyData.features?.cartEnabled !== false,
+                    business_type: companyData.business_type,
+                    menu_mode: companyData.menu_mode
                 });
 
                 // Transform products to include categories array, images, and ratings
@@ -201,7 +203,8 @@ export default function CatalogPage() {
                         categories: product.product_categories?.map(pc => pc.categories) || [],
                         images: product.product_images?.sort((a, b) => a.display_order - b.display_order).map(img => img.image_url) || [],
                         reviews: productReviews,
-                        rating: avgRating
+                        rating: avgRating,
+                        business_type: companyData.business_type
                     };
                 }));
 
@@ -394,8 +397,8 @@ export default function CatalogPage() {
             return;
         }
 
-        if (isOwner || profile?.role === 'owner') {
-            showToast("No puedes guardar tiendas en favoritos si eres dueño de una tienda", "warning");
+        if (isOwner) {
+            showToast("No puedes guardar tu propia tienda en favoritos", "warning");
             return;
         }
 
@@ -772,7 +775,7 @@ export default function CatalogPage() {
 
     return (
         <div className="bg-slate-50 min-h-screen">
-                        {/* Company Header */}
+            {/* Company Header */}
             <div
                 ref={editMode === 'banner' ? containerRef : null}
                 className={cn(
@@ -972,28 +975,26 @@ export default function CatalogPage() {
                                         </span>
                                     </div>
 
-                                    {(!isOwner && profile?.role !== 'owner') && (
-                                        <div className="flex flex-col items-center gap-1">
-                                            <button
-                                                onClick={toggleFavorite}
-                                                className={cn(
-                                                    "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
-                                                    isFavorite
-                                                        ? "bg-rose-600/30 border-rose-500/50 text-white shadow-rose-500/20"
-                                                        : "bg-white/10 border-white/10 text-white hover:bg-white/20"
-                                                )}
-                                                title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                                            >
-                                                <Heart size={14} className={cn("transition-colors", isFavorite ? "text-rose-400 fill-rose-400" : "text-white/70")} />
-                                                <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
-                                                    {favoriteCount.toLocaleString()} <span className="hidden lg:inline">{favoriteCount === 1 ? 'Favorito' : 'Favoritos'}</span>
-                                                </span>
-                                            </button>
-                                            <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
-                                                Favorito
+                                    <div className="flex flex-col items-center gap-1">
+                                        <button
+                                            onClick={toggleFavorite}
+                                            className={cn(
+                                                "flex items-center gap-2 p-1.5 sm:py-1.5 sm:px-4 rounded-xl border backdrop-blur-md transition-all active:scale-95 shadow-lg",
+                                                isFavorite
+                                                    ? "bg-rose-600/30 border-rose-500/50 text-white shadow-rose-500/20"
+                                                    : "bg-white/10 border-white/10 text-white hover:bg-white/20"
+                                            )}
+                                            title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                                        >
+                                            <Heart size={14} className={cn("transition-colors", isFavorite ? "text-rose-400 fill-rose-400" : "text-white/70")} />
+                                            <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">
+                                                {favoriteCount.toLocaleString()} <span className="hidden lg:inline">{favoriteCount === 1 ? 'Favorito' : 'Favoritos'}</span>
                                             </span>
-                                        </div>
-                                    )}
+                                        </button>
+                                        <span className="text-[9px] font-bold text-white uppercase tracking-tight sm:hidden pointer-events-none">
+                                            Favorito
+                                        </span>
+                                    </div>
 
                                     {/* Enviar Mensaje Button */}
                                     <div className="flex flex-col items-center gap-1">
@@ -1182,7 +1183,7 @@ export default function CatalogPage() {
 
                 {/* Product Grid or Grouped List */}
                 <div className="mt-8 space-y-12">
-                    {company?.menu_mode ? (
+                    {(company?.menu_mode || company?.business_type === 'restaurant') ? (
                         // Restaurant Layout: Grouped by Category, View Only, No Cart
                         <div className="space-y-16">
                             {categories.map(category => {
@@ -1210,7 +1211,7 @@ export default function CatalogPage() {
                                                     product={product}
                                                     companySlug={company.slug}
                                                     isDemo={company.slug?.includes('demo')}
-                                                    cartEnabled={false} // Force cart disabled in menu mode
+                                                    cartEnabled={!company?.menu_mode}
                                                     onReviewClick={() => handleOpenProductReviews(product)}
                                                     isOwner={isOwner}
                                                 />
@@ -1235,8 +1236,8 @@ export default function CatalogPage() {
                                         <ProductCard
                                             key={product.id}
                                             product={product}
-                                            companySlug={company.slug}
-                                            cartEnabled={!company?.menu_mode} // Use company setting
+                                            company={company}
+                                            cartEnabled={!company?.menu_mode} // Use menu_mode to disable cart
                                             onReviewClick={() => handleOpenProductReviews(product)}
                                             isOwner={isOwner}
                                         />

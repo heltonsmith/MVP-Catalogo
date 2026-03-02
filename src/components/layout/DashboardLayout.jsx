@@ -55,9 +55,10 @@ export function DashboardLayout() {
 
     const menuItems = [
         { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
-        { name: 'Mis Productos', icon: <Package size={20} />, path: '/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/dashboard/categorias' },
+        { name: 'Mis Productos', icon: <Package size={20} />, path: '/dashboard/productos' },
         { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/dashboard/cotizaciones' },
+        { name: 'Ver Catálogo', icon: <Store size={20} />, path: `/catalogo/${company?.slug}` },
         {
             name: 'Ajustes Perfil',
             icon: <Settings size={20} />,
@@ -118,10 +119,10 @@ export function DashboardLayout() {
             if (tooltipContent) {
                 return (
                     <TooltipCard
+                        side="right"
                         key={item.path}
                         title={tooltipContent.title}
                         description={tooltipContent.description}
-                        side="right"
                     >
                         {navLink}
                     </TooltipCard>
@@ -134,7 +135,7 @@ export function DashboardLayout() {
 
     return (
         <div className="h-full bg-slate-50 flex overflow-x-hidden relative">
-            
+
             {/* Desktop Sidebar */}
             <aside className="w-72 bg-white border-r border-slate-200 fixed h-full hidden md:flex flex-col">
                 <div className="p-6 border-b border-slate-100">

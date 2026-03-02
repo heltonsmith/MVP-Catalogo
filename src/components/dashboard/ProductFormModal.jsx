@@ -23,6 +23,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
         size: '',
         slug: '',
         sku: '',
+        show_sku: true,
         available: true
     });
     const [selectedCategories, setSelectedCategories] = useState([]);
@@ -35,6 +36,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
     const { company } = useAuth();
     const currentPlan = company?.plan || profile?.companies?.plan || 'free';
     const isPro = currentPlan === 'pro' || currentPlan === 'custom' || currentPlan === 'plus';
+    const isRestaurant = company?.business_type === 'restaurant';
 
     const getImageLimit = () => {
         if (currentPlan === 'custom') return 50; // High limit for custom
@@ -58,6 +60,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                     size: productToEdit.size || '',
                     slug: productToEdit.slug || '',
                     sku: productToEdit.sku || '',
+                    show_sku: productToEdit.show_sku !== false,
                     available: productToEdit.available !== false
                 });
                 // Load existing categories and images (limit by plan during initialization)
@@ -76,6 +79,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                     size: '',
                     slug: '',
                     sku: '',
+                    show_sku: true,
                     available: true
                 });
                 setSelectedCategories([]);
@@ -91,28 +95,47 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
 
     // Auto-generate slug from name
     useEffect(() => {
-        if (formData.name && !productToEdit) {
-            const slug = formData.name.toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/(^-|-$)+/g, '');
-            setFormData(prev => ({ ...prev, slug }));
+        if (!productToEdit) {
+            if (formData.name) {
+                const slug = formData.name.toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)+/g, '');
+                setFormData(prev => ({ ...prev, slug }));
+            } else {
+                setFormData(prev => ({ ...prev, slug: '' }));
+            }
         }
     }, [formData.name, productToEdit]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
+
+        if (type === 'number' || name === 'price' || name === 'stock') {
+            // Numeric only for price and stock
+            const numericValue = value.replace(/[^0-9]/g, '');
+            setFormData(prev => ({ ...prev, [name]: numericValue }));
+            return;
+        }
+
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: type === 'checkbox' || type === 'switch' ? (e.target.checked !== undefined ? e.target.checked : checked) : value
         }));
     };
 
+    const handleToggleAvailable = () => {
+        setFormData(prev => ({ ...prev, available: !prev.available }));
+    };
+
     const handleCategoryToggle = (categoryId) => {
-        setSelectedCategories(prev =>
-            prev.includes(categoryId)
-                ? prev.filter(id => id !== categoryId)
-                : [...prev, categoryId]
-        );
+        setSelectedCategories(prev => {
+            const exists = prev.some(id => String(id) === String(categoryId));
+            if (exists) {
+                return prev.filter(id => String(id) !== String(categoryId));
+            } else {
+                return [...prev, categoryId];
+            }
+        });
     };
 
     const handleImageSelect = (e) => {
@@ -230,20 +253,52 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                 return;
             }
 
-            const cleanedName = titleCase(cleanTextInput(formData.name, 100));
-            const cleanedDescription = titleCase(cleanTextInput(formData.description, 2000));
-            const cleanedWeight = titleCase(cleanTextInput(formData.weight, 50));
-            const cleanedSize = titleCase(cleanTextInput(formData.size, 50));
+            if (selectedCategories.length === 0) {
+                showToast('Debes seleccionar al menos una categoría', 'error');
+                setLoading(false);
+                return;
+            }
+
+            const cleanedName = titleCase(cleanTextInput(formData.name, 50));
+            const cleanedDescription = cleanTextInput(formData.description, 254);
+            const cleanedWeight = cleanTextInput(formData.weight, 10);
+            const cleanedSize = cleanTextInput(formData.size, 10);
+            const cleanedSku = formData.sku ? formData.sku.toUpperCase().trim().slice(0, 20) : '';
+
+            // 1. SKU Uniqueness Validation (only if SKU is provided)
+            if (cleanedSku) {
+                let query = supabase
+                    .from('products')
+                    .select('id')
+                    .eq('company_id', companyId)
+                    .eq('sku', cleanedSku);
+
+                if (productToEdit) {
+                    query = query.neq('id', productToEdit.id);
+                }
+
+                const { data: existingSku, error: skuError } = await query.maybeSingle();
+
+                if (skuError) throw skuError;
+                if (existingSku) {
+                    showToast(`El SKU "${cleanedSku}" ya está registrado en esta tienda`, 'error');
+                    setLoading(false);
+                    return;
+                }
+            }
 
             const productData = {
-                ...formData,
                 name: cleanedName,
                 description: cleanedDescription,
                 weight: cleanedWeight,
                 size: cleanedSize,
+                sku: cleanedSku,
+                slug: formData.slug,
                 company_id: companyId,
                 price: parseFloat(formData.price) || 0,
-                stock: parseInt(formData.stock) || 0,
+                stock: isRestaurant ? 0 : (parseInt(formData.stock) || 0),
+                available: formData.available,
+                show_sku: formData.show_sku,
                 wholesale_prices: wholesalePrices.filter(p => p.min_qty && p.price) // Only save valid tiers
             };
 
@@ -485,123 +540,204 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                 {/* Product Name, SKU & Auto-generated Slug */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2 col-span-1 md:col-span-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nombre del Producto *</label>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre del Producto *</label>
+                                            <span className={cn("text-[9px] font-bold", formData.name.length > 50 ? "text-rose-500" : "text-slate-400")}>
+                                                {formData.name.length}/50
+                                            </span>
+                                        </div>
                                         <div className="relative">
                                             <Package className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 required
                                                 name="name"
-                                                placeholder="Ej. Zapatillas Running"
+                                                placeholder={isRestaurant ? "Ej. Pizza Margherita, Hamburguesa Doble" : "Ej. Zapatillas Running"}
                                                 value={formData.name}
                                                 onChange={handleChange}
-                                                maxLength={100}
+                                                maxLength={50}
                                                 className="pl-9 font-bold text-slate-700"
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">SKU / Código</label>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU / Código <span className="text-[8px] opacity-70">(Opcional)</span></label>
+                                            <span className={cn("text-[9px] font-bold", formData.sku.length > 20 ? "text-rose-500" : "text-slate-400")}>
+                                                {formData.sku.length}/20
+                                            </span>
+                                        </div>
                                         <div className="relative">
                                             <Tag className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 name="sku"
-                                                placeholder="Ej. ZAP-001"
+                                                placeholder={isRestaurant ? "EJ. PIZ-001" : "Ej. ZAP-001"}
                                                 value={formData.sku}
                                                 onChange={handleChange}
-                                                className="pl-9"
+                                                maxLength={20}
+                                                className="pl-9 uppercase"
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Slug (URL)</label>
-                                        <Input
-                                            disabled
-                                            value={formData.slug}
-                                            className="font-mono text-xs bg-slate-100 text-slate-500 cursor-not-allowed"
-                                            placeholder="se-genera-automaticamente"
-                                        />
+                                        <div className="flex justify-between items-center pl-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Slug (URL)</label>
+                                        </div>
+                                        <div className="relative">
+                                            <Input
+                                                disabled
+                                                value={formData.slug}
+                                                className="font-mono text-xs bg-slate-50 text-slate-400 cursor-not-allowed border-dashed"
+                                                placeholder="Sincronizado con nombre"
+                                            />
+                                        </div>
                                     </div>
+                                </div>
+
+                                {/* SKU Visibility Checkbox - Moved out of the grid to prevent alignment issues */}
+                                <div className="flex items-center gap-2 pl-1 -mt-2">
+                                    <input
+                                        type="checkbox"
+                                        id="show_sku"
+                                        name="show_sku"
+                                        checked={formData.show_sku}
+                                        onChange={handleChange}
+                                        className="h-3 w-3 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                    />
+                                    <label htmlFor="show_sku" className="text-[10px] font-medium text-slate-500 cursor-pointer">
+                                        Mostrar SKU en el catálogo
+                                    </label>
                                 </div>
 
                                 {/* Description */}
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Descripción</label>
+                                    <div className="flex justify-between items-center pl-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descripción</label>
+                                        <span className={cn("text-[9px] font-bold", formData.description.length > 254 ? "text-rose-500" : "text-slate-400")}>
+                                            {formData.description.length}/254
+                                        </span>
+                                    </div>
                                     <textarea
                                         name="description"
                                         rows={3}
                                         placeholder="Describe tu producto..."
                                         value={formData.description}
                                         onChange={handleChange}
-                                        maxLength={2000}
+                                        maxLength={254}
                                         className="w-full rounded-xl border-slate-200 bg-slate-50/50 p-3 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none transition-all resize-none"
                                     />
                                 </div>
 
                                 {/* Price, Stock, Weight, Size */}
-                                <div className={cn(
-                                    "grid gap-4",
-                                    company?.menu_mode ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"
-                                )}>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Precio *</label>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Precio *</label>
+                                            <span className={cn("text-[9px] font-bold", formData.price.toString().length > 12 ? "text-rose-500" : "text-slate-400")}>
+                                                {formData.price.toString().length}/12
+                                            </span>
+                                        </div>
                                         <div className="relative">
                                             <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 required
-                                                type="number"
+                                                type="text"
                                                 name="price"
                                                 placeholder="0"
                                                 value={formData.price}
                                                 onChange={handleChange}
+                                                maxLength={12}
                                                 className="pl-9"
                                             />
                                         </div>
+                                        <p className="text-[9px] text-slate-400 pl-1 mt-1">Usa 0 para mostrar como <strong>Gratis</strong></p>
                                     </div>
-                                    {!company?.menu_mode && (
+                                    {isRestaurant ? (
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Stock *</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Disponibilidad</label>
+                                            <div
+                                                onClick={handleToggleAvailable}
+                                                className={cn(
+                                                    "flex items-center justify-between w-full h-10 px-4 rounded-xl cursor-pointer transition-all border",
+                                                    formData.available
+                                                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                                        : "bg-slate-50 border-slate-200 text-slate-500"
+                                                )}
+                                            >
+                                                <span className="text-xs font-bold uppercase tracking-wider">
+                                                    {formData.available ? 'Disponible' : 'Agotado'}
+                                                </span>
+                                                <div className={cn(
+                                                    "w-8 h-4 rounded-full relative transition-colors",
+                                                    formData.available ? "bg-emerald-500" : "bg-slate-300"
+                                                )}>
+                                                    <div className={cn(
+                                                        "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all",
+                                                        formData.available ? "right-0.5" : "left-0.5"
+                                                    )} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center pl-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stock *</label>
+                                                <span className={cn("text-[9px] font-bold", formData.stock.toString().length > 5 ? "text-rose-500" : "text-slate-400")}>
+                                                    {formData.stock.toString().length}/5
+                                                </span>
+                                            </div>
                                             <div className="relative">
                                                 <Archive className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                                 <Input
                                                     required
-                                                    type="number"
+                                                    type="text"
                                                     name="stock"
                                                     placeholder="0"
                                                     value={formData.stock}
                                                     onChange={handleChange}
+                                                    maxLength={5}
                                                     className="pl-9"
                                                 />
                                             </div>
                                         </div>
                                     )}
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                                            {company?.menu_mode ? 'Tipo (Menú)' : 'Peso'}
-                                        </label>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                {isRestaurant ? 'Porción' : 'Peso'}
+                                            </label>
+                                            <span className={cn("text-[9px] font-bold", formData.weight.length > 10 ? "text-rose-500" : "text-slate-400")}>
+                                                {formData.weight.length}/10
+                                            </span>
+                                        </div>
                                         <div className="relative">
                                             <Weight className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 name="weight"
-                                                placeholder={company?.menu_mode ? "Ej: Entrada, Plato Fondo" : "Ej: 500g"}
+                                                placeholder={isRestaurant ? "Ej: 500g, 1/4 libra, etc" : "Ej: 500g"}
                                                 value={formData.weight}
                                                 onChange={handleChange}
-                                                maxLength={50}
+                                                maxLength={10}
                                                 className="pl-9"
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                                            {company?.menu_mode ? 'Porción' : 'Tamaño'}
-                                        </label>
+                                        <div className="flex justify-between items-center pl-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                Tamaño
+                                            </label>
+                                            <span className={cn("text-[9px] font-bold", formData.size.length > 10 ? "text-rose-500" : "text-slate-400")}>
+                                                {formData.size.length}/10
+                                            </span>
+                                        </div>
                                         <div className="relative">
                                             <Ruler className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                             <Input
                                                 name="size"
-                                                placeholder={company?.menu_mode ? "Ej: Para 2 personas" : "Ej: M, L, XL"}
+                                                placeholder={isRestaurant ? "Ej: Familiar, Mediana, etc" : "Ej: M, L, XL"}
                                                 value={formData.size}
                                                 onChange={handleChange}
-                                                maxLength={50}
+                                                maxLength={10}
                                                 className="pl-9"
                                             />
                                         </div>
@@ -619,7 +755,7 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                                 onClick={() => handleCategoryToggle(cat.id)}
                                                 className={cn(
                                                     "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                                                    selectedCategories.includes(cat.id)
+                                                    selectedCategories.some(id => String(id) === String(cat.id))
                                                         ? "bg-primary-500 text-white shadow-md"
                                                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                                 )}
@@ -712,49 +848,6 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                         </div>
                                     </div>
                                 )}
-
-                                {/* Availability Radio Group */}
-                                <div className="space-y-2 pt-2 border-t border-slate-100">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Disponibilidad del Producto</label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, available: true }))}
-                                            className={cn(
-                                                "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
-                                                formData.available
-                                                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm"
-                                                    : "bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "h-4 w-4 rounded-full border-2 flex items-center justify-center",
-                                                formData.available ? "border-emerald-500" : "border-slate-300"
-                                            )}>
-                                                {formData.available && <div className="h-2 w-2 bg-emerald-500 rounded-full" />}
-                                            </div>
-                                            <span className="text-sm font-bold">Disponible</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, available: false }))}
-                                            className={cn(
-                                                "flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all",
-                                                !formData.available
-                                                    ? "bg-rose-50 border-rose-500 text-rose-700 shadow-sm"
-                                                    : "bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "h-4 w-4 rounded-full border-2 flex items-center justify-center",
-                                                !formData.available ? "border-rose-500" : "border-slate-300"
-                                            )}>
-                                                {!formData.available && <div className="h-2 w-2 bg-rose-500 rounded-full" />}
-                                            </div>
-                                            <span className="text-sm font-bold">No Disponible</span>
-                                        </button>
-                                    </div>
-                                </div>
                             </form>
                         </div>
 
@@ -769,9 +862,8 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                             </Button>
                         </div>
                     </motion.div>
-                </div >
-            )
-            }
-        </AnimatePresence >
+                </div>
+            )}
+        </AnimatePresence>
     );
 }

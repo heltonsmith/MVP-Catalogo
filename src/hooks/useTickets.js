@@ -114,7 +114,7 @@ export function useTickets(userId) {
             .from('support_tickets')
             .insert({ user_id: userId, company_id, type, subject, description, photos })
             .select()
-            .single();
+            .maybeSingle();
         if (error) throw error;
         await fetchTickets();
         return data;
@@ -348,7 +348,7 @@ export function useAdminTickets() {
                 .from('support_tickets')
                 .select('photos')
                 .eq('id', ticketId)
-                .single();
+                .maybeSingle();
 
             if (fetchErr) throw fetchErr;
 

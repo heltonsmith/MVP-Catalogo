@@ -25,8 +25,8 @@ export function DemoDashboardLayout() {
 
     const menuItems = [
         { name: 'Panel Principal', icon: <LayoutDashboard size={20} />, path: '/demo/dashboard' },
-        { name: 'Mis Productos', icon: <Package size={20} />, path: '/demo/dashboard/productos' },
         { name: 'Categorías', icon: <Layers size={20} />, path: '/demo/dashboard/categorias' },
+        { name: 'Mis Productos', icon: <Package size={20} />, path: '/demo/dashboard/productos' },
         { name: 'Mensajes', icon: <MessageCircle size={20} />, path: '/demo/dashboard/mensajes', badge: '3' },
         { name: 'Cotizaciones', icon: <ExternalLink size={20} />, path: '/demo/dashboard/cotizaciones' },
         { name: 'Ajustes Perfil', icon: <Settings size={20} />, path: '/demo/dashboard/perfil' },
@@ -123,10 +123,10 @@ export function DemoDashboardLayout() {
                             const tooltipContent = getTooltipContent(item.name);
                             return (
                                 <TooltipCard
+                                    side="right"
                                     key={item.path}
                                     title={tooltipContent.title}
                                     description={tooltipContent.description}
-                                    side="right"
                                 >
                                     {navLink}
                                 </TooltipCard>

@@ -129,7 +129,7 @@ export default function DashboardMessages() {
                             .from('profiles')
                             .select('full_name, email, avatar_url, role')
                             .eq('id', newMessage.customer_id)
-                            .single();
+                            .maybeSingle();
 
                         if (profile) {
                             customerName = profile.role === 'admin' ? 'Admin Ktalogoo' : (profile.full_name || profile.email);

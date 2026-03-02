@@ -35,8 +35,13 @@ export default function DashboardCategories() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [counts, setCounts] = useState({});
+
+    const filteredCategories = categories.filter(category =>
+        category.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const fetchCategories = async () => {
         if (isDemo) {
@@ -99,7 +104,17 @@ export default function DashboardCategories() {
 
     const handleAddCategory = async (e) => {
         e.preventDefault();
-        if (!newCategoryName.trim()) return;
+
+        // 1. Normalize and Capitalize before anything else
+        const cleanedName = titleCase(cleanTextInput(newCategoryName, 30));
+        if (!cleanedName) return;
+
+        // 2. Check for duplicates using the cleaned name
+        const isDuplicate = categories.some(c => c.name.toLowerCase() === cleanedName.toLowerCase());
+        if (isDuplicate) {
+            showToast("Esta categoría ya existe", "error");
+            return;
+        }
 
         if (isDemo) {
             handleDemoAction("Añadir Categoría");
@@ -109,13 +124,7 @@ export default function DashboardCategories() {
 
         setIsAdding(true);
         try {
-            const cleanedName = titleCase(cleanTextInput(newCategoryName, 50));
-            if (!cleanedName) {
-                showToast("El nombre de la categoría no es válido", "error");
-                setIsAdding(false);
-                return;
-            }
-            const slug = cleanedName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            const slug = cleanedName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
             const { data, error } = await supabase
                 .from('categories')
                 .insert([{
@@ -125,7 +134,7 @@ export default function DashboardCategories() {
                     order: categories.length
                 }])
                 .select()
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
 
@@ -143,38 +152,63 @@ export default function DashboardCategories() {
     const [editingCategory, setEditingCategory] = useState(null);
     const [editName, setEditName] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
+    const [categoryToDelete, setCategoryToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDeleteCategory = async (id) => {
+    const handleDeleteClick = (category) => {
         if (isDemo) {
             handleDemoAction("Eliminar Categoría");
             return;
         }
 
-        if (counts[id] > 0) {
-            showToast(`No puedes eliminar una categoría que tiene ${counts[id]} productos.`, "error");
+        if (counts[category.id] > 0) {
+            showToast(`No puedes eliminar una categoría que tiene ${counts[category.id]} productos.`, "error");
             return;
         }
-        if (!window.confirm("¿Estás seguro de que deseas eliminar esta categoría?")) return;
 
+        setCategoryToDelete(category);
+    };
+
+    const confirmDeleteCategory = async () => {
+        if (!categoryToDelete) return;
+
+        setIsDeleting(true);
         try {
             const { error } = await supabase
                 .from('categories')
                 .delete()
-                .eq('id', id);
+                .eq('id', categoryToDelete.id);
 
             if (error) throw error;
 
             showToast("Categoría eliminada", "success");
-            setCategories(categories.filter(c => c.id !== id));
+            setCategories(categories.filter(c => c.id !== categoryToDelete.id));
+            setCategoryToDelete(null);
         } catch (error) {
             console.error('Error deleting category:', error);
             showToast("Error al eliminar la categoría", "error");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
     const handleUpdateCategory = async (e) => {
         e.preventDefault();
-        if (!editName.trim() || !editingCategory) return;
+        if (!editingCategory) return;
+
+        // 1. Normalize and Capitalize
+        const cleanedName = titleCase(cleanTextInput(editName, 30));
+        if (!cleanedName) return;
+
+        // 2. Check for duplicates (excluding current)
+        const isDuplicate = categories.some(c =>
+            c.id !== editingCategory.id &&
+            c.name.toLowerCase() === cleanedName.toLowerCase()
+        );
+        if (isDuplicate) {
+            showToast("Ya existe otra categoría con este nombre", "error");
+            return;
+        }
 
         if (isDemo) {
             handleDemoAction("Editar Categoría");
@@ -184,13 +218,7 @@ export default function DashboardCategories() {
 
         setIsUpdating(true);
         try {
-            const cleanedName = titleCase(cleanTextInput(editName, 50));
-            if (!cleanedName) {
-                showToast("El nombre de la categoría no es válido", "error");
-                setIsUpdating(false);
-                return;
-            }
-            const slug = cleanedName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            const slug = cleanedName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
             const { error } = await supabase
                 .from('categories')
                 .update({
@@ -204,7 +232,7 @@ export default function DashboardCategories() {
             showToast("Categoría actualizada correctamente", "success");
             setCategories(categories.map(c =>
                 c.id === editingCategory.id
-                    ? { ...c, name: editName.trim(), slug }
+                    ? { ...c, name: cleanedName, slug }
                     : c
             ));
             setEditingCategory(null);
@@ -227,41 +255,45 @@ export default function DashboardCategories() {
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Categorías</h1>
-                    <p className="text-slate-500 text-sm">Organiza tus productos para que sea más fácil encontrarlos.</p>
-                </div>
-                <div className="w-full sm:w-auto">
-                    <form onSubmit={handleAddCategory} className="flex items-center gap-2">
-                        <Input
-                            placeholder="Categoría..."
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            maxLength={50}
-                            className="bg-white border-slate-200 h-11 flex-1 sm:min-w-[200px] text-sm"
-                            disabled={isAdding}
-                        />
-                        <Button type="submit" disabled={isAdding || !newCategoryName.trim()} className="shadow-lg shadow-primary-100 h-11 px-4 shrink-0">
-                            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5 sm:mr-2" />}
-                            <span className="hidden sm:inline">Añadir</span>
-                        </Button>
-                    </form>
+                <div className="max-w-3xl">
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Categorías</h1>
+                    <p className="text-slate-500 text-sm leading-relaxed">
+                        Crea categorías para organizar tus productos. Luego de crearlas, podrás asignarlas a tus productos en la sección "Mis Productos". Esto permitirá que tus clientes puedan filtrar y encontrar lo que buscan de manera más rápida y ordenada en tu catálogo.
+                    </p>
                 </div>
             </div>
 
             <Card className="border-none shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-50 bg-white">
-                    <div className="relative max-w-sm">
+                <div className="p-4 sm:p-6 border-b border-slate-50 bg-white space-y-4">
+                    <form onSubmit={handleAddCategory} className="flex items-end gap-2">
+                        <Input
+                            placeholder="Nueva Categoría (ej. Postres, Bebidas...)"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            maxLength={30}
+                            showCounter
+                            className="bg-slate-50 border-none h-12 flex-1 text-sm font-semibold"
+                            disabled={isAdding}
+                        />
+                        <Button type="submit" disabled={isAdding || !newCategoryName.trim()} className="shadow-lg shadow-primary-100 h-12 px-4 shrink-0 font-bold mb-0">
+                            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5 sm:mr-2" />}
+                            <span className="hidden sm:inline">Añadir Categoría</span>
+                        </Button>
+                    </form>
+
+                    <div className="relative">
                         <Input
                             placeholder="Buscar categorías..."
-                            className="pl-9 bg-slate-50 border-none h-10 text-xs"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 bg-slate-50/50 border-slate-200 h-10 text-xs focus:bg-white transition-colors"
                         />
                         <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     </div>
                 </div>
                 <CardContent className="p-0">
                     <div className="divide-y divide-slate-100">
-                        {categories.map((category) => (
+                        {filteredCategories.map((category) => (
                             <div key={category.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
                                 <div className="flex items-center gap-4">
                                     <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
@@ -301,14 +333,21 @@ export default function DashboardCategories() {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-9 w-9 text-slate-300 hover:text-red-500"
-                                        onClick={() => handleDeleteCategory(category.id)}
+                                        className="h-9 w-9 text-slate-300 hover:text-red-500 hover:bg-red-50"
+                                        onClick={() => handleDeleteClick(category)}
                                     >
                                         <Trash2 size={16} />
                                     </Button>
                                 </div>
                             </div>
                         ))}
+                        {filteredCategories.length === 0 && !loading && categories.length > 0 && (
+                            <div className="p-12 text-center text-slate-400">
+                                <Search size={48} className="mx-auto mb-4 opacity-10" />
+                                <p className="font-bold uppercase tracking-widest text-xs">No se encontraron resultados</p>
+                                <p className="text-sm mt-1">Intenta con otra búsqueda.</p>
+                            </div>
+                        )}
                         {categories.length === 0 && !loading && (
                             <div className="p-12 text-center text-slate-400">
                                 <Layers size={48} className="mx-auto mb-4 opacity-10" />
@@ -343,7 +382,8 @@ export default function DashboardCategories() {
                                 placeholder="Ej. Accesorios"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
-                                maxLength={50}
+                                maxLength={30}
+                                showCounter
                                 className="font-bold text-slate-700"
                                 autoFocus
                             />
@@ -367,6 +407,48 @@ export default function DashboardCategories() {
                             </Button>
                         </div>
                     </form>
+                </div>
+            </Modal>
+
+            {/* Modal Eliminar Categoría */}
+            <Modal
+                isOpen={!!categoryToDelete}
+                onClose={() => !isDeleting && setCategoryToDelete(null)}
+                title="Eliminar Categoría"
+            >
+                <div className="p-6">
+                    <div className="flex flex-col items-center justify-center text-center space-y-4 mb-6">
+                        <div className="h-16 w-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center shrink-0">
+                            <Trash2 size={28} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900">¿Eliminar "{categoryToDelete?.name}"?</h3>
+                            <p className="text-sm text-slate-500 mt-2 px-2">
+                                Esta acción no se puede deshacer. Los productos que pertenezcan a esta categoría quedarán sin categoría asignada.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="flex-1 font-bold"
+                            onClick={() => setCategoryToDelete(null)}
+                            disabled={isDeleting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={confirmDeleteCategory}
+                            variant="danger"
+                            className="flex-1 font-bold shadow-lg shadow-red-200"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
+                            Eliminar Categoría
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </div>

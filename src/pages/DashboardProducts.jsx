@@ -466,7 +466,7 @@ export default function DashboardProducts() {
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Categoría</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">Precio</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px]">
-                                    {company?.menu_mode ? 'Disponibilidad' : 'Stock'}
+                                    {company?.business_type === 'restaurant' ? 'Disponibilidad' : 'Stock'}
                                 </th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px] text-center">Visible</th>
                                 <th className="px-6 py-4 font-bold text-slate-900 uppercase tracking-wider text-[10px] text-right">Acciones</th>
@@ -506,11 +506,16 @@ export default function DashboardProducts() {
                                     </td>
                                     <td className="px-6 py-4">
                                         {product.sku ? (
-                                            <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-1 rounded uppercase tracking-wider border border-primary-100/50">
-                                                {product.sku}
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-1 rounded uppercase tracking-wider border border-primary-100/50">
+                                                    {product.sku}
+                                                </span>
+                                                {product.show_sku === false && (
+                                                    <span className="text-[9px] text-slate-400 font-medium italic">(Oculto en catálogo)</span>
+                                                )}
+                                            </div>
                                         ) : (
-                                            <span className="text-[10px] text-slate-300 italic">N/A</span>
+                                            <span className="text-[10px] text-slate-300 italic">SKU: N/A</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4">
@@ -533,7 +538,7 @@ export default function DashboardProducts() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        {company?.menu_mode ? (
+                                        {company?.business_type === 'restaurant' ? (
                                             <span className={cn(
                                                 "font-bold px-2 py-0.5 rounded-md text-[10px] uppercase",
                                                 product.available ? "bg-emerald-50 text-emerald-500 border border-emerald-100" : "bg-red-50 text-red-500 border border-red-100"

@@ -13,6 +13,11 @@ export function formatCurrency(value) {
     }).format(value);
 }
 
+export function formatProductPrice(value) {
+    if (value === 0 || value === '0') return 'Gratis';
+    return formatCurrency(value);
+}
+
 export function generateWhatsAppLink(phone, message) {
     const encodedMessage = encodeURIComponent(message);
     return `https://wa.me/${phone}?text=${encodedMessage}`;
