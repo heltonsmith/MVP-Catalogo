@@ -14,7 +14,8 @@ import {
     Home,
     Heart,
     ShoppingBag,
-    MessageSquare
+    MessageSquare,
+    User
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
