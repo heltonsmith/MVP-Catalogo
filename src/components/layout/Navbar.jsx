@@ -9,9 +9,9 @@ import { NotificationCenter } from '../notifications/NotificationCenter';
 import { cn } from '../../utils';
 import { COMPANIES } from '../../data/mock';
 
-export function Navbar({ isLandingMode = false }) {
-    const [isOpen, setIsOpen] = useState(false);
+export function Navbar({ isLandingMode = false, onMenuToggle, isMobileMenuOpen }) {
     const { carts, companyInfo } = useCart();
+    // ... rest of the hook stays the same ...
     const { user, company, signOut, profile, unreadNotifications, refreshUnreadNotifications, isObserving } = useAuth();
     const [localCompany, setLocalCompany] = useState(null);
     const location = useLocation();
@@ -135,7 +135,7 @@ export function Navbar({ isLandingMode = false }) {
     ];
 
     return (
-        <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
+        <nav className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
                     {!isLandingMode ? (
@@ -251,21 +251,6 @@ export function Navbar({ isLandingMode = false }) {
                                         {profile?.role === 'client' || profile?.role === 'user' ? 'Cliente' : 'Sesión Activa'}
                                     </span>
                                 </Link>
-                                <div className="h-8 w-px bg-slate-200 mx-1" />
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => signOut()}
-                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                >
-                                    <LogOut size={16} className="mr-2" />
-                                    Salir
-                                </Button>
-                                <Link to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'}>
-                                    <Button size="sm" className="shadow-lg shadow-primary-200">
-                                        Ir al Panel
-                                    </Button>
-                                </Link>
                             </div>
                         ) : (
                             <>
@@ -286,17 +271,17 @@ export function Navbar({ isLandingMode = false }) {
                         )}
 
                         <button
-                            onClick={() => setIsOpen(!isOpen)}
+                            onClick={onMenuToggle}
                             className="md:hidden p-2 text-slate-600 hover:text-slate-900"
                         >
-                            {isOpen ? <X size={24} /> : <Menu size={24} />}
+                            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Mobile Nav */}
-            {isOpen && (
+            {/* Mobile Nav - only for guests (logged-in users use GlobalSidebar) */}
+            {!user && isMobileMenuOpen && (
                 <div className="md:hidden border-t border-slate-100 bg-white transition-all">
                     <div className="space-y-1 px-4 py-4">
                         {!isLandingMode && navLinks.map((link) => (
@@ -311,7 +296,7 @@ export function Navbar({ isLandingMode = false }) {
                                                 <NavLink
                                                     key={subItem.path}
                                                     to={subItem.path}
-                                                    onClick={() => setIsOpen(false)}
+                                                    onClick={onMenuToggle}
                                                     className={({ isActive }) =>
                                                         cn(
                                                             "block px-3 py-2 text-sm font-medium rounded-md",
@@ -327,7 +312,7 @@ export function Navbar({ isLandingMode = false }) {
                                 ) : (
                                     <NavLink
                                         to={link.path}
-                                        onClick={() => setIsOpen(false)}
+                                        onClick={onMenuToggle}
                                         className={({ isActive }) =>
                                             cn(
                                                 "block px-3 py-2 text-base font-medium rounded-md",
@@ -365,7 +350,7 @@ export function Navbar({ isLandingMode = false }) {
                                             ) : company?.slug ? (
                                                 <Link
                                                     to={`/catalogo/${company.slug}`}
-                                                    onClick={() => setIsOpen(false)}
+                                                    onClick={onMenuToggle}
                                                     className="font-bold text-slate-900 hover:text-primary-600 transition-colors block truncate"
                                                 >
                                                     {company?.name || 'Mi Tienda'}
@@ -384,30 +369,17 @@ export function Navbar({ isLandingMode = false }) {
                                             </div>
                                         </div>
                                     </div>
-                                    <Link to={(profile?.role === 'client' || profile?.role === 'user') ? '/dashboard/cliente' : '/dashboard'} onClick={() => setIsOpen(false)}>
-                                        <Button className="w-full">Ir al Panel</Button>
-                                    </Link>
-                                    <Button
-                                        variant="outline"
-                                        className="w-full border-red-200 text-red-600 hover:bg-red-50"
-                                        onClick={() => {
-                                            signOut();
-                                            setIsOpen(false);
-                                        }}
-                                    >
-                                        Cerrar Sesión
-                                    </Button>
                                 </>
                             ) : (
                                 <>
-                                    <Link to="/login" onClick={() => setIsOpen(false)}>
+                                    <Link to="/login" onClick={onMenuToggle}>
                                         <Button variant="secondary" className="w-full">Iniciar Sesión</Button>
                                     </Link>
-                                    <Link to="/registro" onClick={() => setIsOpen(false)}>
+                                    <Link to="/registro" onClick={onMenuToggle}>
                                         <Button className="w-full">Regístrate Gratis</Button>
                                     </Link>
                                     {!isLandingMode && (
-                                        <Link to="/precios" onClick={() => setIsOpen(false)}>
+                                        <Link to="/precios" onClick={onMenuToggle}>
                                             <Button variant="ghost" className="w-full">Precios</Button>
                                         </Link>
                                     )}

@@ -690,11 +690,11 @@ export default function AdminUsers() {
                                                 </td>
                                                 <td className="px-4 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        <a href={`/catalogo/${user.slug}`} target="_blank" rel="noopener noreferrer">
+                                                        <Link to={`/catalogo/${user.slug}`}>
                                                             <Button size="icon" variant="ghost" title="Ver Tienda" className="h-8 w-8 hover:bg-slate-100">
-                                                                <ExternalLink size={16} className="text-slate-400" />
+                                                                <Store size={16} className="text-slate-400" />
                                                             </Button>
-                                                        </a>
+                                                        </Link>
                                                         <select
                                                             value={user.plan || 'free'}
                                                             onChange={(e) => changePlan(user, e.target.value)}
@@ -804,9 +804,9 @@ export default function AdminUsers() {
                                         </select>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <a href={`/catalogo/${user.slug}`} target="_blank" rel="noopener noreferrer">
-                                            <Button size="icon" variant="ghost" className="h-10 w-10 bg-slate-50 rounded-xl"><ExternalLink size={18} className="text-slate-400" /></Button>
-                                        </a>
+                                        <Link to={`/catalogo/${user.slug}`}>
+                                            <Button size="icon" variant="ghost" className="h-10 w-10 bg-slate-50 rounded-xl"><Store size={18} className="text-slate-400" /></Button>
+                                        </Link>
                                         <Button size="icon" variant="ghost" className="h-10 w-10 bg-slate-50 rounded-xl" onClick={() => handleObserve(user)}>
                                             <Eye size={18} className="text-primary-500" />
                                         </Button>
@@ -877,11 +877,11 @@ export default function AdminUsers() {
                                                 <td className="px-4 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-1">
                                                         {user.company && (
-                                                            <a href={`/catalogo/${user.company.slug}`} target="_blank" rel="noopener noreferrer">
+                                                            <Link to={`/catalogo/${user.company.slug}`}>
                                                                 <Button size="icon" variant="ghost" title="Ver Tienda" className="h-8 w-8 hover:bg-slate-100">
-                                                                    <ExternalLink size={16} className="text-slate-400" />
+                                                                    <Store size={16} className="text-slate-400" />
                                                                 </Button>
-                                                            </a>
+                                                            </Link>
                                                         )}
                                                         <Button size="icon" variant="ghost" title={user.company ? 'Observar Tienda' : 'Observar Panel Cliente'} className="h-8 w-8 text-primary-500 hover:bg-primary-50" onClick={() => handleObserveUser(user)}>
                                                             <Eye size={16} />
@@ -949,9 +949,9 @@ export default function AdminUsers() {
                                 <div className="flex items-center gap-2 pt-3 border-t border-slate-50">
                                     <div className="flex items-center gap-1 ml-auto">
                                         {user.company && (
-                                            <a href={`/catalogo/${user.company.slug}`} target="_blank" rel="noopener noreferrer">
-                                                <Button size="icon" variant="ghost" className="h-10 w-10 bg-slate-50 rounded-xl"><ExternalLink size={18} className="text-slate-400" /></Button>
-                                            </a>
+                                            <Link to={`/catalogo/${user.company.slug}`}>
+                                                <Button size="icon" variant="ghost" className="h-10 w-10 bg-slate-50 rounded-xl"><Store size={18} className="text-slate-400" /></Button>
+                                            </Link>
                                         )}
                                         <Button size="icon" variant="ghost" className="h-10 w-10 bg-slate-50 rounded-xl" onClick={() => handleObserveUser(user)}>
                                             <Eye size={18} className="text-primary-500" />

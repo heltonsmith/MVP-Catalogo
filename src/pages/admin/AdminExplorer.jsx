@@ -269,7 +269,7 @@ export default function AdminExplorer() {
                                                 <MapPin size={14} className="text-slate-300" />
                                                 <span className="truncate max-w-[120px]">{company.city || 'Chile'}</span>
                                             </div>
-                                            <Link to={`/catalogo/${company.slug}`} target="_blank">
+                                            <Link to={`/catalogo/${company.slug}`}>
                                                 <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg hover:bg-primary-50 hover:text-primary-600 font-black flex gap-1">
                                                     Gestionar <ChevronRight size={14} />
                                                 </Button>

@@ -871,11 +871,11 @@ export default function DashboardOverview() {
                             <Button
                                 onClick={() => {
                                     const url = isDemo ? `/demo/catalogo/${displayCompany.slug}` : `/catalogo/${displayCompany.slug}`;
-                                    window.open(url, '_blank');
+                                    navigate(url);
                                 }}
                                 className="w-full sm:w-auto font-bold h-12 gap-3 shadow-lg shadow-primary-100"
                             >
-                                <ExternalLink className="h-4 w-4" />
+                                <Store className="h-4 w-4" />
                                 {isDemo ? 'Ver Demo' : 'Ver Catálogo'}
                             </Button>
                         </div>

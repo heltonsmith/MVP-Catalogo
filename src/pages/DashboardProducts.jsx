@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, ExternalLink, Copy, Clock, Zap, X, Eye, EyeOff } from 'lucide-react';
+import { Link, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { Package, MoreVertical, Edit, Trash2, Search, Plus, Filter, Loader2, AlertCircle, Store, Copy, Clock, Zap, X, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -18,6 +18,7 @@ import { useUpgradeRequest } from '../hooks/useUpgradeRequest';
 import { PRODUCTS as MOCK_PRODUCTS, CATEGORIES as MOCK_CATEGORIES, COMPANIES } from '../data/mock';
 
 export default function DashboardProducts() {
+    const navigate = useNavigate();
     const { company: authCompany, loading: authLoading } = useAuth();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -355,11 +356,11 @@ export default function DashboardProducts() {
                                 if (isDemo) {
                                     handleDemoAction("Ver Catálogo");
                                 } else {
-                                    window.open(`/catalogo/${company.slug}`, '_blank');
+                                    navigate(`/catalogo/${company.slug}`);
                                 }
                             }}
                         >
-                            <ExternalLink size={16} />
+                            <Store size={16} />
                             <span className="hidden md:inline">Ver Catálogo</span>
                         </Button>
                     </div>
@@ -407,9 +408,6 @@ export default function DashboardProducts() {
                         </select>
                         <Filter className="absolute left-3 top-2.5 h-5 w-5 text-slate-400 pointer-events-none" />
                     </div>
-                    <Button variant="secondary" className="px-3 h-10 hidden md:flex">
-                        <Filter className="h-5 w-5" />
-                    </Button>
                 </div>
             </div>
 

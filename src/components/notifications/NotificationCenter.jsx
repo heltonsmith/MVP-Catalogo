@@ -103,7 +103,7 @@ export function NotificationCenter() {
                         const url = productSlug
                             ? `/catalogo/${companySlug}/producto/${productSlug}`
                             : `/catalogo/${companySlug}`;
-                        window.open(url, '_blank');
+                        navigate(url);
                     }
                 } else if (n.type === 'review') {
                     const companySlug = n.metadata?.company_slug;
@@ -113,7 +113,7 @@ export function NotificationCenter() {
                         const url = productSlug
                             ? `/catalogo/${companySlug}/producto/${productSlug}#reviews`
                             : `/catalogo/${companySlug}#reviews`;
-                        window.open(url, '_blank');
+                        navigate(url);
                     }
                 } else if (n.metadata?.ticket_id) {
                     if (profile?.role === 'admin') {
@@ -275,7 +275,7 @@ export function NotificationCenter() {
                                                                     const url = productSlug
                                                                         ? `/catalogo/${companySlug}/producto/${productSlug}`
                                                                         : `/catalogo/${companySlug}`;
-                                                                    window.open(url, '_blank');
+                                                                    navigate(url);
                                                                 }}
                                                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
                                                             >
@@ -291,7 +291,7 @@ export function NotificationCenter() {
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     const companySlug = notification.metadata.company_slug;
-                                                                    window.open(`/catalogo/${companySlug}`, '_blank');
+                                                                    navigate(`/catalogo/${companySlug}`);
                                                                 }}
                                                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 border border-primary-100 text-[10px] font-bold text-primary-600 hover:bg-primary-100 transition-all shadow-sm"
                                                             >

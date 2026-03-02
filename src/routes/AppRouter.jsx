@@ -95,69 +95,69 @@ export function AppRouter() {
                     <Route path="/registro" element={<RegisterPage />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+
+                    {/* Dashboard Routes Inside AppLayout */}
+                    <Route path="/dashboard" element={<DashboardLayout />}>
+                        <Route index element={<DashboardOverview />} />
+                        <Route path="productos" element={<DashboardProducts />} />
+                        <Route path="mensajes" element={<DashboardMessages />} />
+                        <Route path="cotizaciones" element={<DashboardQuotes />} />
+                        <Route path="categorias" element={<DashboardCategories />} />
+                        <Route path="perfil" element={<DashboardProfile />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
+
+                    <Route path="/dashboard/cliente" element={<CustomerDashboardLayout />}>
+                        <Route index element={<CustomerDashboard />} />
+                        <Route path="favoritos" element={<CustomerFavorites />} />
+                        <Route path="pedidos" element={<CustomerOrders />} />
+                        <Route path="resenas" element={<CustomerReviews />} />
+                        <Route path="cotizaciones" element={<CustomerQuotes />} />
+                        <Route path="mensajes" element={<Navigate to="/inbox" replace />} />
+                        <Route path="perfil" element={<CustomerProfile />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
+
+                    <Route path="/admin" element={<AdminLayout />}>
+                        <Route index element={<AdminOverview />} />
+                        <Route path="explorador" element={<AdminExplorer />} />
+                        <Route path="usuarios" element={<AdminUsers />} />
+                        <Route path="tickets" element={<AdminTickets />} />
+                        <Route path="configuracion" element={<AdminSettings />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
+
+                    <Route path="/demo/tienda/dashboard" element={<DemoStoreDashboardLayout />}>
+                        <Route index element={<DashboardOverview />} />
+                        <Route path="productos" element={<DashboardProducts />} />
+                        <Route path="mensajes" element={<DashboardMessages />} />
+                        <Route path="cotizaciones" element={<DashboardQuotes />} />
+                        <Route path="categorias" element={<DashboardCategories />} />
+                        <Route path="perfil" element={<DashboardProfile />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
+
+                    <Route path="/demo/restaurante/dashboard" element={<DemoRestaurantDashboardLayout />}>
+                        <Route index element={<DashboardOverview />} />
+                        <Route path="productos" element={<DashboardProducts />} />
+                        <Route path="mensajes" element={<DashboardMessages />} />
+                        <Route path="categorias" element={<DashboardCategories />} />
+                        <Route path="perfil" element={<DashboardProfile />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
+
+                    <Route path="/demo/dashboard" element={<DemoDashboardLayout />}>
+                        <Route index element={<DashboardOverview />} />
+                        <Route path="productos" element={<DashboardProducts />} />
+                        <Route path="mensajes" element={<DashboardMessages />} />
+                        <Route path="cotizaciones" element={<DashboardQuotes />} />
+                        <Route path="categorias" element={<DashboardCategories />} />
+                        <Route path="perfil" element={<DashboardProfile />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
+
                     <Route path="*" element={<NotFoundPage />} />
                 </Route>
-
-                <Route path="/dashboard" element={<DashboardLayout />}>
-                    <Route index element={<DashboardOverview />} />
-                    <Route path="productos" element={<DashboardProducts />} />
-                    <Route path="mensajes" element={<DashboardMessages />} />
-                    <Route path="cotizaciones" element={<DashboardQuotes />} />
-                    <Route path="categorias" element={<DashboardCategories />} />
-                    <Route path="perfil" element={<DashboardProfile />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                </Route>
-
-                <Route path="/dashboard/cliente" element={<CustomerDashboardLayout />}>
-                    <Route index element={<CustomerDashboard />} />
-                    <Route path="favoritos" element={<CustomerFavorites />} />
-                    <Route path="pedidos" element={<CustomerOrders />} />
-                    <Route path="resenas" element={<CustomerReviews />} />
-                    <Route path="cotizaciones" element={<CustomerQuotes />} />
-                    <Route path="mensajes" element={<Navigate to="/inbox" replace />} />
-                    <Route path="perfil" element={<CustomerProfile />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                </Route>
-
-                <Route path="/admin" element={<AdminLayout />}>
-                    <Route index element={<AdminOverview />} />
-                    <Route path="explorador" element={<AdminExplorer />} />
-                    <Route path="usuarios" element={<AdminUsers />} />
-                    <Route path="tickets" element={<AdminTickets />} />
-                    <Route path="configuracion" element={<AdminSettings />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                </Route>
-
-                <Route path="/demo/tienda/dashboard" element={<DemoStoreDashboardLayout />}>
-                    <Route index element={<DashboardOverview />} />
-                    <Route path="productos" element={<DashboardProducts />} />
-                    <Route path="mensajes" element={<DashboardMessages />} />
-                    <Route path="cotizaciones" element={<DashboardQuotes />} />
-                    <Route path="categorias" element={<DashboardCategories />} />
-                    <Route path="perfil" element={<DashboardProfile />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                </Route>
-
-                <Route path="/demo/restaurante/dashboard" element={<DemoRestaurantDashboardLayout />}>
-                    <Route index element={<DashboardOverview />} />
-                    <Route path="productos" element={<DashboardProducts />} />
-                    <Route path="mensajes" element={<DashboardMessages />} />
-                    <Route path="categorias" element={<DashboardCategories />} />
-                    <Route path="perfil" element={<DashboardProfile />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                </Route>
-
-                <Route path="/demo/dashboard" element={<DemoDashboardLayout />}>
-                    <Route index element={<DashboardOverview />} />
-                    <Route path="productos" element={<DashboardProducts />} />
-                    <Route path="mensajes" element={<DashboardMessages />} />
-                    <Route path="cotizaciones" element={<DashboardQuotes />} />
-                    <Route path="categorias" element={<DashboardCategories />} />
-                    <Route path="perfil" element={<DashboardProfile />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                </Route>
-
-                <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </Suspense>
     );

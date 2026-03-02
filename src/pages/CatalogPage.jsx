@@ -1144,7 +1144,7 @@ export default function CatalogPage() {
 
             <div className="mx-auto max-w-7xl px-4 py-8">
                 {/* Search and Filters */}
-                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 sticky top-16 z-10 bg-slate-50 py-4 border-b border-slate-200 w-full">
+                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 sticky top-16 z-30 bg-slate-50 py-4 border-b border-slate-200 w-full">
                     <div className="relative w-full md:w-96 max-w-full">
                         <Input
                             placeholder="Buscar productos..."
@@ -1236,7 +1236,8 @@ export default function CatalogPage() {
                                         <ProductCard
                                             key={product.id}
                                             product={product}
-                                            company={company}
+                                            companySlug={company.slug}
+                                            isDemo={company.slug?.includes('demo')}
                                             cartEnabled={!company?.menu_mode} // Use menu_mode to disable cart
                                             onReviewClick={() => handleOpenProductReviews(product)}
                                             isOwner={isOwner}
