@@ -610,6 +610,7 @@ export default function DashboardProducts() {
                 onSuccess={handleSuccess}
                 companyId={company?.id}
                 categories={categories}
+                onCategoryCreated={fetchCategories}
             />
 
             <PlanUpgradeModal

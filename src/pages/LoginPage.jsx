@@ -161,7 +161,7 @@ export default function LoginPage() {
 
     return (
         <div className="flex min-h-screen items-center justify-center px-4 py-10 sm:py-12">
-                        <Card className="w-full max-w-md border-none shadow-xl">
+            <Card className="w-full max-w-md border-none shadow-xl">
                 <CardContent className="p-8">
                     <div className="flex flex-col items-center text-center">
                         <Link to="/" className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-200">
@@ -276,7 +276,7 @@ export default function LoginPage() {
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    Verificación: Selecciona el <span className="text-primary-600">{captcha.target?.label}</span>
+                                    Verificación: Toca el/la <span className="text-primary-600">{captcha.target?.label}</span>
                                 </span>
                                 <button
                                     type="button"

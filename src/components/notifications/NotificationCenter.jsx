@@ -48,8 +48,53 @@ export function NotificationCenter() {
             case 'chat':
             case 'message': return <MessageCircle className="text-emerald-500" size={16} />;
             case 'system': return <Sparkles className="text-primary-500" size={16} />;
+            case 'broadcast': return <Megaphone className="text-purple-500" size={16} />;
             default: return <AlertCircle className="text-slate-500" size={16} />;
         }
+    };
+
+    // Render **bold** and *italic* markdown in notification content
+    const renderFormattedText = (text) => {
+        if (!text) return null;
+        // Split by **bold** first, then *italic* within each segment
+        const parts = [];
+        const boldRegex = /\*\*(.+?)\*\*/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = boldRegex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                parts.push({ text: text.slice(lastIndex, match.index), bold: false });
+            }
+            parts.push({ text: match[1], bold: true });
+            lastIndex = boldRegex.lastIndex;
+        }
+        if (lastIndex < text.length) {
+            parts.push({ text: text.slice(lastIndex), bold: false });
+        }
+
+        // Now process each part for *italic*
+        return parts.map((part, i) => {
+            const italicParts = [];
+            const italicRegex = /\*(.+?)\*/g;
+            let iLastIndex = 0;
+            let iMatch;
+
+            while ((iMatch = italicRegex.exec(part.text)) !== null) {
+                if (iMatch.index > iLastIndex) {
+                    italicParts.push(<span key={`${i}-${iLastIndex}`} className={part.bold ? 'font-bold' : ''}>{part.text.slice(iLastIndex, iMatch.index)}</span>);
+                }
+                italicParts.push(<em key={`${i}-i-${iMatch.index}`} className={part.bold ? 'font-bold' : ''}>{iMatch[1]}</em>);
+                iLastIndex = italicRegex.lastIndex;
+            }
+            if (iLastIndex < part.text.length) {
+                italicParts.push(<span key={`${i}-${iLastIndex}`} className={part.bold ? 'font-bold' : ''}>{part.text.slice(iLastIndex)}</span>);
+            }
+            if (italicParts.length === 0) {
+                return <span key={i} className={part.bold ? 'font-bold' : ''}>{part.text}</span>;
+            }
+            return italicParts;
+        });
     };
 
     const formatTime = (dateString) => {
@@ -229,7 +274,8 @@ export function NotificationCenter() {
                                                                 notification.type === 'quote' ? 'bg-blue-50 text-blue-600' :
                                                                     notification.type === 'stock' ? 'bg-amber-50 text-amber-600' :
                                                                         notification.type === 'system' ? 'bg-primary-50 text-primary-600' :
-                                                                            notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
+                                                                            notification.type === 'broadcast' ? 'bg-purple-50 text-purple-600' :
+                                                                                notification.type === 'chat' || notification.type === 'message' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
                                                         )}>
                                                             {getIcon(notification)}
                                                         </div>
@@ -258,11 +304,20 @@ export function NotificationCenter() {
                                                         </span>
                                                     </div>
                                                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                                                        {notification.metadata?.comment || (
-                                                            notification.metadata?.actor_role === 'admin' && notification.content
-                                                                ? notification.content.replace(/.*(?= te ha enviado)/, 'Admin Ktalogoo')
-                                                                : notification.content
-                                                        )}
+                                                        {notification.type === 'broadcast'
+                                                            ? renderFormattedText(
+                                                                notification.metadata?.comment || (
+                                                                    notification.metadata?.actor_role === 'admin' && notification.content
+                                                                        ? notification.content.replace(/.*(?= te ha enviado)/, 'Admin Ktalogoo')
+                                                                        : notification.content
+                                                                )
+                                                            )
+                                                            : (notification.metadata?.comment || (
+                                                                notification.metadata?.actor_role === 'admin' && notification.content
+                                                                    ? notification.content.replace(/.*(?= te ha enviado)/, 'Admin Ktalogoo')
+                                                                    : notification.content
+                                                            ))
+                                                        }
                                                     </p>
 
                                                     {notification.type === 'stock' && notification.metadata?.company_slug && (

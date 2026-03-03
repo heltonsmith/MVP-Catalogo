@@ -15,7 +15,9 @@ import {
     Heart,
     ShoppingBag,
     MessageSquare,
-    User
+    User,
+    Megaphone,
+    Globe
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -47,6 +49,7 @@ export function GlobalSidebar({ isOpen, onClose }) {
         menuItems = [
             { name: 'Resumen', path: '/admin', icon: <LayoutDashboard size={20} />, end: true },
             { name: 'Ir al Inbox', path: '/inbox', icon: <Inbox size={20} /> },
+            { name: 'Difusión', path: '/admin/difusion', icon: <Megaphone size={20} /> },
             { name: 'Explorador', path: '/admin/explorador', icon: <Search size={20} /> },
             { name: 'Usuarios & Tiendas', path: '/admin/usuarios', icon: <Users size={20} /> },
             {
@@ -55,12 +58,14 @@ export function GlobalSidebar({ isOpen, onClose }) {
                 icon: <MessageSquare size={20} />,
                 badge: unreadTicketsCount > 0 ? unreadTicketsCount : null
             },
-            { name: 'Configuración', path: '/admin/configuracion', icon: <Settings size={20} /> },
+            { name: 'Controles', path: '/admin/controles', icon: <Settings size={20} /> },
+            { name: 'Configuración', path: '/admin/configuracion', icon: <Globe size={20} /> },
         ];
     } else if (isStore) {
         menuItems = [
             { name: 'Panel Principal', path: '/dashboard', icon: <LayoutDashboard size={20} />, end: true },
             { name: 'Ir al Inbox', path: '/inbox', icon: <Inbox size={20} /> },
+            { name: 'Difusión', path: '/dashboard/difusion', icon: <Megaphone size={20} /> },
             { name: 'Categorías', path: '/dashboard/categorias', icon: <Layers size={20} /> },
             { name: 'Mis Productos', path: '/dashboard/productos', icon: <Package size={20} /> },
             { name: 'Cotizaciones', path: '/dashboard/cotizaciones', icon: <ExternalLink size={20} />, lockedIfFree: true },
@@ -132,14 +137,19 @@ export function GlobalSidebar({ isOpen, onClose }) {
     return (
         <>
             {/* Desktop Sidebar */}
-            <aside className={cn(
-                "w-72 bg-white border-r border-slate-200 fixed top-16 bottom-0 hidden md:flex flex-col z-40 transition-all duration-300",
-            )}>
+            <aside
+                style={{ top: 'calc(4rem + var(--observer-banner-height, 0px))' }}
+                className={cn(
+                    "w-72 bg-white border-r border-slate-200 fixed bottom-0 hidden md:flex flex-col z-40 transition-all duration-300",
+                )}
+            >
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex items-center space-x-3">
                         <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center overflow-hidden shadow-sm ring-1 ring-slate-200 shrink-0">
                             {isStore && company?.logo ? (
                                 <img src={company.logo} alt="" className="h-full w-full object-cover" />
+                            ) : profile?.avatar_url ? (
+                                <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
                             ) : isAdmin ? (
                                 <Shield className="h-6 w-6 text-primary-600" />
                             ) : (
@@ -174,14 +184,19 @@ export function GlobalSidebar({ isOpen, onClose }) {
             </aside>
 
             {/* Mobile Menu Drawer (same logic but using isOpen) */}
-            <aside className={cn(
-                "fixed inset-y-0 left-0 w-72 bg-white z-[60] md:hidden transform transition-transform duration-300 ease-in-out border-r border-slate-200 flex flex-col pt-4 shadow-2xl",
-                isOpen ? "translate-x-0" : "-translate-x-full"
-            )}>
+            <aside
+                style={{ top: 'var(--observer-banner-height, 0px)' }}
+                className={cn(
+                    "fixed inset-y-0 left-0 w-72 bg-white z-[110] md:hidden transform transition-transform duration-300 ease-in-out border-r border-slate-200 flex flex-col pt-4 shadow-2xl",
+                    isOpen ? "translate-x-0" : "-translate-x-full"
+                )}
+            >
                 <div className="p-4 border-b border-slate-100 flex items-center space-x-3 mb-2">
                     <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center overflow-hidden shadow-sm ring-1 ring-slate-200 shrink-0">
                         {isStore && company?.logo ? (
                             <img src={company.logo} alt="" className="h-full w-full object-cover" />
+                        ) : profile?.avatar_url ? (
+                            <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
                         ) : isAdmin ? (
                             <Shield className="h-6 w-6 text-primary-600" />
                         ) : (

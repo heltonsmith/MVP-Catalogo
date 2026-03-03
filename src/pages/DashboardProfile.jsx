@@ -348,6 +348,30 @@ export default function DashboardProfile() {
             return;
         }
 
+        // --- Unique Store Name Check ---
+        setLoading(true);
+        try {
+            const { data: existingStore, error: storeCheckError } = await supabase
+                .from('companies')
+                .select('id')
+                .ilike('name', cleanedData.name)
+                .neq('id', company.id) // Exclude current company
+                .maybeSingle();
+
+            if (storeCheckError) {
+                console.error('Error checking store name uniqueness:', storeCheckError);
+            }
+
+            if (existingStore) {
+                showToast(`El nombre "${cleanedData.name}" ya está siendo usado por otra tienda. Por favor busca un nombre único.`, "error");
+                setLoading(false);
+                return;
+            }
+        } catch (err) {
+            console.error('Exception during store name check:', err);
+        }
+        // --- End Unique Store Name Check ---
+
         setLoading(true);
         try {
             // 1. Save RUT and full_name to profiles table FIRST (always works)
@@ -690,141 +714,6 @@ export default function DashboardProfile() {
                         </Card >
                     </div >
                 );
-            case 'broadcast':
-                return (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                        <Card className="border-none shadow-xl bg-white overflow-hidden">
-                            <div className="p-6 border-b border-slate-50 font-bold text-slate-800 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Megaphone size={18} className="text-primary-500" />
-                                    Canal de Difusión Seguidores
-                                </div>
-                                {(!isPro && !isDemo) && (
-                                    <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-1 rounded-full border border-primary-200 uppercase tracking-widest">
-                                        Planes de Pago
-                                    </span>
-                                )}
-                            </div>
-                            <CardContent className="p-8 relative">
-                                <div className={cn("transition-all duration-500", (!isPro && !isDemo) && "blur-[2px] opacity-50 pointer-events-none")}>
-                                    <div className="max-w-xl mx-auto text-center space-y-6">
-                                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm font-black shadow-sm ring-1 ring-primary-100">
-                                            <Users size={16} />
-                                            <span>{followerCount.toLocaleString()} Seguidores Activos</span>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <h3 className="text-xl font-black text-slate-900 leading-tight">Envía novedades a tus clientes</h3>
-                                            <p className="text-sm text-slate-500 font-bold leading-relaxed">
-                                                Tus seguidores recibirán una notificación inmediata con el mensaje que escribas abajo.
-                                                ¡Úsalo para ofertas relámpago, nuevos ingresos o anuncios importantes!
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            {/* Emoji Palette */}
-                                            <div className="flex flex-wrap items-center justify-center gap-1.5 p-2 bg-slate-50/80 rounded-xl border border-slate-100/50 backdrop-blur-sm">
-                                                {COMMON_EMOJIS.map((emoji, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        type="button"
-                                                        onClick={() => handleEmojiClick(emoji)}
-                                                        className="w-8 h-8 flex items-center justify-center text-lg hover:bg-white hover:scale-125 hover:shadow-sm rounded-lg transition-all duration-200 active:scale-95"
-                                                        title="Click para insertar"
-                                                    >
-                                                        {emoji}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            <div className="relative group">
-                                                <textarea
-                                                    ref={broadcastRef}
-                                                    value={broadcastMsg}
-                                                    onChange={(e) => setBroadcastMsg(e.target.value)}
-                                                    placeholder="Ej: ¡Hola! Tenemos 10 productos nuevos en oferta por tiempo limitado. ¡No te los pierdas! 🚀"
-                                                    rows={5}
-                                                    className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-5 text-sm font-bold text-slate-700 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all resize-none shadow-inner"
-                                                />
-                                                <div className="absolute bottom-4 right-4 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
-                                                    {broadcastMsg.length} caracteres
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <Button
-                                            onClick={handleSendBroadcast}
-                                            disabled={sendingBroadcast || !broadcastMsg.trim()}
-                                            className="w-full h-14 rounded-2xl text-base font-black shadow-xl shadow-primary-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                        >
-                                            {sendingBroadcast ? (
-                                                <>
-                                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                                    Enviando a {followerCount} seguidores...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Send className="mr-2 h-5 w-5" />
-                                                    Enviar Notificación de Difusión
-                                                </>
-                                            )}
-                                        </Button>
-
-                                        <div className="pt-4 flex items-center justify-center gap-6 border-t border-slate-100">
-                                            <div className="flex flex-col items-center gap-1">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Alcance</span>
-                                                <span className="text-xs font-bold text-slate-700">Inmediato</span>
-                                            </div>
-                                            <div className="h-4 w-px bg-slate-200" />
-                                            <div className="flex flex-col items-center gap-1">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Tipo</span>
-                                                <span className="text-xs font-bold text-slate-700">Directo</span>
-                                            </div>
-                                            <div className="h-4 w-px bg-slate-200" />
-                                            <div className="flex flex-col items-center gap-1">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Botón CTA</span>
-                                                <span className="text-xs font-bold text-slate-700">Ir a Tienda</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {(!isPro && !isDemo) && (
-                                    <div className="absolute inset-0 flex items-center justify-center z-10">
-                                        <div className="flex flex-col items-center gap-3">
-                                            {pendingRequest && (
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse">
-                                                    <Clock size={12} />
-                                                    Solicitud en Revisión
-                                                </div>
-                                            )}
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => setShowUpgradeModal(true)}
-                                                className={cn(
-                                                    "bg-white/80 backdrop-blur-sm border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 font-black rounded-xl shadow-lg",
-                                                    pendingRequest && "border-amber-200 shadow-none opacity-90"
-                                                )}
-                                            >
-                                                {pendingRequest ? (
-                                                    <>
-                                                        <Clock size={16} className="mr-2" />
-                                                        Ver Estado de Mejora
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Crown size={16} className="mr-2" />
-                                                        Habilitar Canal de Difusión
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                );
             case 'notifications':
                 const notifPrefs = company?.notification_prefs || { notify_follow: true, notify_favorite: true, notify_quote: true };
 
@@ -1161,107 +1050,100 @@ export default function DashboardProfile() {
 
                                     {/* Owner Identity Fields */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nombre Completo del Titular</label>
-                                            <Input
-                                                value={formData.full_name}
-                                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                                                placeholder="Juan Pérez"
-                                                maxLength={40}
-                                                showCounter
-                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">RUT</label>
-                                            <Input
-                                                value={formData.rut}
-                                                onChange={(e) => {
-                                                    const clean = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
-                                                    if (clean.length <= 12) {
-                                                        setFormData({ ...formData, rut: sharedFormatRut(e.target.value) });
-                                                    }
-                                                }}
-                                                placeholder="12.345.678-9"
-                                                maxLength={12}
-                                                error={formData.rut && !sharedValidateRut(formData.rut) ? "RUT inválido" : null}
-                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                            />
-                                        </div>
+                                        <Input
+                                            label="Nombre Completo del Titular"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            value={formData.full_name}
+                                            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                                            placeholder="Juan Pérez"
+                                            maxLength={40}
+                                            showCounter
+                                            className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                        />
+                                        <Input
+                                            label="RUT"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            value={formData.rut}
+                                            onChange={(e) => {
+                                                const clean = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
+                                                if (clean.length <= 12) {
+                                                    setFormData({ ...formData, rut: sharedFormatRut(e.target.value) });
+                                                }
+                                            }}
+                                            placeholder="12.345.678-9"
+                                            maxLength={12}
+                                            error={formData.rut && !sharedValidateRut(formData.rut) ? "RUT inválido" : null}
+                                            className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                        />
                                     </div>
 
                                     {/* Form Fields */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nombre Comercial</label>
-                                            <Input
-                                                value={formData.name}
-                                                onChange={(e) => {
-                                                    const name = e.target.value;
-                                                    const slug = name.toLowerCase()
-                                                        .replace(/[^a-z0-9]+/g, '-')
-                                                        .replace(/(^-|-$)+/g, '');
-                                                    setFormData({ ...formData, name, slug });
-                                                }}
-                                                maxLength={30}
-                                                showCounter
-                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Slug de URL (Automático)</label>
-                                            <Input
-                                                value={formData.slug}
-                                                readOnly
-                                                disabled
-                                                className="bg-slate-100 border-transparent text-slate-500 font-mono text-xs cursor-not-allowed"
-                                            />
-                                        </div>
+                                        <Input
+                                            label="Nombre Comercial"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            value={formData.name}
+                                            onChange={(e) => {
+                                                const name = e.target.value;
+                                                const slug = name.toLowerCase()
+                                                    .replace(/[^a-z0-9]+/g, '-')
+                                                    .replace(/(^-|-$)+/g, '');
+                                                setFormData({ ...formData, name, slug });
+                                            }}
+                                            maxLength={30}
+                                            showCounter
+                                            className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                        />
+                                        <Input
+                                            label="Slug de URL (Automático)"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            value={formData.slug}
+                                            readOnly
+                                            disabled
+                                            className="bg-slate-100 border-transparent text-slate-500 font-mono text-xs cursor-not-allowed"
+                                        />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Descripción corta</label>
-                                            <Input
-                                                type="textarea"
-                                                value={formData.description}
-                                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                                maxLength={80}
-                                                showCounter
-                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">WhatsApp</label>
-                                            <Input
-                                                value={formData.whatsapp}
-                                                onChange={(e) => setFormData({ ...formData, whatsapp: sharedFormatPhone(e.target.value) })}
-                                                placeholder="+56XXXXXXXXX"
-                                                maxLength={20}
-                                                error={formData.whatsapp && formData.whatsapp.length > 3 && !sharedValidatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
-                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                            />
-                                        </div>
+                                        <Input
+                                            label="Descripción corta"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            type="textarea"
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            maxLength={80}
+                                            showCounter
+                                            className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                        />
+                                        <Input
+                                            label="WhatsApp"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            value={formData.whatsapp}
+                                            onChange={(e) => setFormData({ ...formData, whatsapp: sharedFormatPhone(e.target.value) })}
+                                            placeholder="+56XXXXXXXXX"
+                                            maxLength={20}
+                                            error={formData.whatsapp && formData.whatsapp.length > 3 && !sharedValidatePhone(formData.whatsapp) ? "WhatsApp inválido" : null}
+                                            className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                        />
                                     </div>
 
                                     {/* Address & Location */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Dirección Física</label>
-                                            <Input
-                                                value={formData.address}
-                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                                placeholder="Av. Principal 123, Local 5"
-                                                maxLength={50}
-                                                showCounter
-                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Ubicación (Región y Comuna)</label>
+                                        <Input
+                                            label="Dirección Física"
+                                            labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                                            value={formData.address}
+                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            placeholder="Av. Principal 123, Local 5"
+                                            maxLength={50}
+                                            showCounter
+                                            className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                        />
+                                        <div className="w-full">
                                             <LocationSelector
                                                 value={formData.location}
                                                 onChange={(val) => setFormData({ ...formData, location: val })}
+                                                labelClassName="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
                                             />
                                         </div>
                                     </div>
@@ -1270,39 +1152,36 @@ export default function DashboardProfile() {
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Presencia Digital</label>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-medium text-slate-500 pl-1">Instagram</label>
-                                                <Input
-                                                    value={formData.instagram}
-                                                    onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                                                    placeholder="https://instagram.com/su-cuenta"
-                                                    maxLength={255}
-                                                    error={formData.instagram && !sharedIsValidUrl(formData.instagram) ? "Debe usar https://" : null}
-                                                    className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-medium text-slate-500 pl-1">TikTok</label>
-                                                <Input
-                                                    value={formData.tiktok}
-                                                    onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
-                                                    placeholder="https://tiktok.com/@su-cuenta"
-                                                    maxLength={255}
-                                                    error={formData.tiktok && !sharedIsValidUrl(formData.tiktok) ? "Debe usar https://" : null}
-                                                    className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-medium text-slate-500 pl-1">Sitio Web</label>
-                                                <Input
-                                                    value={formData.website}
-                                                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                                                    placeholder="https://su-tienda.com"
-                                                    maxLength={255}
-                                                    error={formData.website && !sharedIsValidUrl(formData.website) ? "Debe usar https://" : null}
-                                                    className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
-                                                />
-                                            </div>
+                                            <Input
+                                                label="Instagram"
+                                                labelClassName="text-[10px] font-medium text-slate-500 pl-1"
+                                                value={formData.instagram}
+                                                onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                                                placeholder="https://instagram.com/su-cuenta"
+                                                maxLength={255}
+                                                error={formData.instagram && !sharedIsValidUrl(formData.instagram) ? "Debe usar https://" : null}
+                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
+                                            <Input
+                                                label="TikTok"
+                                                labelClassName="text-[10px] font-medium text-slate-500 pl-1"
+                                                value={formData.tiktok}
+                                                onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
+                                                placeholder="https://tiktok.com/@su-cuenta"
+                                                maxLength={255}
+                                                error={formData.tiktok && !sharedIsValidUrl(formData.tiktok) ? "Debe usar https://" : null}
+                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
+                                            <Input
+                                                label="Sitio Web"
+                                                labelClassName="text-[10px] font-medium text-slate-500 pl-1"
+                                                value={formData.website}
+                                                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                                                placeholder="https://su-tienda.com"
+                                                maxLength={255}
+                                                error={formData.website && !sharedIsValidUrl(formData.website) ? "Debe usar https://" : null}
+                                                className="bg-slate-50/50 border-slate-100 focus:bg-white transition-colors"
+                                            />
                                         </div>
                                     </div>
 
@@ -1603,12 +1482,6 @@ export default function DashboardProfile() {
                         {[
                             { id: 'profile', name: 'Perfil', fullName: 'Perfil de Tienda', icon: <User size={18} /> },
                             {
-                                id: 'broadcast',
-                                name: 'Difusión',
-                                fullName: 'Canal de Difusión',
-                                icon: <Megaphone size={18} />
-                            },
-                            {
                                 id: 'messages',
                                 name: 'Mensajes',
                                 fullName: 'Mensajes Sistema',
@@ -1648,17 +1521,6 @@ export default function DashboardProfile() {
                                 </button>
                             );
 
-                            if (item.id === 'broadcast' && company?.plan === 'free') {
-                                return (
-                                    <TooltipCard
-                                        key={i}
-                                        title="Canal de Difusión"
-                                        description="Comunícate directamente con tus seguidores. Envía notificaciones instantáneas sobre ofertas, nuevos productos o noticias importantes directamente a su panel."
-                                    >
-                                        {button}
-                                    </TooltipCard>
-                                );
-                            }
 
                             return button;
                         })}

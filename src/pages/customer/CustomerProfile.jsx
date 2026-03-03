@@ -46,7 +46,9 @@ export default function CustomerProfile() {
         rut: profile?.rut || '',
         phone: profile?.phone || '',
         address: profile?.shipping_address || '',
-        newPassword: ''
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
     });
 
     const formatRUT = (value) => sharedFormatRut(value);
@@ -172,18 +174,60 @@ export default function CustomerProfile() {
 
             // 2. Update Password if provided
             if (formData.newPassword) {
+                // Validation
+                if (!formData.currentPassword) {
+                    showToast("Debes ingresar tu contraseña actual para cambiarla", "error");
+                    setLoading(false);
+                    return;
+                }
+
+                if (formData.newPassword.length < 6) {
+                    showToast("La nueva contraseña debe tener al menos 6 caracteres", "error");
+                    setLoading(false);
+                    return;
+                }
+
+                if (formData.newPassword !== formData.confirmPassword) {
+                    showToast("La nueva contraseña y la confirmación no coinciden", "error");
+                    setLoading(false);
+                    return;
+                }
+
+                // Verify current password first
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email: profile?.email || user?.email,
+                    password: formData.currentPassword
+                });
+
+                if (signInError) {
+                    showToast("La contraseña actual es incorrecta", "error");
+                    setLoading(false);
+                    return;
+                }
+
+                // Update password
                 const { error: passwordError } = await supabase.auth.updateUser({
                     password: formData.newPassword
                 });
-                if (passwordError) throw passwordError;
-                setFormData(prev => ({ ...prev, newPassword: '' }));
+
+                if (passwordError) {
+                    if (passwordError.message.includes('should be different')) {
+                        showToast("La nueva contraseña debe ser diferente a la anterior", "error");
+                    } else {
+                        throw passwordError;
+                    }
+                    setLoading(false);
+                    return;
+                }
+
+                setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
             }
 
             await refreshProfile();
             showToast("Perfil actualizado correctamente", "success");
         } catch (error) {
             console.error('Error updating profile:', error);
-            showToast("Error al actualizar perfil", "error");
+            showToast(error.message || "Error al actualizar perfil", "error");
         } finally {
             setLoading(false);
         }
@@ -339,22 +383,49 @@ export default function CustomerProfile() {
                                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white">2</span>
                                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Seguridad</h3>
                                     </div>
-                                    <div className="relative">
-                                        <Input
-                                            label="Nueva Contraseña (Opcional)"
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="Mínimo 6 caracteres"
-                                            value={formData.newPassword}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
-                                            className="h-12 bg-slate-50 border-transparent focus:bg-white"
-                                            autoComplete="new-password"
-                                        />
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div className="relative">
+                                            <Input
+                                                label="Contraseña Actual"
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Tu contraseña actual"
+                                                value={formData.currentPassword}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                                className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                                autoComplete="current-password"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="relative">
+                                                <Input
+                                                    label="Nueva Contraseña"
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="Mínimo 6 caracteres"
+                                                    value={formData.newPassword}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                                    className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                                    autoComplete="new-password"
+                                                />
+                                            </div>
+                                            <div className="relative">
+                                                <Input
+                                                    label="Confirmar Nueva Contraseña"
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="Repite tu nueva contraseña"
+                                                    value={formData.confirmPassword}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                                    className="h-12 bg-slate-50 border-transparent focus:bg-white"
+                                                    autoComplete="new-password"
+                                                />
+                                            </div>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-4 top-[38px] text-slate-400 hover:text-slate-600"
+                                            className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-primary-600 transition-colors self-start ml-1"
                                         >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            {showPassword ? "Ocultar Contraseñas" : "Mostrar Contraseñas"}
                                         </button>
                                     </div>
                                 </div>

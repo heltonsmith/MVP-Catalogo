@@ -45,11 +45,13 @@ export function LocationSelector({ value, onChange, className, labelClassName, s
     const isAllRegions = selectedRegion === 'Todas las regiones';
 
     return (
-        <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-3", className)}>
+        <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-4", className)}>
             <div className="space-y-1.5">
-                <label className={cn("text-xs font-bold text-slate-500 uppercase tracking-wider", labelClassName)}>
-                    Región {showRequired && <span className="text-red-500">*</span>}
-                </label>
+                <div className="flex items-center justify-between min-h-[1.25rem]">
+                    <label className={cn("text-xs font-bold text-slate-500 uppercase tracking-wider", labelClassName)}>
+                        Región {showRequired && <span className="text-red-500">*</span>}
+                    </label>
+                </div>
                 <div className="relative group">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors pointer-events-none" />
                     <select
@@ -68,9 +70,11 @@ export function LocationSelector({ value, onChange, className, labelClassName, s
             </div>
 
             <div className="space-y-1.5">
-                <label className={cn("text-xs font-bold text-slate-500 uppercase tracking-wider", labelClassName)}>
-                    Comuna / Ciudad {showRequired && <span className="text-red-500">*</span>}
-                </label>
+                <div className="flex items-center justify-between min-h-[1.25rem]">
+                    <label className={cn("text-xs font-bold text-slate-500 uppercase tracking-wider", labelClassName)}>
+                        Comuna / Ciudad {showRequired && <span className="text-red-500">*</span>}
+                    </label>
+                </div>
                 <div className="relative group">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors pointer-events-none" />
                     <select

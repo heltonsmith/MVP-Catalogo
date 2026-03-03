@@ -58,7 +58,11 @@ export function useNotifications() {
             suppressRefetchRef.current = false;
             return;
         }
-        fetchNotifications(true);
+        // Debounce to avoid race conditions with the local realtime subscription
+        const timer = setTimeout(() => {
+            fetchNotifications(true);
+        }, 500);
+        return () => clearTimeout(timer);
     }, [unreadNotifications]);
 
     // Direct Realtime subscription for instant local updates
@@ -79,21 +83,23 @@ export function useNotifications() {
                 }
 
                 if (payload.eventType === 'INSERT') {
-                    // Only fetch for truly new notifications (not our own actions)
+                    // Only process bell notifications (not inbox messages)
                     const newNotification = payload.new;
                     if (newNotification.type !== 'message' && newNotification.type !== 'chat') {
                         setNotifications(prev => {
                             // Avoid duplicates
                             if (prev.some(n => n.id === newNotification.id)) return prev;
-                            return [newNotification, ...prev];
-                        });
-                        if (!newNotification.is_read) {
-                            setUnreadCount(prev => prev + 1);
+                            const updated = [newNotification, ...prev];
+                            // Calculate absolute unread count from local state
+                            // This prevents multiple hook instances from each incrementing the global count
+                            const newCount = updated.filter(n => n.is_read === false || n.is_read === 'f').length;
+                            setUnreadCount(newCount);
                             if (setUnreadNotifications) {
                                 suppressRefetchRef.current = true;
-                                setUnreadNotifications(prev => prev + 1);
+                                setUnreadNotifications(newCount);
                             }
-                        }
+                            return updated;
+                        });
                     }
                 } else if (payload.eventType === 'UPDATE') {
                     setNotifications(prev => {

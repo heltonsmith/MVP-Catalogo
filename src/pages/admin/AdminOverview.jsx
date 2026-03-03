@@ -204,69 +204,77 @@ export default function AdminOverview() {
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="h-12 w-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600">
-                                <Users size={24} />
+                <Link to="/admin/usuarios" className="block transform transition-all active:scale-[0.98]">
+                    <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="h-12 w-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600">
+                                    <Users size={24} />
+                                </div>
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">Activo</span>
                             </div>
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">Activo</span>
-                        </div>
-                        <div className="mt-4">
-                            <p className="text-2xl font-bold text-slate-900">{stats.totalUsers}</p>
-                            <p className="text-xs text-slate-500 font-medium">Usuarios Registrados</p>
-                        </div>
-                    </CardContent>
-                </Card>
+                            <div className="mt-4">
+                                <p className="text-2xl font-bold text-slate-900">{stats.totalUsers}</p>
+                                <p className="text-xs text-slate-500 font-medium">Usuarios Registrados</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="h-12 w-12 rounded-2xl bg-secondary-50 flex items-center justify-center text-secondary-600">
-                                <Store size={24} />
+                <Link to="/admin/usuarios" className="block transform transition-all active:scale-[0.98]">
+                    <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="h-12 w-12 rounded-2xl bg-secondary-50 flex items-center justify-center text-secondary-600">
+                                    <Store size={24} />
+                                </div>
+                                <TrendingUp size={18} className="text-emerald-500" />
                             </div>
-                            <TrendingUp size={18} className="text-emerald-500" />
-                        </div>
-                        <div className="mt-4">
-                            <p className="text-2xl font-bold text-slate-900">{stats.totalStores}</p>
-                            <p className="text-xs text-slate-500 font-medium">Tiendas Creadas</p>
-                        </div>
-                    </CardContent>
-                </Card>
+                            <div className="mt-4">
+                                <p className="text-2xl font-bold text-slate-900">{stats.totalStores}</p>
+                                <p className="text-xs text-slate-500 font-medium">Tiendas Creadas</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                <CheckCircle2 size={24} />
+                <Link to="/admin/usuarios" className="block transform transition-all active:scale-[0.98]">
+                    <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                    <CheckCircle2 size={24} />
+                                </div>
+                                <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-1 rounded-lg">PRO</span>
                             </div>
-                            <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-2 py-1 rounded-lg">PRO</span>
-                        </div>
-                        <div className="mt-4">
-                            <p className="text-2xl font-bold text-slate-900">{stats.activeSubscriptions}</p>
-                            <p className="text-xs text-slate-500 font-medium">Suscripciones Activas</p>
-                        </div>
-                    </CardContent>
-                </Card>
+                            <div className="mt-4">
+                                <p className="text-2xl font-bold text-slate-900">{stats.activeSubscriptions}</p>
+                                <p className="text-xs text-slate-500 font-medium">Suscripciones Activas</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow ring-2 ring-amber-100 italic">
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-                                <Sparkles size={24} />
+                <a href="#pending-upgrades" className="block transform transition-all active:scale-[0.98]">
+                    <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow ring-2 ring-amber-100 italic cursor-pointer">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+                                    <Sparkles size={24} />
+                                </div>
+                                <Badge variant="warning" className="text-[10px] uppercase">{stats.pendingUpgrades} Pendientes</Badge>
                             </div>
-                            <Badge variant="warning" className="text-[10px] uppercase">{stats.pendingUpgrades} Pendientes</Badge>
-                        </div>
-                        <div className="mt-4">
-                            <p className="text-2xl font-bold text-slate-900">{stats.pendingUpgrades}</p>
-                            <p className="text-xs text-slate-500 font-medium">Solicitudes de Upgrade</p>
-                        </div>
-                    </CardContent>
-                </Card>
+                            <div className="mt-4">
+                                <p className="text-2xl font-bold text-slate-900">{stats.pendingUpgrades}</p>
+                                <p className="text-xs text-slate-500 font-medium">Solicitudes de Upgrade</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </a>
             </div>
 
             {/* Pending Requests Section */}
-            <div className="space-y-6">
+            <div id="pending-upgrades" className="space-y-6 scroll-mt-24">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                         <AlertCircle size={20} className="text-amber-500" />

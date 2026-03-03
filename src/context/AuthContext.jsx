@@ -28,6 +28,10 @@ export const AuthProvider = ({ children }) => {
     // Flag to suppress AuthContext's realtime refresh after optimistic updates from useNotifications
     const suppressGlobalRefreshRef = useRef(false);
 
+    // Maintenance & System Controls
+    const [isMaintenanceActive, setIsMaintenanceActive] = useState(false);
+    const lastResetProcessed = useRef(localStorage.getItem('ktaloog_last_reset'));
+
     // Observer Mode / Impersonation
     const [isObserving, setIsObserving] = useState(false);
     const [observerData, setObserverData] = useState(null); // Stores original admin profile/user
@@ -252,9 +256,68 @@ export const AuthProvider = ({ children }) => {
 
         init();
 
+        // --- System Controls & Realtime Listener ---
+        const setupSystemChannel = () => {
+            console.log('Auth: Setting up system control listeners...');
+
+            // Initial fetch of current status
+            const fetchInitialStatus = async () => {
+                const { data } = await supabase.from('system_config').select('key, value');
+                if (data) {
+                    const config = data.reduce((acc, item) => ({ ...acc, [item.key]: item.value }), {});
+                    if (config.MAINTENANCE_MODE === 'true') {
+                        setIsMaintenanceActive(true);
+                    }
+                    if (config.FORCE_RESET_TIMESTAMP && config.FORCE_RESET_TIMESTAMP !== lastResetProcessed.current) {
+                        applyForceReset(config.FORCE_RESET_TIMESTAMP);
+                    }
+                }
+            };
+
+            fetchInitialStatus();
+
+            return supabase
+                .channel('public:system_config')
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'system_config'
+                }, (payload) => {
+                    const { key, value } = payload.new;
+                    console.log('Auth: System control signal received:', key, value);
+
+                    if (key === 'MAINTENANCE_MODE') {
+                        setIsMaintenanceActive(value === 'true');
+                    } else if (key === 'FORCE_RESET_TIMESTAMP') {
+                        if (value && value !== lastResetProcessed.current) {
+                            applyForceReset(value);
+                        }
+                    }
+                })
+                .subscribe();
+        };
+
+        const applyForceReset = async (timestamp) => {
+            console.warn('Auth: FORCE RESET SIGNAL DETECTED. Cleaning up...');
+            localStorage.setItem('ktaloog_last_reset', timestamp);
+            lastResetProcessed.current = timestamp;
+
+            // Clear all local storage except the last reset token
+            const resetKey = 'ktaloog_last_reset';
+            Object.keys(localStorage).forEach(key => {
+                if (key !== resetKey) localStorage.removeItem(key);
+            });
+
+            await supabase.auth.signOut();
+            window.location.href = '/login?reset=true';
+        };
+
+        const systemChannel = setupSystemChannel();
+
         return () => {
             isMounted = false;
             subscription.unsubscribe();
+            if (systemChannel) supabase.removeChannel(systemChannel);
             clearTimeout(globalTimeout);
         };
     }, []);
@@ -616,6 +679,24 @@ export const AuthProvider = ({ children }) => {
                     <div className="flex flex-col items-center gap-4">
                         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600"></div>
                         <p className="text-sm font-medium text-slate-500 animate-pulse">Iniciando plataforma...</p>
+                    </div>
+                </div>
+            ) : isMaintenanceActive && profile?.role !== 'admin' ? (
+                <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+                    <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 p-10 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
+                        <div className="h-24 w-24 bg-primary-50 rounded-3xl flex items-center justify-center mb-8 text-primary-600 animate-bounce cursor-default">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h.01" /><path d="M22 12A10 10 0 1 1 2 12c0-1.1.25-2.14.7-3.08" /><path d="M7 3h10" /><path d="M12 12v.01" /><path d="m15.5 5.5 2 2" /><path d="m8.5 5.5-2 2" /><path d="M22 12c0-5.52-4.48-10-10-10" /></svg>
+                        </div>
+                        <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight leading-tight uppercase italic">Modo Mantenimiento</h1>
+                        <p className="text-slate-500 font-bold leading-relaxed mb-8">
+                            Estamos realizando mejoras importantes en la plataforma para brindarte una mejor experiencia.
+                            <br /><br />
+                            <span className="text-primary-600">Volveremos pronto. ¡Gracias por tu paciencia!</span>
+                        </p>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-8">
+                            <div className="h-full bg-primary-600 animate-[progress_3s_infinite_linear]" style={{ width: '40%' }}></div>
+                        </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ktaloog v1.2.0-stable</p>
                     </div>
                 </div>
             ) : (

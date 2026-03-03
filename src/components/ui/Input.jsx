@@ -1,27 +1,29 @@
 import { cn } from '../../utils';
 
-export function Input({ className, label, error, icon, showCounter, maxLength, value, ...props }) {
-    const currentLength = value ? String(value).length : 0;
+export function Input({ className, label, error, icon, showCounter, maxLength, value, labelClassName, ...props }) {
+    const currentLength = (value && typeof value === 'string') ? value.length : 0;
 
     return (
         <div className="w-full space-y-1.5">
-            <div className="flex items-center justify-between">
-                {label && (
-                    <label className="text-sm font-medium text-slate-700">
-                        {label}
-                    </label>
-                )}
-                {showCounter && maxLength && (
-                    <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all",
-                        currentLength >= maxLength
-                            ? "text-red-600 bg-red-50 border-red-100 animate-pulse"
-                            : "text-slate-400 bg-slate-50 border-slate-100"
-                    )}>
-                        {currentLength} / {maxLength}
-                    </span>
-                )}
-            </div>
+            {(label || (showCounter && maxLength)) && (
+                <div className="flex items-center justify-between min-h-[1.25rem]">
+                    {label && (
+                        <label className={cn("text-sm font-medium text-slate-700", labelClassName)}>
+                            {label}
+                        </label>
+                    )}
+                    {showCounter && maxLength && (
+                        <span className={cn(
+                            "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all",
+                            currentLength >= maxLength
+                                ? "text-red-600 bg-red-50 border-red-100 animate-pulse"
+                                : "text-slate-400 bg-slate-50 border-slate-100"
+                        )}>
+                            {currentLength} / {maxLength}
+                        </span>
+                    )}
+                </div>
+            )}
             <div className="relative">
                 {icon && (
                     <div className="absolute left-3 top-3 text-slate-400">

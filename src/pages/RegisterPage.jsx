@@ -287,6 +287,29 @@ export default function RegisterPage() {
                     return;
                 }
             }
+
+            // --- Unique Store Name Check ---
+            setLoading(true); // Start loading early for the check
+            try {
+                const { data: existingStore, error: storeCheckError } = await supabase
+                    .from('companies')
+                    .select('id')
+                    .ilike('name', cleanedData.businessName)
+                    .maybeSingle();
+
+                if (storeCheckError) {
+                    console.error('Error checking store name uniqueness:', storeCheckError);
+                }
+
+                if (existingStore) {
+                    showToast(`El nombre de emprendimiento "${cleanedData.businessName}" ya está registrado. Por favor busca otro nombre único.`, "error");
+                    setLoading(false);
+                    return;
+                }
+            } catch (err) {
+                console.error('Exception during store name check:', err);
+            }
+            // --- End Unique Store Name Check ---
         }
 
         setLoading(true);

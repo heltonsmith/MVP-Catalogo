@@ -180,6 +180,11 @@ export default function ProductDetailsPage() {
             return;
         }
 
+        if (!tempReview.comment || !tempReview.comment.trim()) {
+            showToast("Por favor escribe un comentario sobre el producto", "error");
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .from('reviews')
@@ -236,6 +241,11 @@ export default function ProductDetailsPage() {
                 customer_name: profile?.full_name || user.user_metadata?.full_name || 'Anónimo',
                 created_at: new Date().toISOString()
             }).eq('id', editingReview.id);
+
+            if (!tempReview.comment || !tempReview.comment.trim()) {
+                showToast("El comentario no puede estar vacío", "error");
+                return;
+            }
 
             // Admin bypass
             if (profile?.role !== 'admin') {
@@ -567,50 +577,101 @@ export default function ProductDetailsPage() {
 
                     {product.reviews && product.reviews.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {product.reviews.map(review => (
-                                <div key={review.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-300 group relative">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm overflow-hidden">
-                                                {review.avatar ? (
-                                                    <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
-                                                ) : review.user && review.user !== 'Anónimo' ? (
-                                                    <span className="font-bold text-slate-500 text-lg">{review.user.charAt(0).toUpperCase()}</span>
-                                                ) : (
-                                                    <User size={20} className="text-slate-300" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <span className="font-black text-slate-900 text-sm block uppercase tracking-tight">{review.user}</span>
-                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{review.date}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <StarRating rating={review.rating} size={12} />
-                                            {/* Edit/Delete Actions for Owner or Admin */}
-                                            {user && (review.user_id === user.id || profile?.role === 'admin') && (
-                                                <div className="flex gap-1 ml-2">
-                                                    <button
-                                                        onClick={() => startEditReview(review)}
-                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="Editar"
-                                                    >
-                                                        <Pencil size={14} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteReview(review.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Eliminar"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
+                            {product.reviews.map(review => {
+                                const isEditing = editingReview?.id === review.id;
+
+                                return (
+                                    <div key={review.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-xl transition-all duration-300 group relative">
+                                        {isEditing ? (
+                                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <div className="flex flex-col items-center gap-2 mb-2">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actualizar calificación</span>
+                                                    <StarRating
+                                                        interactive
+                                                        rating={tempReview.rating}
+                                                        onRate={(val) => setTempReview(prev => ({ ...prev, rating: val }))}
+                                                        size={24}
+                                                    />
                                                 </div>
-                                            )}
-                                        </div>
+                                                <div className="relative">
+                                                    <textarea
+                                                        className="w-full rounded-2xl border-2 border-slate-100 bg-white focus:bg-white focus:border-primary-500 focus:ring-primary-500 min-h-[100px] text-sm transition-all placeholder:text-slate-350 p-4 shadow-inner resize-none h-auto"
+                                                        placeholder="Edita tu experiencia..."
+                                                        value={tempReview.comment}
+                                                        onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
+                                                        maxLength={150}
+                                                    />
+                                                    <div className="absolute bottom-3 right-4 text-[10px] font-bold text-slate-400">
+                                                        {tempReview.comment?.length || 0}/150
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        className="flex-1 h-10 text-xs font-bold"
+                                                        onClick={handleUpdateReview}
+                                                        disabled={tempReview.rating === 0 || !tempReview.comment?.trim()}
+                                                    >
+                                                        Guardar Cambios
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        className="flex-1 h-10 text-xs font-bold"
+                                                        onClick={() => {
+                                                            setEditingReview(null);
+                                                            setTempReview({ rating: 0, comment: '' });
+                                                        }}
+                                                    >
+                                                        Cancelar
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm overflow-hidden">
+                                                            {review.avatar ? (
+                                                                <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
+                                                            ) : review.user && review.user !== 'Anónimo' ? (
+                                                                <span className="font-bold text-slate-500 text-lg">{review.user.charAt(0).toUpperCase()}</span>
+                                                            ) : (
+                                                                <User size={20} className="text-slate-300" />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-black text-slate-900 text-sm block uppercase tracking-tight">{review.user}</span>
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{review.date}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <StarRating rating={review.rating} size={12} />
+                                                        {/* Edit/Delete Actions for Owner or Admin */}
+                                                        {user && (review.user_id === user.id || profile?.role === 'admin') && (
+                                                            <div className="flex gap-1 ml-2">
+                                                                <button
+                                                                    onClick={() => startEditReview(review)}
+                                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteReview(review.id)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Eliminar"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <p className="text-slate-600 text-sm italic leading-relaxed break-words">"{review.comment}"</p>
+                                            </>
+                                        )}
                                     </div>
-                                    <p className="text-slate-600 text-sm italic leading-relaxed break-words">"{review.comment}"</p>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center text-slate-400">
@@ -624,7 +685,7 @@ export default function ProductDetailsPage() {
                 <div id="write-review" className="mt-12 bg-slate-50 rounded-3xl p-6 md:p-8 border border-slate-100">
                     <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Utensils className="text-primary-600" size={20} />
-                        {editingReview ? 'Editar tu opinión' : 'Deja tu opinión sobre este producto'}
+                        Deja tu opinión sobre este producto
                     </h3>
 
                     {!user ? (
@@ -637,7 +698,7 @@ export default function ProductDetailsPage() {
                         <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                             <p className="text-slate-500 font-medium italic">Como dueño de la tienda, no puedes calificar tus propios productos.</p>
                         </div>
-                    ) : (hasReviewed && !editingReview) ? (
+                    ) : hasReviewed ? (
                         <div className="text-center py-8 bg-emerald-50 rounded-2xl border border-emerald-100">
                             <p className="text-emerald-700 font-medium">¡Ya has opinado sobre este producto! Gracias.</p>
                         </div>
@@ -661,7 +722,7 @@ export default function ProductDetailsPage() {
                                         onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
                                         maxLength={150}
                                         className="w-full rounded-xl border-slate-200 focus:border-primary-500 focus:ring-primary-500 min-h-[120px] resize-none"
-                                        placeholder="¿Qué te pareció el producto?"
+                                        placeholder="Cuéntanos tu experiencia..."
                                     />
                                     <div className="absolute bottom-3 right-3 text-[10px] font-bold text-slate-400">
                                         {tempReview.comment?.length || 0}/150
@@ -670,11 +731,11 @@ export default function ProductDetailsPage() {
                             </div>
 
                             <Button
-                                onClick={editingReview ? handleUpdateReview : handleSubmitReview}
-                                disabled={tempReview.rating === 0}
+                                onClick={handleSubmitReview}
+                                disabled={tempReview.rating === 0 || !tempReview.comment?.trim()}
                                 className="w-full"
                             >
-                                {editingReview ? 'Actualizar Opinión' : 'Publicar Opinión'}
+                                Publicar Opinión
                             </Button>
                         </div>
                     )}
@@ -700,53 +761,98 @@ export default function ProductDetailsPage() {
 
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                         {product.reviews && product.reviews.length > 0 ? (
-                            product.reviews.map(review => (
-                                <div key={review.id} className="border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
-                                                {review.avatar ? (
-                                                    <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <User size={18} className="text-slate-400" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <span className="font-bold text-slate-800 text-sm block">{review.user}</span>
-                                                <span className="text-[10px] text-slate-400 font-medium">{review.date}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {user && (review.user_id === user.id || profile?.role === 'admin') && (
-                                                <div className="flex items-center gap-1 mr-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            setIsReviewsOpen(false);
-                                                            setEditingReview(review);
-                                                            setTempReview({ rating: review.rating, comment: review.comment });
-                                                            // Scroll to form automatically
-                                                            document.getElementById('write-review')?.scrollIntoView({ behavior: 'smooth' });
-                                                        }}
-                                                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
-                                                        title="Editar"
-                                                    >
-                                                        <Pencil size={14} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteReview(review.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
-                                                        title="Eliminar"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
+                            product.reviews.map(review => {
+                                const isEditing = editingReview?.id === review.id;
+
+                                return (
+                                    <div key={review.id} className="border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
+                                        {isEditing ? (
+                                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <div className="flex flex-col items-center gap-2 mb-2">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actualizar calificación</span>
+                                                    <StarRating
+                                                        interactive
+                                                        rating={tempReview.rating}
+                                                        onRate={(val) => setTempReview(prev => ({ ...prev, rating: val }))}
+                                                        size={24}
+                                                    />
                                                 </div>
-                                            )}
-                                            <StarRating rating={review.rating} size={12} />
-                                        </div>
+                                                <div className="relative">
+                                                    <textarea
+                                                        className="w-full rounded-2xl border-2 border-slate-100 bg-white focus:bg-white focus:border-primary-500 focus:ring-primary-500 min-h-[100px] text-sm transition-all placeholder:text-slate-350 p-4 shadow-inner resize-none h-auto"
+                                                        placeholder="Edita tu experiencia..."
+                                                        value={tempReview.comment}
+                                                        onChange={(e) => setTempReview(prev => ({ ...prev, comment: e.target.value.slice(0, 150) }))}
+                                                        maxLength={150}
+                                                    />
+                                                    <div className="absolute bottom-3 right-4 text-[10px] font-bold text-slate-400">
+                                                        {tempReview.comment?.length || 0}/150
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        className="flex-1 h-10 text-xs font-bold"
+                                                        onClick={handleUpdateReview}
+                                                        disabled={tempReview.rating === 0 || !tempReview.comment?.trim()}
+                                                    >
+                                                        Guardar Cambios
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        className="flex-1 h-10 text-xs font-bold"
+                                                        onClick={() => {
+                                                            setEditingReview(null);
+                                                            setTempReview({ rating: 0, comment: '' });
+                                                        }}
+                                                    >
+                                                        Cancelar
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                                            {review.avatar ? (
+                                                                <img src={review.avatar} alt={review.user} className="h-full w-full object-cover" />
+                                                            ) : (
+                                                                <User size={18} className="text-slate-400" />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-bold text-slate-800 text-sm block">{review.user}</span>
+                                                            <span className="text-[10px] text-slate-400 font-medium">{review.date}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {user && (review.user_id === user.id || profile?.role === 'admin') && (
+                                                            <div className="flex items-center gap-1 mr-1">
+                                                                <button
+                                                                    onClick={() => startEditReview(review)}
+                                                                    className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteReview(review.id)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                                                                    title="Eliminar"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        <StarRating rating={review.rating} size={12} />
+                                                    </div>
+                                                </div>
+                                                <p className="text-slate-600 text-sm italic leading-relaxed pl-12 break-words">"{review.comment}"</p>
+                                            </>
+                                        )}
                                     </div>
-                                    <p className="text-slate-600 text-sm italic leading-relaxed pl-12 break-words">"{review.comment}"</p>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
                             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center text-slate-400">
                                 <p className="font-bold uppercase tracking-widest text-xs">Este producto aún no tiene reseñas</p>
@@ -756,10 +862,10 @@ export default function ProductDetailsPage() {
                     </div>
 
                     {/* Quick Review Form inside Modal for Clients */}
-                    {user && (profile?.role === 'admin' || (profile?.role !== 'owner' && (!hasReviewed || editingReview))) && (
+                    {user && (profile?.role === 'admin' || (profile?.role !== 'owner' && !hasReviewed)) && (
                         <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-2">
                             <h4 className="text-sm font-bold text-slate-800 mb-4">
-                                {editingReview ? 'Actualiza tu opinión' : 'Comparte tu opinión'}
+                                Comparte tu opinión
                             </h4>
                             <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
                                 <div className="flex justify-center">
@@ -783,15 +889,11 @@ export default function ProductDetailsPage() {
                                     </div>
                                 </div>
                                 <Button
-                                    onClick={async () => {
-                                        if (editingReview) await handleUpdateReview();
-                                        else await handleSubmitReview();
-                                        // Option to close modal after success could be added here
-                                    }}
-                                    disabled={tempReview.rating === 0}
+                                    onClick={handleSubmitReview}
+                                    disabled={tempReview.rating === 0 || !tempReview.comment?.trim()}
                                     className="w-full h-10 text-sm font-bold"
                                 >
-                                    {editingReview ? 'Actualizar' : 'Publicar'}
+                                    Publicar
                                 </Button>
                             </div>
                         </div>

@@ -36,6 +36,7 @@ const DashboardMessages = lazy(() => import('../pages/DashboardMessages'));
 const DashboardQuotes = lazy(() => import('../pages/DashboardQuotes'));
 const DashboardCategories = lazy(() => import('../pages/DashboardCategories'));
 const DashboardProfile = lazy(() => import('../pages/DashboardProfile'));
+const StoreBroadcast = lazy(() => import('../pages/StoreBroadcast'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('../pages/CustomerDashboard'));
@@ -51,6 +52,8 @@ const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'));
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'));
 const AdminExplorer = lazy(() => import('../pages/admin/AdminExplorer'));
 const AdminTickets = lazy(() => import('../pages/admin/AdminTickets'));
+const AdminBroadcast = lazy(() => import('../pages/admin/AdminBroadcast'));
+const AdminSystemControls = lazy(() => import('../pages/admin/AdminSystemControls'));
 
 // Other Pages
 const PublicExplorer = lazy(() => import('../pages/PublicExplorer'));
@@ -103,6 +106,7 @@ export function AppRouter() {
                         <Route path="mensajes" element={<DashboardMessages />} />
                         <Route path="cotizaciones" element={<DashboardQuotes />} />
                         <Route path="categorias" element={<DashboardCategories />} />
+                        <Route path="difusion" element={<StoreBroadcast />} />
                         <Route path="perfil" element={<DashboardProfile />} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Route>
@@ -123,6 +127,8 @@ export function AppRouter() {
                         <Route path="explorador" element={<AdminExplorer />} />
                         <Route path="usuarios" element={<AdminUsers />} />
                         <Route path="tickets" element={<AdminTickets />} />
+                        <Route path="difusion" element={<AdminBroadcast />} />
+                        <Route path="controles" element={<AdminSystemControls />} />
                         <Route path="configuracion" element={<AdminSettings />} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Route>

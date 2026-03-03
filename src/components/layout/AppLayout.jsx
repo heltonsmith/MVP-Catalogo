@@ -35,7 +35,10 @@ export function AppLayout() {
     const showSidebar = !!user;
 
     return (
-        <div className="min-h-screen flex flex-col pt-16">
+        <div
+            style={{ paddingTop: 'calc(4rem + var(--observer-banner-height, 0px))' }}
+            className="min-h-screen flex flex-col"
+        >
             <Navbar
                 isLandingMode={hideBranding || hideBrandingOnMobile}
                 onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

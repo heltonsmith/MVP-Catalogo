@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../hooks/useSettings';
 import { cn, resizeImage, titleCase, cleanTextInput } from '../../utils';
 
-export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSuccess, companyId, categories = [] }) {
+export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSuccess, companyId, categories = [], onCategoryCreated }) {
     const { showToast } = useToast();
     const { profile } = useAuth();
     const [loading, setLoading] = useState(false);
@@ -31,6 +31,9 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
     const [imageFiles, setImageFiles] = useState([]);
     const [removedImageUrls, setRemovedImageUrls] = useState([]);
     const [wholesalePrices, setWholesalePrices] = useState([]);
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
     const { getSetting } = useSettings();
     const { company } = useAuth();
@@ -95,17 +98,16 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
 
     // Auto-generate slug from name
     useEffect(() => {
-        if (!productToEdit) {
-            if (formData.name) {
-                const slug = formData.name.toLowerCase()
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/(^-|-$)+/g, '');
-                setFormData(prev => ({ ...prev, slug }));
-            } else {
-                setFormData(prev => ({ ...prev, slug: '' }));
-            }
+        if (formData.name) {
+            const slug = formData.name.toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)+/g, '');
+
+            setFormData(prev => ({ ...prev, slug }));
+        } else {
+            setFormData(prev => ({ ...prev, slug: '' }));
         }
-    }, [formData.name, productToEdit]);
+    }, [formData.name]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -198,6 +200,55 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
         setWholesalePrices(prev => prev.map((item, i) =>
             i === index ? { ...item, [field]: value } : item
         ));
+    };
+
+    const handleAddCategory = async (e) => {
+        if (e) e.preventDefault();
+
+        // 1. Normalize and Capitalize
+        const cleanedName = titleCase(cleanTextInput(newCategoryName, 30));
+        if (!cleanedName) return;
+
+        // 2. Check for duplicates
+        const isDuplicate = categories.some(c => c.name.toLowerCase() === cleanedName.toLowerCase());
+        if (isDuplicate) {
+            showToast("Esta categoría ya existe", "error");
+            return;
+        }
+
+        setIsCreatingCategory(true);
+        try {
+            const slug = cleanedName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            const { data, error } = await supabase
+                .from('categories')
+                .insert([{
+                    company_id: companyId,
+                    name: cleanedName,
+                    slug,
+                    order: categories.length
+                }])
+                .select()
+                .maybeSingle();
+
+            if (error) throw error;
+
+            showToast("Categoría añadida correctamente", "success");
+            setNewCategoryName('');
+            setIsAddingCategory(false);
+
+            // Trigger refresh in parent
+            if (onCategoryCreated) await onCategoryCreated();
+
+            // Auto-select the new category
+            if (data?.id) {
+                setSelectedCategories(prev => [...prev, data.id]);
+            }
+        } catch (error) {
+            console.error('Error adding category:', error);
+            showToast("No se pudo añadir la categoría", "error");
+        } finally {
+            setIsCreatingCategory(false);
+        }
     };
 
     const uploadImages = async (productId) => {
@@ -763,6 +814,69 @@ export function ProductFormModal({ isOpen, onClose, productToEdit = null, onSucc
                                                 {cat.name}
                                             </button>
                                         ))}
+
+                                        {/* Inline Category Creation */}
+                                        {!isAddingCategory ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAddingCategory(true)}
+                                                className="px-3 py-1.5 rounded-lg text-sm font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 transition-all flex items-center gap-1"
+                                            >
+                                                <Plus size={14} />
+                                                <span>Añadir</span>
+                                            </button>
+                                        ) : (
+                                            <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="relative flex-1 sm:w-64">
+                                                    <Input
+                                                        placeholder="Nueva Categoría..."
+                                                        value={newCategoryName}
+                                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                                        maxLength={30}
+                                                        className="h-9 text-xs font-semibold pr-16"
+                                                        autoFocus
+                                                        disabled={isCreatingCategory}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                handleAddCategory();
+                                                            }
+                                                            if (e.key === 'Escape') {
+                                                                setIsAddingCategory(false);
+                                                                setNewCategoryName('');
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="absolute right-2 top-2 text-[8px] font-bold text-slate-400">
+                                                        {newCategoryName.length}/30
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1 shrink-0">
+                                                    <Button
+                                                        type="button"
+                                                        size="icon"
+                                                        className="h-9 w-9 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm"
+                                                        onClick={handleAddCategory}
+                                                        disabled={isCreatingCategory || !newCategoryName.trim()}
+                                                    >
+                                                        {isCreatingCategory ? <Loader2 size={14} className="animate-spin" /> : <Plus size={18} />}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                                                        onClick={() => {
+                                                            setIsAddingCategory(false);
+                                                            setNewCategoryName('');
+                                                        }}
+                                                        disabled={isCreatingCategory}
+                                                    >
+                                                        <X size={18} />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
