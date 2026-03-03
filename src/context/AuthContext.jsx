@@ -258,47 +258,68 @@ export const AuthProvider = ({ children }) => {
 
         // --- System Controls & Realtime Listener ---
         const setupSystemChannel = () => {
-            console.log('Auth: Setting up system control listeners...');
+            console.log('Auth: [System] Setting up system control listeners...');
+
+            const applySignal = (rawKey, rawValue) => {
+                const key = String(rawKey || '').toUpperCase();
+                const value = String(rawValue || '');
+                console.log(`Auth: [System Signal] key=${key}, value=${value}`);
+
+                if (key === 'MAINTENANCE_MODE') {
+                    const isActive = value === 'true';
+                    console.log('Auth: Setting maintenance active:', isActive);
+                    setIsMaintenanceActive(isActive);
+                } else if (key === 'FORCE_RESET_TIMESTAMP') {
+                    if (value && value !== lastResetProcessed.current) {
+                        applyForceReset(value);
+                    }
+                }
+            };
 
             // Initial fetch of current status
             const fetchInitialStatus = async () => {
-                const { data } = await supabase.from('system_config').select('key, value');
-                if (data) {
-                    const config = data.reduce((acc, item) => ({ ...acc, [item.key]: item.value }), {});
-                    if (config.MAINTENANCE_MODE === 'true') {
-                        setIsMaintenanceActive(true);
+                try {
+                    const { data } = await supabase.from('system_config').select('key, value');
+                    if (data) {
+                        const config = data.reduce((acc, item) => ({ ...acc, [item.key]: item.value }), {});
+                        console.log('Auth: [System] Initial config fetched:', config);
+                        if (config.MAINTENANCE_MODE) applySignal('MAINTENANCE_MODE', config.MAINTENANCE_MODE);
+                        if (config.FORCE_RESET_TIMESTAMP) applySignal('FORCE_RESET_TIMESTAMP', config.FORCE_RESET_TIMESTAMP);
                     }
-                    if (config.FORCE_RESET_TIMESTAMP && config.FORCE_RESET_TIMESTAMP !== lastResetProcessed.current) {
-                        applyForceReset(config.FORCE_RESET_TIMESTAMP);
-                    }
+                } catch (e) {
+                    console.error('Auth: [System] Error fetching initial status:', e);
                 }
             };
 
             fetchInitialStatus();
 
             return supabase
-                .channel('public:system_config')
+                .channel('global-system-configs') // Use a clean channel name
                 .on('postgres_changes', {
-                    event: 'UPDATE',
+                    event: '*',
                     schema: 'public',
                     table: 'system_config'
                 }, (payload) => {
-                    const { key, value } = payload.new;
-                    console.log('Auth: System control signal received:', key, value);
-
-                    if (key === 'MAINTENANCE_MODE') {
-                        setIsMaintenanceActive(value === 'true');
-                    } else if (key === 'FORCE_RESET_TIMESTAMP') {
-                        if (value && value !== lastResetProcessed.current) {
-                            applyForceReset(value);
-                        }
-                    }
+                    const { key, value } = payload.new || {};
+                    console.log('Auth: [Realtime DB] System signal:', key, value);
+                    applySignal(key, value);
                 })
-                .subscribe();
+                .on('broadcast', { event: 'system-update' }, ({ payload }) => {
+                    console.log('Auth: [Broadcast] System signal:', payload.key, payload.value);
+                    applySignal(payload.key, payload.value);
+                })
+                .subscribe((status) => {
+                    console.log('Auth: [Realtime] Subscription status:', status);
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        console.warn('Auth: [Realtime] Connection failed (likely blocked by browser). Falling back to 5s polling.');
+                    }
+                });
         };
 
         const applyForceReset = async (timestamp) => {
-            console.warn('Auth: FORCE RESET SIGNAL DETECTED. Cleaning up...');
+            if (!timestamp || timestamp === lastResetProcessed.current) return;
+
+            console.warn('Auth: !!! FORCE RESET SIGNAL DETECTED !!! Timestamp:', timestamp);
             localStorage.setItem('ktaloog_last_reset', timestamp);
             lastResetProcessed.current = timestamp;
 
@@ -308,16 +329,42 @@ export const AuthProvider = ({ children }) => {
                 if (key !== resetKey) localStorage.removeItem(key);
             });
 
+            // Brief delay to allow the user to maybe see a toast if we were to add one, 
+            // but for force reset, we usually want it immediate.
             await supabase.auth.signOut();
             window.location.href = '/login?reset=true';
         };
 
         const systemChannel = setupSystemChannel();
 
+        // Polling fallback for system config (every 5s to compensate for WebSocket failures in some browsers)
+        const systemPollInterval = setInterval(async () => {
+            if (!isMounted) return;
+            try {
+                const { data } = await supabase.from('system_config').select('key, value');
+                if (data) {
+                    const config = data.reduce((acc, item) => ({ ...acc, [item.key]: item.value }), {});
+                    if (config.MAINTENANCE_MODE !== undefined) {
+                        const isActive = config.MAINTENANCE_MODE === 'true';
+                        if (isActive !== isMaintenanceActive) {
+                            console.log('Auth: [Polling] Maintenance status change detected:', isActive);
+                            setIsMaintenanceActive(isActive);
+                        }
+                    }
+                    if (config.FORCE_RESET_TIMESTAMP && config.FORCE_RESET_TIMESTAMP !== lastResetProcessed.current) {
+                        applyForceReset(config.FORCE_RESET_TIMESTAMP);
+                    }
+                }
+            } catch (e) {
+                console.error('Auth: [Polling] Check failed:', e);
+            }
+        }, 5000);
+
         return () => {
             isMounted = false;
             subscription.unsubscribe();
             if (systemChannel) supabase.removeChannel(systemChannel);
+            clearInterval(systemPollInterval);
             clearTimeout(globalTimeout);
         };
     }, []);
@@ -644,6 +691,9 @@ export const AuthProvider = ({ children }) => {
     };
 
 
+    const role = profile?.role || user?.app_metadata?.role || user?.user_metadata?.role || (user?.email?.includes('admin') ? 'admin' : null);
+    const isAdmin = role === 'admin' || role === 'super_admin' || profile?.role === 'admin' || profile?.role === 'super_admin';
+
     const value = useMemo(() => ({
         signUp: (data) => supabase.auth.signUp(data),
         signIn,
@@ -669,8 +719,24 @@ export const AuthProvider = ({ children }) => {
         stopObserving,
         isObserving,
         observerData,
-        loading
-    }), [user, session, company, profile, pendingUpgrade, unreadNotifications, loading, isObserving, observerData]);
+        loading,
+        isMaintenanceActive,
+        role,
+        isAdmin
+    }), [user, session, company, profile, pendingUpgrade, unreadNotifications, loading, isObserving, observerData, isMaintenanceActive, role, isAdmin]);
+
+    // Debug Helper
+    useEffect(() => {
+        window._authDebug = {
+            profile,
+            user,
+            role,
+            isAdmin,
+            isMaintenanceActive,
+            setMaintenance: setIsMaintenanceActive,
+            refresh: refreshCompany
+        };
+    }, [profile, user, role, isAdmin, isMaintenanceActive]);
 
     return (
         <AuthContext.Provider value={value}>
@@ -681,7 +747,7 @@ export const AuthProvider = ({ children }) => {
                         <p className="text-sm font-medium text-slate-500 animate-pulse">Iniciando plataforma...</p>
                     </div>
                 </div>
-            ) : isMaintenanceActive && profile?.role !== 'admin' ? (
+            ) : isMaintenanceActive && !isAdmin ? (
                 <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
                     <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 p-10 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
                         <div className="h-24 w-24 bg-primary-50 rounded-3xl flex items-center justify-center mb-8 text-primary-600 animate-bounce cursor-default">
@@ -696,6 +762,14 @@ export const AuthProvider = ({ children }) => {
                         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-8">
                             <div className="h-full bg-primary-600 animate-[progress_3s_infinite_linear]" style={{ width: '40%' }}></div>
                         </div>
+
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mb-8 px-6 py-2 rounded-xl text-xs font-black text-primary-600 border-2 border-primary-100 hover:border-primary-600 hover:bg-primary-50 transition-all uppercase tracking-widest"
+                        >
+                            Verificar estado ahora
+                        </button>
+
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ktaloog v1.2.0-stable</p>
                     </div>
                 </div>

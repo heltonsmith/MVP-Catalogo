@@ -221,10 +221,14 @@ export default function StoreBroadcast() {
                                         onChange={(e) => setMessage(e.target.value)}
                                         placeholder="Ej: ¡Hola! Tenemos 10 productos nuevos en oferta por tiempo limitado. ¡No te los pierdas! 🚀"
                                         rows={5}
+                                        maxLength={150}
                                         className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-5 text-sm font-bold text-slate-700 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all resize-none shadow-inner"
                                     />
-                                    <div className="absolute bottom-4 right-4 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
-                                        {message.length} caracteres
+                                    <div className={cn(
+                                        "absolute bottom-4 right-4 flex items-center gap-2 text-[10px] font-black tracking-widest uppercase transition-colors",
+                                        message.length >= 150 ? "text-rose-500" : "text-slate-400"
+                                    )}>
+                                        {message.length} / 150
                                     </div>
                                 </div>
                             </div>

@@ -45,6 +45,20 @@ export default function AdminSystemControls() {
 
             setMaintenanceMode(pendingMaintenanceValue);
             await refreshSettings();
+
+            // BROADCAST: Instant signal to all connected clients
+            const channel = supabase.channel('global-system-configs');
+            channel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.send({
+                        type: 'broadcast',
+                        event: 'system-update',
+                        payload: { key: 'MAINTENANCE_MODE', value: String(pendingMaintenanceValue) }
+                    });
+                    supabase.removeChannel(channel);
+                }
+            });
+
             showToast(`Modo mantenimiento ${pendingMaintenanceValue ? 'ACTIVADO' : 'DESACTIVADO'}`, 'success');
         } catch (error) {
             console.error('Error toggling maintenance:', error);
@@ -72,6 +86,19 @@ export default function AdminSystemControls() {
                 });
 
             if (error) throw error;
+
+            // BROADCAST: Instant signal to all connected clients
+            const channel = supabase.channel('global-system-configs');
+            channel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.send({
+                        type: 'broadcast',
+                        event: 'system-update',
+                        payload: { key: 'FORCE_RESET_TIMESTAMP', value: timestamp }
+                    });
+                    supabase.removeChannel(channel);
+                }
+            });
 
             showToast('Reinicio del sistema enviado con éxito', 'success');
             // reload after a short delay to ensure toast is seen
