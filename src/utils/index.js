@@ -19,8 +19,7 @@ export function formatProductPrice(value) {
 }
 
 export function generateWhatsAppLink(phone, message) {
-    const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/${phone}?text=${encodedMessage}`;
+    return `https://wa.me/${phone.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
 }
 
 export function slugify(text) {
@@ -117,6 +116,11 @@ export function isValidUrl(url) {
     return url.startsWith('https://');
 }
 
+export function cleanTextInput(text, maxLength = 255) {
+    if (!text) return '';
+    return text.toString().trim().slice(0, maxLength);
+}
+
 export function titleCase(text) {
     if (!text) return '';
     return text
@@ -126,9 +130,4 @@ export function titleCase(text) {
         .filter(word => word.length > 0)
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-}
-
-export function cleanTextInput(text, maxLength = 255) {
-    if (!text) return '';
-    return text.toString().trim().slice(0, maxLength);
 }

@@ -38,6 +38,8 @@ export const AuthProvider = ({ children }) => {
 
     // Ref to prevent multiple simultaneous loads for the same user
     const loadingForUserId = useRef(null);
+    const hasSystemChannelInitialized = useRef(false);
+    const hasInitialized = useRef(false);
 
     const refreshUnreadNotifications = useCallback(async (overrideUserId) => {
         const targetId = overrideUserId || user?.id;
@@ -199,12 +201,15 @@ export const AuthProvider = ({ children }) => {
         // Safety: Global timeout to ensure "Cargando..." never stays forever
         const globalTimeout = setTimeout(() => {
             if (isMounted && loading) {
-                console.log('Auth: Global safety timeout reached');
+                console.info('Auth: Load safety margin reached — ensuring UI is interactive');
                 setLoading(false);
             }
-        }, 5000);
+        }, 8000);
 
         const init = async () => {
+            if (hasInitialized.current) return;
+            hasInitialized.current = true;
+
             console.log('Auth: Running initialization...');
             try {
                 // Safety: Session fetch timeout
@@ -213,9 +218,9 @@ export const AuthProvider = ({ children }) => {
                     5000,
                     { data: { session: null }, error: null }
                 );
+
                 if (error) {
                     console.error('Auth: getSession error:', error);
-                    // Don't throw, just continue as guest
                 }
 
                 if (isMounted) {
@@ -236,8 +241,12 @@ export const AuthProvider = ({ children }) => {
         };
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth: State change event:', event);
             if (!isMounted) return;
+
+            // Only log important transitions to reduce noise
+            if (event !== 'INITIAL_SESSION') {
+                console.log('Auth: State change event:', event);
+            }
 
             const currentUser = session?.user ?? null;
             setSession(session);
@@ -263,14 +272,17 @@ export const AuthProvider = ({ children }) => {
             const applySignal = (rawKey, rawValue) => {
                 const key = String(rawKey || '').toUpperCase();
                 const value = String(rawValue || '');
-                console.log(`Auth: [System Signal] key=${key}, value=${value}`);
 
                 if (key === 'MAINTENANCE_MODE') {
                     const isActive = value === 'true';
-                    console.log('Auth: Setting maintenance active:', isActive);
-                    setIsMaintenanceActive(isActive);
+                    if (isActive !== isMaintenanceActive) {
+                        console.log('Auth: [System Signal] Maintenance status change:', isActive);
+                        setIsMaintenanceActive(isActive);
+                    }
                 } else if (key === 'FORCE_RESET_TIMESTAMP') {
+                    // Only log if it's a NEW reset (different from what we've processed)
                     if (value && value !== lastResetProcessed.current) {
+                        console.log(`Auth: [System Signal] NEW Force reset detected: ${value}`);
                         applyForceReset(value);
                     }
                 }
@@ -282,7 +294,7 @@ export const AuthProvider = ({ children }) => {
                     const { data } = await supabase.from('system_config').select('key, value');
                     if (data) {
                         const config = data.reduce((acc, item) => ({ ...acc, [item.key]: item.value }), {});
-                        console.log('Auth: [System] Initial config fetched:', config);
+                        // System config loaded silently
                         if (config.MAINTENANCE_MODE) applySignal('MAINTENANCE_MODE', config.MAINTENANCE_MODE);
                         if (config.FORCE_RESET_TIMESTAMP) applySignal('FORCE_RESET_TIMESTAMP', config.FORCE_RESET_TIMESTAMP);
                     }
@@ -301,17 +313,17 @@ export const AuthProvider = ({ children }) => {
                     table: 'system_config'
                 }, (payload) => {
                     const { key, value } = payload.new || {};
-                    console.log('Auth: [Realtime DB] System signal:', key, value);
                     applySignal(key, value);
                 })
                 .on('broadcast', { event: 'system-update' }, ({ payload }) => {
-                    console.log('Auth: [Broadcast] System signal:', payload.key, payload.value);
                     applySignal(payload.key, payload.value);
                 })
                 .subscribe((status) => {
-                    console.log('Auth: [Realtime] Subscription status:', status);
-                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                        console.warn('Auth: [Realtime] Connection failed (likely blocked by browser). Falling back to 5s polling.');
+                    if (isMounted) {
+                        console.log('Auth: [Realtime] Subscription status:', status);
+                        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            console.warn('Auth: [Realtime] Connection failed (likely blocked by browser). Falling back to 5s polling.');
+                        }
                     }
                 });
         };
@@ -335,7 +347,11 @@ export const AuthProvider = ({ children }) => {
             window.location.href = '/login?reset=true';
         };
 
-        const systemChannel = setupSystemChannel();
+        let systemChannel = null;
+        if (!hasSystemChannelInitialized.current) {
+            hasSystemChannelInitialized.current = true;
+            systemChannel = setupSystemChannel();
+        }
 
         // Polling fallback for system config (every 5s to compensate for WebSocket failures in some browsers)
         const systemPollInterval = setInterval(async () => {
@@ -362,8 +378,13 @@ export const AuthProvider = ({ children }) => {
 
         return () => {
             isMounted = false;
-            subscription.unsubscribe();
-            if (systemChannel) supabase.removeChannel(systemChannel);
+            if (subscription) subscription.unsubscribe();
+            if (systemChannel) {
+                // If we are unmounting extremely fast (React Dev Stress/Strict Mode), 
+                // removeChannel might trigger a "closed before established" browser warning.
+                // We use a safe wrapper or simply ignore if we are tearing down.
+                supabase.removeChannel(systemChannel).catch(() => { });
+            }
             clearInterval(systemPollInterval);
             clearTimeout(globalTimeout);
         };
@@ -401,8 +422,9 @@ export const AuthProvider = ({ children }) => {
             });
 
         return () => {
-            console.log('Auth: Cleaning up company realtime sync');
-            supabase.removeChannel(channel);
+            if (channel) {
+                supabase.removeChannel(channel).catch(() => { });
+            }
         };
     }, [user]);
 
@@ -425,7 +447,7 @@ export const AuthProvider = ({ children }) => {
             // Remove old channel if exists — set teardown flag to ignore CLOSED callback
             if (channelRef) {
                 tearingDown = true;
-                supabase.removeChannel(channelRef);
+                supabase.removeChannel(channelRef).catch(() => { });
                 channelRef = null;
                 // Reset teardown flag after a tick so the new channel's events work normally
                 setTimeout(() => { tearingDown = false; }, 100);
@@ -450,7 +472,7 @@ export const AuthProvider = ({ children }) => {
                 })
                 .subscribe((status) => {
                     // Ignore status events during intentional teardown
-                    if (tearingDown) return;
+                    if (tearingDown || !isMounted) return;
 
                     console.log('Auth: Notification channel status:', status);
                     if (status === 'SUBSCRIBED') {
@@ -496,7 +518,7 @@ export const AuthProvider = ({ children }) => {
             clearInterval(pollInterval);
             if (channelRef) {
                 console.log('Auth: Removing notifications subscription for:', user.id);
-                supabase.removeChannel(channelRef);
+                supabase.removeChannel(channelRef).catch(() => { });
             }
         };
     }, [user?.id, refreshUnreadNotifications]);

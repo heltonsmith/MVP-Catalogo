@@ -1126,21 +1126,7 @@ export default function CatalogPage() {
                                         <Share2 size={16} className="sm:size-18" />
                                     </button>
 
-                                    {/* Cart Button Floating - Hide if menu mode */}
-                                    {!isOwner && currentCart.length > 0 && !company?.menu_mode && (
-                                        <Link
-                                            to="/carrito"
-                                            className="fixed bottom-6 right-6 z-[999] bg-emerald-600 text-white rounded-xl shadow-[0_10px_30px_rgba(5,145,100,0.3)] p-2 pr-4 flex items-center gap-3 hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-12"
-                                        >
-                                            <div className="bg-rose-500 text-white text-xs font-black h-7 w-7 rounded-lg flex items-center justify-center shadow-sm shrink-0 border border-white/20">
-                                                {currentCart.length}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <p className="text-[9px] font-bold uppercase tracking-wider opacity-80 leading-tight mb-0.5">Ver Carrito</p>
-                                                <p className="font-black text-xs uppercase tracking-tight leading-tight">Cotizar Ahora</p>
-                                            </div>
-                                        </Link>
-                                    )}
+                                    {/* Link and other buttons removed from here to move to fixed root later or keep if they are header-only */}
                                     {company.plan && company.plan !== 'free' && (
                                         <button
                                             onClick={() => setIsQROpen(true)}
@@ -1790,6 +1776,30 @@ export default function CatalogPage() {
                 </div>
             </Modal>
             {/* Follow categorization modal removed per user request */}
+
+            {/* Cart Button Floating - Moved to root to avoid stacking context issues */}
+            {!isOwner && currentCart.length > 0 && !company?.menu_mode && (
+                <Link
+                    to="/carrito"
+                    className="fixed z-[9999] bg-emerald-600 text-white shadow-[0_10px_30px_rgba(5,145,100,0.3)] transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-right-12 
+                                flex items-center gap-2
+                                right-0 rounded-l-2xl rounded-r-none p-3 pl-4 sm:right-8 sm:rounded-xl sm:bottom-8 lg:bottom-12 lg:right-12"
+                    style={{
+                        bottom: (typeof window !== 'undefined' && window.innerWidth < 640) ? '25%' : undefined
+                    }}
+                >
+                    <div className="relative">
+                        <ShoppingCart size={24} className="sm:size-7" />
+                        <div className="absolute -top-3 -right-2 bg-rose-500 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center shadow-sm border-2 border-emerald-600">
+                            {currentCart.length}
+                        </div>
+                    </div>
+                    <div className="hidden sm:flex flex-col pr-1">
+                        <p className="text-[9px] font-bold uppercase tracking-wider opacity-80 leading-tight mb-0.5">Ver Carrito</p>
+                        <p className="font-black text-xs uppercase tracking-tight leading-tight">Cotizar Ahora</p>
+                    </div>
+                </Link>
+            )}
         </div >
     );
 }
